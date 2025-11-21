@@ -1,12 +1,11 @@
 
-
 import React, { useState, useEffect } from 'react';
-import { getUsers, processMatch, getSettings } from '../services/storage';
-import { User, MatchProcessResult, AchievementDef, PointBreakdown } from '../types';
-import { Card } from '../components/ui/Card';
-import { NumPad } from '../components/ui/NumPad';
+import { getUsers, processMatch, getSettings } from './storage';
+import { User, MatchProcessResult, AchievementDef, PointBreakdown } from './types';
+import { Card } from './Card';
+import { NumPad } from './NumPad';
 import { Swords, Trophy, Minus, X, TrendingUp, Star, Search, User as UserIcon } from 'lucide-react';
-import { AchievementPopup } from '../components/AchievementPopup';
+import { AchievementPopup } from './AchievementPopup';
 
 // Declare confetti global
 declare const confetti: any;

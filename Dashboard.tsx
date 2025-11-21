@@ -1,11 +1,10 @@
 
-
 import React, { useEffect, useState } from 'react';
-import { Card } from '../components/ui/Card';
-import { getUsers, recordAttendance, getSettings, isEventActive, getLogs } from '../services/storage';
-import { User, SystemSettings, AchievementDef, ActivityLog, ActivityType } from '../types';
+import { Card } from './Card';
+import { getUsers, recordAttendance, getSettings, isEventActive, getLogs } from './storage';
+import { User, SystemSettings, AchievementDef, ActivityLog, ActivityType } from './types';
 import { Trophy, TrendingUp, Calendar, Zap, Star, Clock, Activity } from 'lucide-react';
-import { AchievementPopup } from '../components/AchievementPopup';
+import { AchievementPopup } from './AchievementPopup';
 
 // Declare confetti global
 declare const confetti: any;

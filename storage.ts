@@ -1,6 +1,5 @@
 
-
-import { User, MatchRecord, SystemSettings, ActivityLog, ActivityType, AchievementDef, MatchProcessResult, AttendanceResult, BackupData, PointBreakdown } from '../types';
+import { User, MatchRecord, SystemSettings, ActivityLog, ActivityType, AchievementDef, MatchProcessResult, AttendanceResult, BackupData, PointBreakdown } from './types';
 
 const USERS_KEY = 'club_rivals_users_v2';
 const MATCHES_KEY = 'club_rivals_matches';

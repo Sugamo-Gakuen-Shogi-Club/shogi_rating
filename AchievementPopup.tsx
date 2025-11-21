@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { AchievementDef } from '../types';
+import { AchievementDef } from './types';
 import { Award, X } from 'lucide-react';
 
 interface AchievementItem {

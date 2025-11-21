@@ -1,9 +1,8 @@
 
-
 import React, { useState, useEffect } from 'react';
-import { getUsers, getMatches, ACHIEVEMENTS_DATA, updateUserTitle, getRivalryStats, RivalData } from '../services/storage';
-import { User, MatchRecord } from '../types';
-import { Card } from '../components/ui/Card';
+import { getUsers, getMatches, ACHIEVEMENTS_DATA, updateUserTitle, getRivalryStats, RivalData } from './storage';
+import { User, MatchRecord } from './types';
+import { Card } from './Card';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Award, TrendingUp, Calendar, ArrowLeft, Tag, Zap, Star, CheckCircle, Skull, Crown, Swords } from 'lucide-react';
 

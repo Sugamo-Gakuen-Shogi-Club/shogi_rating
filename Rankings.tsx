@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
-import { getUsers, ACHIEVEMENTS_DATA } from '../services/storage';
-import { Card } from '../components/ui/Card';
+import { getUsers, ACHIEVEMENTS_DATA } from './storage';
+import { Card } from './Card';
 import { ArrowUp, ArrowDown, Minus, Star } from 'lucide-react';
 
 type SortKey = 'combined' | 'rate' | 'monthlyPoints' | 'totalPoints' | 'activityDays';

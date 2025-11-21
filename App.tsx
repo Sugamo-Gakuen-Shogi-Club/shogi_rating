@@ -1,15 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { HashRouter, Routes, Route, useLocation, Link } from 'react-router-dom';
 import { Home, Trophy, User as UserIcon, Settings, PlusCircle, Menu } from 'lucide-react';
-import { seedData } from './services/storage';
+import { seedData } from './storage';
 
 // Pages
-import Dashboard from './pages/Dashboard';
-import Rankings from './pages/Rankings';
-import MatchEntry from './pages/MatchEntry';
-import Profile from './pages/Profile';
-import Admin from './pages/Admin';
-import { Screensaver } from './components/Screensaver';
+import Dashboard from './Dashboard';
+import Rankings from './Rankings';
+import MatchEntry from './MatchEntry';
+import Profile from './Profile';
+import Admin from './Admin';
+import { Screensaver } from './Screensaver';
 
 // Layout Component
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -29,7 +29,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       <aside className="hidden md:flex flex-col w-64 bg-slate-900 text-white shadow-xl z-20">
         <div className="p-6 border-b border-slate-700">
           <h1 className="text-2xl font-extrabold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-teal-400">
-            巣鴨学園将棋班 対局出席促進アプリ
+            将棋班 Rivals
           </h1>
           <p className="text-xs text-slate-400 mt-1">Point & Rate Manager</p>
         </div>

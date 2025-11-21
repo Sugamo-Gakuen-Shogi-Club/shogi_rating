@@ -1,10 +1,10 @@
 
-import React, { useState, useEffect, useRef } from 'react';
-import { getUsers, saveUsers, getSettings, saveSettings, manualPointAdjustment, resetMonthly, isEventActive, exportData, importData, getMatches, deleteMatch } from '../services/storage';
-import { User, SystemSettings, MatchRecord } from '../types';
-import { Card } from '../components/ui/Card';
-import { NumPad } from '../components/ui/NumPad';
-import { Settings, Trash2, Plus, ToggleLeft, ToggleRight, Calendar, Download, Upload, History, AlertCircle, CheckCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { getUsers, saveUsers, getSettings, saveSettings, manualPointAdjustment, resetMonthly, isEventActive, exportData, importData, getMatches, deleteMatch } from './storage';
+import { User, SystemSettings, MatchRecord } from './types';
+import { Card } from './Card';
+import { NumPad } from './NumPad';
+import { Settings, Trash2, Plus, ToggleLeft, ToggleRight, Calendar, Download, Copy, ClipboardCheck, History, CheckCircle, AlertCircle } from 'lucide-react';
 
 const Admin: React.FC = () => {
   const [pin, setPin] = useState('');
@@ -28,8 +28,9 @@ const Admin: React.FC = () => {
   const [isPointProcessing, setIsPointProcessing] = useState(false);
   const [pointSuccessMsg, setPointSuccessMsg] = useState<string | null>(null);
 
-  // File Input
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  // Backup Text State
+  const [backupText, setBackupText] = useState('');
+  const [showBackupArea, setShowBackupArea] = useState(false);
 
   useEffect(() => {
       refreshData();
@@ -153,37 +154,6 @@ const Admin: React.FC = () => {
       }
   }
 
-  const handleBackup = () => {
-      const json = exportData();
-      const blob = new Blob([json], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `club_rivals_backup_${new Date().toISOString().slice(0,10)}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
-  }
-
-  const handleRestoreClick = () => {
-      fileInputRef.current?.click();
-  }
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-          const content = ev.target?.result as string;
-          if (importData(content)) {
-              alert('データを復元しました。ページをリロードします。');
-              window.location.reload();
-          } else {
-              alert('データの復元に失敗しました。ファイル形式を確認してください。');
-          }
-      };
-      reader.readAsText(file);
-  }
-
   const handleDeleteMatch = (matchId: string) => {
       if (window.confirm('この対戦記録を取り消しますか？\nレートとポイントの変動も元に戻ります。')) {
           try {
@@ -195,6 +165,30 @@ const Admin: React.FC = () => {
           }
       }
   }
+
+  // --- New Text-Based Backup Handlers ---
+  const handleGenerateBackup = () => {
+      const json = exportData();
+      setBackupText(json);
+      setShowBackupArea(true);
+  };
+
+  const handleRestoreBackup = () => {
+      if (!backupText) return;
+      if (window.confirm('入力されたデータで復元しますか？現在のデータはすべて上書きされます。')) {
+          if (importData(backupText)) {
+              alert('復元に成功しました。ページをリロードします。');
+              window.location.reload();
+          } else {
+              alert('データの形式が正しくありません。');
+          }
+      }
+  };
+
+  const copyToClipboard = () => {
+      navigator.clipboard.writeText(backupText);
+      alert('クリップボードにコピーしました');
+  };
 
   const getPlayerName = (id: string) => users.find(u => u.id === id)?.name || 'Unknown';
 
@@ -234,32 +228,59 @@ const Admin: React.FC = () => {
         <Settings /> 管理者ダッシュボード
       </h2>
 
-      {/* Data Management (Backup/Restore) */}
-      <Card title="データ管理">
-          <div className="flex flex-col md:flex-row gap-4">
-              <button 
-                onClick={handleBackup}
-                className="flex-1 flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 py-4 rounded-xl font-bold transition-all border border-slate-200"
-              >
-                  <Download size={20} />
-                  バックアップを保存
-              </button>
-              <button 
-                onClick={handleRestoreClick}
-                className="flex-1 flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 py-4 rounded-xl font-bold transition-all border border-slate-200"
-              >
-                  <Upload size={20} />
-                  データを復元
-              </button>
-              <input 
-                type="file" 
-                ref={fileInputRef} 
-                className="hidden" 
-                accept=".json" 
-                onChange={handleFileChange}
-              />
+      {/* Data Management (Text-based) */}
+      <Card title="データバックアップ / 復元">
+          <div className="space-y-4">
+              <div className="flex items-start gap-2 text-sm text-slate-500 bg-slate-50 p-3 rounded-lg border border-slate-100">
+                  <AlertCircle size={16} className="mt-0.5 shrink-0 text-slate-400" />
+                  <p>
+                    端末を変更する場合や、データを安全に保管するために、定期的にバックアップデータをコピーしてメモ帳アプリなどに保存してください。
+                    復元する際は、保存したテキストを貼り付けて「復元」ボタンを押してください。
+                  </p>
+              </div>
+              
+              <div className="flex flex-col md:flex-row gap-4">
+                  <button 
+                    onClick={handleGenerateBackup}
+                    className="flex-1 bg-blue-50 hover:bg-blue-100 text-blue-700 py-3 rounded-xl font-bold transition-all border border-blue-200 flex items-center justify-center gap-2"
+                  >
+                      <Download size={18} /> 現在のデータを表示
+                  </button>
+                  <button 
+                    onClick={() => { setBackupText(''); setShowBackupArea(true); }}
+                    className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-3 rounded-xl font-bold transition-all border border-slate-200 flex items-center justify-center gap-2"
+                  >
+                      <ClipboardCheck size={18} /> 復元データ入力欄を開く
+                  </button>
+              </div>
+
+              {showBackupArea && (
+                  <div className="animate-in fade-in slide-in-from-top-2 duration-200">
+                      <textarea 
+                          value={backupText}
+                          onChange={(e) => setBackupText(e.target.value)}
+                          placeholder='ここにバックアップデータ(JSON)が表示されます。または、復元したいデータを貼り付けてください。'
+                          className="w-full h-48 p-4 rounded-xl border border-slate-300 font-mono text-xs bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none leading-relaxed"
+                      />
+                      <div className="flex gap-3 mt-2">
+                          <button 
+                              onClick={copyToClipboard}
+                              disabled={!backupText}
+                              className="flex-1 bg-slate-800 text-white py-2 rounded-lg font-bold hover:bg-slate-700 disabled:bg-slate-300 active:scale-95 transition-transform flex items-center justify-center gap-2"
+                          >
+                              <Copy size={16} /> すべてコピー
+                          </button>
+                          <button 
+                              onClick={handleRestoreBackup}
+                              disabled={!backupText}
+                              className="flex-1 bg-red-500 text-white py-2 rounded-lg font-bold hover:bg-red-600 disabled:bg-slate-300 active:scale-95 transition-transform flex items-center justify-center gap-2"
+                          >
+                              <ClipboardCheck size={16} /> この内容で復元
+                          </button>
+                      </div>
+                  </div>
+              )}
           </div>
-          <p className="text-xs text-slate-400 mt-2 text-center">※ タブレットを変更する場合や、データを守るために定期的にバックアップを保存してください。</p>
       </Card>
 
       {/* Recent Matches (Undo) */}

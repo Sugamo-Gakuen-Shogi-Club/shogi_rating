@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
-import { getUsers } from '../services/storage';
-import { User } from '../types';
+import { getUsers } from './storage';
+import { User } from './types';
 import { Trophy, Star, Calendar, TrendingUp } from 'lucide-react';
 
 interface ScreensaverProps {
