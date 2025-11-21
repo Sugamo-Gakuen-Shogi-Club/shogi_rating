@@ -29,7 +29,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       <aside className="hidden md:flex flex-col w-64 bg-slate-900 text-white shadow-xl z-20">
         <div className="p-6 border-b border-slate-700">
           <h1 className="text-2xl font-extrabold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-teal-400">
-            将棋班 Rivals
+            巣鴨学園将棋班 対局出席促進アプリ
           </h1>
           <p className="text-xs text-slate-400 mt-1">Point & Rate Manager</p>
         </div>
