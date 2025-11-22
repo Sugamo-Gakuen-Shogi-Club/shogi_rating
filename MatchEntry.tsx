@@ -2,10 +2,10 @@
 import React, { useState, useEffect } from 'react';
 import { getUsers, processMatch, getSettings } from './storage';
 import { User, MatchProcessResult, AchievementDef, PointBreakdown } from './types';
-import { Card } from './Card';
 import { NumPad } from './NumPad';
-import { Swords, Trophy, Minus, X, TrendingUp, Star, Search, User as UserIcon } from 'lucide-react';
+import { Trophy, Minus, TrendingUp, Star, Search, User as UserIcon } from 'lucide-react';
 import { AchievementPopup } from './AchievementPopup';
+import { UserSelector } from './UserSelector';
 
 // Declare confetti global
 declare const confetti: any;
@@ -13,78 +13,6 @@ declare const confetti: any;
 interface AchievementItem {
   achievement: AchievementDef;
   playerName?: string;
-}
-
-// Helper Component for Player Select Modal
-const PlayerSelectModal: React.FC<{
-    isOpen: boolean;
-    onClose: () => void;
-    onSelect: (id: string) => void;
-    users: User[];
-    excludeId?: string;
-    title: string;
-    colorClass: string;
-}> = ({ isOpen, onClose, onSelect, users, excludeId, title, colorClass }) => {
-    const [search, setSearch] = useState('');
-    
-    // Reset search on open
-    useEffect(() => {
-        if (isOpen) setSearch('');
-    }, [isOpen]);
-
-    if (!isOpen) return null;
-
-    const filteredUsers = users
-        .filter(u => u.id !== excludeId)
-        .filter(u => u.name.toLowerCase().includes(search.toLowerCase()));
-
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-            <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-                <div className={`p-6 ${colorClass} text-white flex items-center justify-between shrink-0`}>
-                    <h3 className="text-xl font-black uppercase tracking-widest">{title} 選択</h3>
-                    <button onClick={onClose} className="p-2 bg-white/20 rounded-full hover:bg-white/30 transition-colors">
-                        <X size={24} />
-                    </button>
-                </div>
-                
-                <div className="p-4 border-b border-slate-100 shrink-0 bg-white">
-                    <div className="relative">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
-                        <input 
-                            autoFocus
-                            type="text" 
-                            placeholder="名前で検索..." 
-                            className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-xl text-lg font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                        />
-                    </div>
-                </div>
-
-                <div className="overflow-y-auto p-4 grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    {filteredUsers.map(u => (
-                        <button 
-                            key={u.id}
-                            onClick={() => onSelect(u.id)}
-                            className="flex flex-col items-center p-4 rounded-xl border border-slate-100 hover:border-blue-500 hover:shadow-md hover:bg-blue-50/50 transition-all text-center group"
-                        >
-                             <div className={`w-12 h-12 rounded-full ${u.avatarColor} flex items-center justify-center text-white font-bold mb-2 text-lg shadow-sm group-hover:scale-110 transition-transform`}>
-                                {u.name.charAt(0)}
-                             </div>
-                             <div className="font-bold text-slate-800 text-sm leading-tight">{u.name}</div>
-                             <div className="text-xs text-slate-400 mt-1 font-mono">R:{Math.round(u.rate)}</div>
-                        </button>
-                    ))}
-                    {filteredUsers.length === 0 && (
-                        <div className="col-span-full text-center py-8 text-slate-400">
-                            ユーザーが見つかりません
-                        </div>
-                    )}
-                </div>
-            </div>
-        </div>
-    );
 }
 
 const MatchEntry: React.FC = () => {
@@ -298,19 +226,20 @@ const MatchEntry: React.FC = () => {
 
   return (
     <div className="max-w-4xl mx-auto pb-12">
-      <PlayerSelectModal 
-        isOpen={modalTarget !== null}
-        onClose={() => setModalTarget(null)}
-        onSelect={(id) => {
-            if (modalTarget === 'p1') setP1(id);
-            else setP2(id);
-            setModalTarget(null);
-        }}
-        users={users}
-        excludeId={modalTarget === 'p1' ? p2 : p1}
-        title={modalTarget === 'p1' ? 'Player 1' : 'Player 2'}
-        colorClass={modalTarget === 'p1' ? 'bg-gradient-to-r from-red-500 to-rose-600' : 'bg-gradient-to-r from-blue-500 to-indigo-600'}
-      />
+      {modalTarget && (
+          <UserSelector 
+            users={users}
+            onSelect={(id) => {
+                if (modalTarget === 'p1') setP1(id);
+                else setP2(id);
+                setModalTarget(null);
+            }}
+            onClose={() => setModalTarget(null)}
+            excludeIds={modalTarget === 'p1' ? (p2 ? [p2] : []) : (p1 ? [p1] : [])}
+            mode="MATCH_SELECT"
+            title={modalTarget === 'p1' ? 'Player 1 を選択' : 'Player 2 を選択'}
+          />
+      )}
 
       <div className="mb-8 text-center">
         <h2 className="text-4xl font-black text-slate-800 tracking-tight uppercase flex items-center justify-center gap-3">
@@ -347,7 +276,7 @@ const MatchEntry: React.FC = () => {
                             <div className="w-24 h-24 rounded-full bg-slate-100 flex items-center justify-center mb-4">
                                 <UserIcon size={40}/>
                             </div>
-                            <div className="font-bold text-lg">Tap to Select</div>
+                            <div className="font-bold text-lg">タップして選択</div>
                         </div>
                     )}
 
@@ -391,7 +320,7 @@ const MatchEntry: React.FC = () => {
                              <div className="w-24 h-24 rounded-full bg-slate-100 flex items-center justify-center mb-4">
                                 <UserIcon size={40}/>
                             </div>
-                            <div className="font-bold text-lg">Tap to Select</div>
+                            <div className="font-bold text-lg">タップして選択</div>
                         </div>
                     )}
 
@@ -447,7 +376,7 @@ const MatchEntry: React.FC = () => {
                         disabled={isSubmitting || !p1 || !p2 || !result || pin.length < 4}
                         className="w-full h-[60px] bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-black text-lg shadow-lg hover:shadow-xl transition-all active:scale-95 disabled:opacity-50 disabled:scale-100"
                     >
-                        {isSubmitting ? 'Processing...' : 'CONFIRM MATCH'}
+                        {isSubmitting ? 'Processing...' : '記録する'}
                     </button>
                  </div>
              </div>

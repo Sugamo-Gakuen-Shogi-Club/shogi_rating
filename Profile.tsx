@@ -4,13 +4,15 @@ import { getUsers, getMatches, ACHIEVEMENTS_DATA, updateUserTitle, getRivalrySta
 import { User, MatchRecord } from './types';
 import { Card } from './Card';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Award, TrendingUp, Calendar, ArrowLeft, Tag, Zap, Star, CheckCircle, Skull, Crown, Swords } from 'lucide-react';
+import { Award, TrendingUp, Calendar, ArrowLeft, Tag, Star, Crown, Swords, Search, Skull } from 'lucide-react';
+import { UserSelector } from './UserSelector';
 
 const Profile: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [matches, setMatches] = useState<MatchRecord[]>([]);
   const [rivalStats, setRivalStats] = useState<{bestCustomer: RivalData | null, nemeses: RivalData | null}>({bestCustomer: null, nemeses: null});
+  const [isSelectorOpen, setIsSelectorOpen] = useState(false);
 
   useEffect(() => {
     setUsers(getUsers());
@@ -29,31 +31,18 @@ const Profile: React.FC = () => {
     setUsers(getUsers()); // Refresh
   };
 
-  // View 1: User Selection Grid
+  // View 1: User Selection
   if (!selectedId) {
     return (
       <div className="space-y-6 animate-in fade-in duration-300">
-        <div className="text-center mb-8">
-            <h2 className="text-2xl font-bold text-slate-800">個人データ閲覧</h2>
-            <p className="text-slate-500">詳細を確認したい部員を選択してください</p>
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-            {users.map(u => (
-                <button 
-                    key={u.id}
-                    onClick={() => setSelectedId(u.id)}
-                    className="bg-white p-4 rounded-xl border border-slate-200 hover:border-blue-500 hover:shadow-md transition-all text-left flex flex-col items-center gap-3 group"
-                >
-                    <div className={`w-14 h-14 rounded-full ${u.avatarColor} flex items-center justify-center text-white font-bold text-xl group-hover:scale-110 transition-transform`}>
-                        {u.name.charAt(0)}
-                    </div>
-                    <div className="text-center">
-                        <div className="font-bold text-slate-800 group-hover:text-blue-600">{u.name}</div>
-                        <div className="text-xs text-slate-400 mt-1">R:{Math.round(u.rate)} / {u.totalPoints}Pt</div>
-                    </div>
-                </button>
-            ))}
-        </div>
+        {/* Using UserSelector for consistent UX */}
+        <UserSelector 
+            users={users}
+            onSelect={(id) => setSelectedId(id)}
+            title="プロフィール閲覧（部員を選択）"
+            mode="SIMPLE"
+            // No close button because this is the main view
+        />
       </div>
     );
   }
@@ -91,16 +80,37 @@ const Profile: React.FC = () => {
   const getBarWidth = (val: number) => `${(val / maxPoint) * 100}%`;
 
   return (
-    <div className="space-y-6 animate-in slide-in-from-right duration-300">
+    <div className="space-y-6 animate-in slide-in-from-right duration-300 pb-20">
+      
+      {isSelectorOpen && (
+          <UserSelector 
+            users={users}
+            onSelect={(id) => {
+                setSelectedId(id);
+                setIsSelectorOpen(false);
+            }}
+            onClose={() => setIsSelectorOpen(false)}
+            title="別の部員を選択"
+          />
+      )}
+
       {/* Back Button & Header */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+            <button 
+                onClick={() => setSelectedId(null)}
+                className="p-2 rounded-full hover:bg-slate-200 transition-colors bg-white shadow-sm"
+            >
+                <ArrowLeft size={24} className="text-slate-600"/>
+            </button>
+            <h2 className="text-2xl font-bold text-slate-800">個人詳細データ</h2>
+        </div>
         <button 
-            onClick={() => setSelectedId(null)}
-            className="p-2 rounded-full hover:bg-slate-200 transition-colors"
+            onClick={() => setIsSelectorOpen(true)}
+            className="flex items-center gap-2 bg-white px-4 py-2 rounded-lg border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors shadow-sm"
         >
-            <ArrowLeft size={24} className="text-slate-600"/>
+            <Search size={16}/> 他の部員を見る
         </button>
-        <h2 className="text-2xl font-bold text-slate-800">個人詳細データ</h2>
       </div>
 
       {/* Main Profile Header */}
