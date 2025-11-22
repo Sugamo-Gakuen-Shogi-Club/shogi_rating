@@ -1,9 +1,9 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { Card } from './Card';
 import { getUsers, recordAttendance, getSettings, isEventActive, getLogs } from './storage';
 import { User, SystemSettings, AchievementDef, ActivityLog, ActivityType } from './types';
-import { Trophy, TrendingUp, Calendar, Zap, Star, Clock, Activity } from 'lucide-react';
+import { Trophy, TrendingUp, Calendar, Zap, Star, Clock, Activity, Search, X, Filter, CheckCircle } from 'lucide-react';
 import { AchievementPopup } from './AchievementPopup';
 
 // Declare confetti global
@@ -14,15 +14,163 @@ interface AchievementItem {
   playerName?: string;
 }
 
+// --- Attendance Modal Component ---
+const AttendanceModal: React.FC<{
+  isOpen: boolean;
+  onClose: () => void;
+  onSelect: (userId: string) => void;
+  users: User[];
+}> = ({ isOpen, onClose, onSelect, users }) => {
+  const [search, setSearch] = useState('');
+  const [selectedInitial, setSelectedInitial] = useState<string | null>(null);
+
+  // Reset state on open
+  useEffect(() => {
+    if (isOpen) {
+      setSearch('');
+      setSelectedInitial(null);
+    }
+  }, [isOpen]);
+
+  // Calculate unique initials (First character of name)
+  const initials = useMemo(() => {
+    const chars = new Set(users.map(u => u.name.charAt(0)));
+    return Array.from(chars).sort();
+  }, [users]);
+
+  if (!isOpen) return null;
+
+  // Filter logic
+  const filteredUsers = users.filter(u => {
+    const matchesSearch = u.name.toLowerCase().includes(search.toLowerCase());
+    const matchesInitial = selectedInitial ? u.name.startsWith(selectedInitial) : true;
+    return matchesSearch && matchesInitial;
+  });
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+      <div className="bg-white w-full max-w-3xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+        {/* Header */}
+        <div className="p-5 bg-blue-600 text-white flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-2">
+             <Calendar className="text-blue-200" />
+             <h3 className="text-xl font-black uppercase tracking-widest">出席登録</h3>
+          </div>
+          <button onClick={onClose} className="p-2 bg-white/20 rounded-full hover:bg-white/30 transition-colors">
+            <X size={24} />
+          </button>
+        </div>
+
+        {/* Controls */}
+        <div className="p-4 border-b border-slate-100 bg-slate-50 space-y-4 shrink-0">
+          {/* Search Bar */}
+          <div className="relative">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+            <input 
+              autoFocus
+              type="text" 
+              placeholder="名前で検索..." 
+              className="w-full pl-12 pr-4 py-3 bg-white border border-slate-200 rounded-xl font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setSelectedInitial(null); // Clear initial filter when typing
+              }}
+            />
+          </div>
+
+          {/* Initials Filter Chips */}
+          <div>
+             <div className="flex items-center gap-2 text-xs font-bold text-slate-400 mb-2 uppercase">
+                <Filter size={12} /> 頭文字で絞り込み
+             </div>
+             <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto pr-2 scrollbar-thin">
+                <button 
+                  onClick={() => setSelectedInitial(null)}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-bold transition-all border ${!selectedInitial ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+                >
+                  全て
+                </button>
+                {initials.map(char => (
+                  <button
+                    key={char}
+                    onClick={() => {
+                        setSelectedInitial(char === selectedInitial ? null : char);
+                        setSearch(''); // Clear text search when clicking initial
+                    }}
+                    className={`w-10 h-10 flex items-center justify-center rounded-lg text-lg font-bold transition-all border ${selectedInitial === char ? 'bg-blue-600 text-white border-blue-600 shadow-md scale-110' : 'bg-white text-slate-700 border-slate-200 hover:border-blue-400 hover:text-blue-600'}`}
+                  >
+                    {char}
+                  </button>
+                ))}
+             </div>
+          </div>
+        </div>
+
+        {/* User Grid */}
+        <div className="overflow-y-auto p-4 bg-slate-50/50 flex-1">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+            {filteredUsers.map(u => {
+                // Check if already attended today
+                const today = new Date().toISOString().split('T')[0];
+                const last = u.lastAttendance ? new Date(u.lastAttendance).toISOString().split('T')[0] : null;
+                const isAttended = today === last;
+
+                return (
+                  <button 
+                    key={u.id}
+                    onClick={() => !isAttended && onSelect(u.id)}
+                    disabled={isAttended}
+                    className={`relative flex flex-col items-center p-3 rounded-xl border transition-all text-center group
+                        ${isAttended 
+                            ? 'bg-slate-100 border-slate-200 opacity-60 cursor-default' 
+                            : 'bg-white border-slate-200 hover:border-blue-500 hover:shadow-lg hover:-translate-y-1 cursor-pointer'
+                        }
+                    `}
+                  >
+                    {isAttended && (
+                        <div className="absolute top-2 right-2 text-green-500 bg-white rounded-full p-0.5 shadow-sm z-10">
+                            <CheckCircle size={16} fill="currentColor" className="text-white bg-green-500 rounded-full"/>
+                        </div>
+                    )}
+                    <div className={`w-14 h-14 rounded-full ${u.avatarColor} flex items-center justify-center text-white font-bold mb-2 text-xl shadow-sm group-hover:scale-110 transition-transform`}>
+                      {u.name.charAt(0)}
+                    </div>
+                    <div className="font-bold text-slate-800 text-sm leading-tight w-full truncate">{u.name}</div>
+                    {isAttended ? (
+                        <div className="text-[10px] text-green-600 font-bold mt-1 bg-green-100 px-2 py-0.5 rounded-full">出席済</div>
+                    ) : (
+                        <div className="text-[10px] text-slate-400 mt-1 font-mono">Tap to Check-in</div>
+                    )}
+                  </button>
+                );
+            })}
+            {filteredUsers.length === 0 && (
+              <div className="col-span-full text-center py-12 text-slate-400 flex flex-col items-center">
+                <Search size={48} className="opacity-20 mb-4" />
+                <p>該当する部員が見つかりません</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// --- Main Dashboard Component ---
+
 const Dashboard: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [settings, setSettings] = useState<SystemSettings | null>(null);
-  const [selectedUser, setSelectedUser] = useState('');
   const [attendanceMsg, setAttendanceMsg] = useState('');
   const [isActiveEvent, setIsActiveEvent] = useState(false);
   const [daysRemaining, setDaysRemaining] = useState(0);
   const [newAchievements, setNewAchievements] = useState<AchievementItem[]>([]);
+  
+  // Modal State
+  const [isAttendanceModalOpen, setIsAttendanceModalOpen] = useState(false);
 
   useEffect(() => {
     refreshData();
@@ -44,13 +192,13 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  const handleAttendance = () => {
-    if (!selectedUser) return;
-    const result = recordAttendance(selectedUser);
-    const user = users.find(u => u.id === selectedUser);
+  const handleAttendance = (userId: string) => {
+    const result = recordAttendance(userId);
+    const user = users.find(u => u.id === userId);
     
     if (result.success) {
-      setAttendanceMsg(result.message);
+      setAttendanceMsg(`${user?.name || ''}: 出席完了 (+5pt)`);
+      
       if (result.newAchievements.length > 0 && user) {
           setNewAchievements(result.newAchievements.map(a => ({
             achievement: a,
@@ -58,34 +206,40 @@ const Dashboard: React.FC = () => {
           })));
       }
       
-      // Simple confetti for attendance
+      // Confetti
       if (typeof confetti === 'function') {
           confetti({
-              particleCount: 50,
-              spread: 40,
-              origin: { y: 0.7 },
-              colors: ['#3B82F6', '#60A5FA']
+              particleCount: 80,
+              spread: 60,
+              origin: { y: 0.6 },
+              colors: ['#3B82F6', '#10B981', '#F59E0B']
           });
       }
 
       refreshData();
-      setTimeout(() => setAttendanceMsg(''), 3000);
+      // Clear message after delay
+      setTimeout(() => setAttendanceMsg(''), 2500);
     } else {
-      setAttendanceMsg(result.message);
-      setTimeout(() => setAttendanceMsg(''), 3000);
+       alert(result.message);
     }
   };
 
-  // Combined Score Calculation: Rate + Total Points
+  // Combined Score Calculation
   const topCombined = [...users].sort((a, b) => (b.rate + b.totalPoints) - (a.rate + a.totalPoints)).slice(0, 3);
   const topPoints = [...users].sort((a, b) => b.monthlyPoints - a.monthlyPoints).slice(0, 3);
 
-  // Helper to get user name
   const getName = (id: string) => users.find(u => u.id === id)?.name || 'Unknown';
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-20 md:pb-0">
       <AchievementPopup items={newAchievements} onClose={() => setNewAchievements([])} />
+      
+      <AttendanceModal 
+        isOpen={isAttendanceModalOpen}
+        onClose={() => setIsAttendanceModalOpen(false)}
+        onSelect={handleAttendance}
+        users={users}
+      />
 
       {/* Hero Section */}
       <div className={`rounded-3xl p-8 text-white shadow-lg relative overflow-hidden ${isActiveEvent ? 'bg-gradient-to-r from-indigo-600 to-purple-600' : 'bg-gradient-to-r from-blue-600 to-indigo-700'}`}>
@@ -148,31 +302,26 @@ const Dashboard: React.FC = () => {
           `}</style>
       </div>
 
-      {/* Quick Attendance */}
-      <Card title="出席確認" icon={<Calendar size={20} />} className="border-blue-200 ring-4 ring-blue-50/50">
-        <div className="flex flex-col sm:flex-row gap-4 items-center">
-          <select 
-            className="flex-1 w-full p-3 rounded-xl border border-slate-200 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-            value={selectedUser}
-            onChange={(e) => setSelectedUser(e.target.value)}
-          >
-            <option value="">名前を選択してください...</option>
-            {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-          </select>
-          <button 
-            onClick={handleAttendance}
-            disabled={!selectedUser}
-            className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white px-8 py-3 rounded-xl font-bold transition-all active:scale-95 shadow-lg shadow-blue-600/20"
-          >
-            出席 (+5pt)
-          </button>
-        </div>
-        {attendanceMsg && (
-          <div className={`mt-4 p-3 rounded-lg text-center font-bold animate-bounce ${attendanceMsg.includes('済み') ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'}`}>
+      {/* Quick Attendance Button (New Design) */}
+      <button 
+        onClick={() => setIsAttendanceModalOpen(true)}
+        className="w-full bg-white hover:bg-blue-50 border-2 border-blue-100 hover:border-blue-300 text-blue-700 p-6 rounded-2xl shadow-sm transition-all group flex flex-col sm:flex-row items-center justify-center gap-4 active:scale-[0.99]"
+      >
+         <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
+             <Calendar size={32} />
+         </div>
+         <div className="text-center sm:text-left">
+             <h3 className="text-xl font-black">ここをタップして出席登録</h3>
+             <p className="text-slate-500 text-sm font-medium">検索・頭文字フィルターで簡単に選択できます</p>
+         </div>
+      </button>
+
+      {attendanceMsg && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 bg-slate-800 text-white px-6 py-3 rounded-full shadow-2xl font-bold animate-in fade-in slide-in-from-bottom-4 flex items-center gap-2">
+            <CheckCircle size={20} className="text-green-400" />
             {attendanceMsg}
-          </div>
-        )}
-      </Card>
+        </div>
+      )}
 
       {/* Top Stats Grid */}
       <div className="grid md:grid-cols-2 gap-6">

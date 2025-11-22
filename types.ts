@@ -24,6 +24,7 @@ export interface RateHistoryPoint {
 export interface User {
   id: string;
   name: string;
+  reading?: string; // Hiragana reading for sorting/filtering
   isNewMember: boolean;
   rate: number;
   

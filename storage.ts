@@ -48,6 +48,52 @@ export const ACHIEVEMENTS_DATA: AchievementDef[] = [
   { id: 'DAYS_100', name: '生ける伝説', description: '活動日数100日', conditionType: 'DAYS', threshold: 100 },
 ];
 
+// Full Mapping for Hiragana Conversion
+const NAME_READINGS: Record<string, string> = {
+    // 中１
+    "熱田　　望": "あつた のぞむ",
+    "池田　大翔": "いけだ ひろと",
+    "岩間　悠希": "いわま ゆうき",
+    "辻井　琥基": "つじい こうき",
+    // 中２
+    "白石　怜大": "しらいし れお",
+    "高椋　煌生": "たかむく こうき",
+    "布施　皓己": "ふせ こうき",
+    "吉井　千智": "よしい ちさと",
+    // 中３
+    "秋山　七星": "あきやま ななせ",
+    "大庭　悠誠": "おおば ゆうせい",
+    "熊谷　流星": "くまがい りゅうせい",
+    "佐藤　勘太": "さとう かんた",
+    "下田　　聖": "しもだ ひじり",
+    "遅　　志丞": "ち しじょう",
+    "皆川　哲弥": "みながわ てつや",
+    "宮崎　惺也": "みやざき せいや",
+    "山崎　泰蔵": "やまざき たいぞう",
+    // 高１
+    "片山　幸典": "かたやま ゆきのり",
+    "葛石　知佑": "かついし ともすけ",
+    "金　　悠鉉": "きむ ゆひょん",
+    "小林　慈人": "こばやし よしと",
+    "坂内　元気": "ばんない げんき",
+    "下村　篤生": "しもむら あつき",
+    "染谷　尚太朗": "そめや しょうたろう",
+    "高木　翔玄": "たかぎ しょうげん",
+    "棚瀬　侑真": "たなせ ゆうま",
+    "中野　琥太郎": "なかの こたろう",
+    "西内　幸輝": "にしうち こうき",
+    "野田　　慧": "のだ けい",
+    "秀村　紘嗣": "ひでむら ひろし",
+    "船津　太一": "ふなつ たいち",
+    "槇　　啓秀": "まき けいしゅう",
+    "松井　俐真": "まつい りま",
+    "森本　直樹": "もりもと なおき",
+    "山田　悠聖": "やまだ ゆうせい",
+    "若林　　空": "わかばやし そら",
+    "小畑　貴慈": "おばた たかちか",
+    "龍口　直史": "たつぐち なおふみ"
+};
+
 // Member List Data
 const INITIAL_MEMBERS = [
   // 中１ (New Members)
@@ -116,18 +162,42 @@ export const isEventActive = (): boolean => {
   return new Date() < new Date(settings.eventEndsAt);
 };
 
+// Helper to find reading
+const findReading = (name: string): string => {
+    // Normalize spaces to match dictionary keys
+    // Attempt 1: Exact match
+    if (NAME_READINGS[name]) return NAME_READINGS[name];
+
+    // Attempt 2: Normalize spaces in dictionary keys and input
+    const cleanName = name.replace(/\s+/g, '');
+    for (const [key, val] of Object.entries(NAME_READINGS)) {
+        if (key.replace(/\s+/g, '') === cleanName) return val;
+    }
+
+    return ''; // Not found
+};
+
 export const getUsers = (): User[] => {
   const u = localStorage.getItem(USERS_KEY);
   if (!u) return [];
   
-  // Migration for existing data (ensure new fields exist)
+  // Migration for existing data
   const users: User[] = JSON.parse(u);
-  return users.map(user => ({
-    ...user,
-    pointsMatch: user.pointsMatch ?? 0,
-    pointsAttendance: user.pointsAttendance ?? 0,
-    pointsSpecial: user.pointsSpecial ?? 0,
-  }));
+  return users.map(user => {
+      // Force update reading if it's missing or looks like the Kanji name (simple check)
+      let reading = user.reading;
+      if (!reading || reading === user.name || !/^[\u3040-\u309F\s]+$/.test(reading)) {
+          reading = findReading(user.name);
+      }
+
+      return {
+        ...user,
+        pointsMatch: user.pointsMatch ?? 0,
+        pointsAttendance: user.pointsAttendance ?? 0,
+        pointsSpecial: user.pointsSpecial ?? 0,
+        reading: reading
+      };
+  });
 };
 
 export const saveUsers = (users: User[]) => {
@@ -611,6 +681,7 @@ export const seedData = () => {
     const users: User[] = INITIAL_MEMBERS.map((m, idx) => ({
       id: `u${idx + 100}`,
       name: m.name.replace(/\s+/g, ' '),
+      reading: findReading(m.name), // Add reading
       isNewMember: m.isNew,
       rate: 1000,
       
