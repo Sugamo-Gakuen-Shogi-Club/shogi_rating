@@ -221,7 +221,7 @@ export const UserSelector: React.FC<UserSelectorProps> = ({
                                 
                                 <div className="w-full">
                                     <div className="font-bold text-slate-800 text-sm leading-tight w-full truncate">{u.name}</div>
-                                    <div className="text-[10px] text-slate-400 mt-0.5 w-full truncate font-medium">{u.reading || '-'}</div>
+                                    {/* 読み仮名表示を削除しました */}
                                 </div>
                                 
                                 {/* モード別の追加情報 */}
