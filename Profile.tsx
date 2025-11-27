@@ -1,22 +1,122 @@
 
 import React, { useState, useEffect } from 'react';
-import { getUsers, getMatches, ACHIEVEMENTS_DATA, updateUserTitle, getRivalryStats, RivalData } from './storage';
-import { User, MatchRecord } from './types';
+import { getUsers, getMatches, ACHIEVEMENTS_DATA, updateUserTitle, getRivalryStats, ICONS_DATA, updateUserIcon, getUserAvatarChar, getLogs, getSettings, isEventActive, getUserIconDef } from './storage';
+import { User, MatchRecord, IconDef, ActivityLog, ActivityType, EventType, RivalData } from './types';
 import { Card } from './Card';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Award, TrendingUp, Calendar, ArrowLeft, Tag, Star, Crown, Swords, Search, Skull } from 'lucide-react';
+import { Award, TrendingUp, Calendar, ArrowLeft, Tag, Star, Crown, Swords, Search, Skull, Smile, Lock, Grid, Shield } from 'lucide-react';
 import { UserSelector } from './UserSelector';
+import { useNavigate } from 'react-router-dom';
+import { ShogiPiece } from './ShogiPiece';
+
+// Icon Selector Modal
+const IconSelectorModal: React.FC<{
+    user: User;
+    onClose: () => void;
+    onSelect: (iconId: string) => void;
+}> = ({ user, onClose, onSelect }) => {
+    const categories: {key: string, label: string, icon: React.ReactNode}[] = [
+        { key: 'DEFAULT', label: '基本', icon: <Smile size={16}/> },
+        { key: 'SHOGI', label: '将棋の駒', icon: <Grid size={16}/> },
+        { key: 'CHESS', label: 'チェス駒', icon: <Shield size={16}/> },
+        { key: 'SPECIAL', label: 'スペシャル', icon: <Star size={16}/> },
+    ];
+    const [activeCategory, setActiveCategory] = useState('DEFAULT');
+
+    const displayedIcons = ICONS_DATA.filter(i => {
+        if (activeCategory === 'SPECIAL') {
+            return i.category === 'SPECIAL' || i.category === 'RANK'; 
+        }
+        return i.category === activeCategory;
+    });
+
+    return (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-in fade-in zoom-in duration-200">
+            <div className="bg-slate-900 w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden border border-white/10 flex flex-col max-h-[90vh]">
+                <div className="p-4 border-b border-white/5 bg-slate-800 flex items-center justify-between shrink-0">
+                     <h3 className="text-lg font-black text-white flex items-center gap-2">
+                         <Smile className="text-blue-500" /> アイコンコレクション
+                     </h3>
+                     <button onClick={onClose} className="p-2 bg-slate-700 text-slate-300 rounded-full hover:bg-slate-600 transition-colors">
+                         <ArrowLeft size={20} />
+                     </button>
+                </div>
+
+                <div className="flex bg-slate-950 p-1 shrink-0 gap-1 overflow-x-auto border-b border-white/5">
+                    {categories.map(cat => (
+                        <button
+                            key={cat.key}
+                            onClick={() => setActiveCategory(cat.key)}
+                            className={`flex-1 py-2 px-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all whitespace-nowrap
+                                ${activeCategory === cat.key ? 'bg-slate-800 text-blue-400 shadow-sm border border-white/5' : 'text-slate-500 hover:bg-white/5'}`}
+                        >
+                            {cat.icon} {cat.label}
+                        </button>
+                    ))}
+                </div>
+                
+                <div className="p-6 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-6 overflow-y-auto bg-slate-900">
+                    {displayedIcons.map(icon => {
+                        const isUnlocked = user.unlockedIcons.includes(icon.id);
+                        const isActive = user.activeIconId === icon.id;
+                        
+                        return (
+                            <button
+                                key={icon.id}
+                                disabled={!isUnlocked}
+                                onClick={() => onSelect(icon.id)}
+                                className={`
+                                    relative aspect-square rounded-2xl flex flex-col items-center justify-center transition-all group border-2 p-2
+                                    ${isActive 
+                                        ? 'bg-blue-900/20 border-blue-500 ring-2 ring-blue-500/30' 
+                                        : isUnlocked 
+                                            ? 'bg-slate-800 border-slate-700 hover:border-blue-500 hover:shadow-lg hover:-translate-y-1' 
+                                            : 'bg-slate-900 border-slate-800 opacity-40 cursor-not-allowed'}
+                                `}
+                            >
+                                <div className={`flex items-center justify-center mb-2 ${isUnlocked ? '' : 'blur-[2px] opacity-30'}`}>
+                                    {icon.category === 'SHOGI' ? (
+                                        <ShogiPiece char={icon.char} scale={0.6} shadow={false} />
+                                    ) : (
+                                        <div className="text-3xl text-white">{icon.char}</div>
+                                    )}
+                                </div>
+                                
+                                {isUnlocked ? (
+                                    <div className="text-[10px] font-bold truncate w-full text-center leading-tight text-slate-300">
+                                        {icon.name}
+                                    </div>
+                                ) : (
+                                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/80 rounded-2xl backdrop-blur-[1px] p-2 text-center z-10 border border-white/5">
+                                        <Lock size={16} className="text-slate-500 mb-1" />
+                                        <div className="text-[8px] font-bold text-slate-500 leading-tight line-clamp-2">
+                                            {icon.conditionDescription}
+                                        </div>
+                                    </div>
+                                )}
+                            </button>
+                        );
+                    })}
+                </div>
+            </div>
+        </div>
+    );
+};
 
 const Profile: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [matches, setMatches] = useState<MatchRecord[]>([]);
+  const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [rivalStats, setRivalStats] = useState<{bestCustomer: RivalData | null, nemeses: RivalData | null}>({bestCustomer: null, nemeses: null});
   const [isSelectorOpen, setIsSelectorOpen] = useState(false);
+  const [isIconModalOpen, setIsIconModalOpen] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     setUsers(getUsers());
     setMatches(getMatches());
+    setLogs(getLogs());
   }, []);
 
   useEffect(() => {
@@ -31,17 +131,23 @@ const Profile: React.FC = () => {
     setUsers(getUsers()); // Refresh
   };
 
+  const handleIconChange = (iconId: string) => {
+      if (!selectedId) return;
+      updateUserIcon(selectedId, iconId);
+      setUsers(getUsers());
+      setIsIconModalOpen(false);
+  };
+
   // View 1: User Selection
   if (!selectedId) {
     return (
       <div className="space-y-6 animate-in fade-in duration-300">
-        {/* Using UserSelector for consistent UX */}
         <UserSelector 
             users={users}
             onSelect={(id) => setSelectedId(id)}
+            onClose={() => navigate('/')}
             title="プロフィール閲覧（部員を選択）"
             mode="SIMPLE"
-            // No close button because this is the main view
         />
       </div>
     );
@@ -51,6 +157,11 @@ const Profile: React.FC = () => {
   const user = users.find(u => u.id === selectedId);
   if (!user) return <div>User not found</div>;
 
+  const settings = getSettings();
+  const isFactionWar = isEventActive() && settings.eventType === EventType.FACTION_WAR;
+  const iconDef = getUserIconDef(user.activeIconId);
+  const isRed = user.faction === 'RED';
+
   // Prepare graph data
   const graphData = user.rateHistory.map(h => ({
     date: new Date(h.date).toLocaleDateString('ja-JP'),
@@ -59,6 +170,7 @@ const Profile: React.FC = () => {
 
   // Get recent matches for this user
   const userMatches = matches.filter(m => m.player1Id === user.id || m.player2Id === user.id).slice(0, 5);
+  const userLogs = logs.filter(l => l.userId === user.id && l.points > 0).slice(0, 5);
 
   const getOpponentName = (m: MatchRecord) => {
     const oppId = m.player1Id === user.id ? m.player2Id : m.player1Id;
@@ -72,12 +184,10 @@ const Profile: React.FC = () => {
       return '負け';
   };
 
-  // Available titles
   const unlockedAchievements = ACHIEVEMENTS_DATA.filter(ach => user.achievements.includes(ach.id));
-
-  // Point Breakdown Data
   const maxPoint = Math.max(user.pointsMatch, user.pointsAttendance, user.pointsSpecial, 10);
   const getBarWidth = (val: number) => `${(val / maxPoint) * 100}%`;
+
 
   return (
     <div className="space-y-6 animate-in slide-in-from-right duration-300 pb-20">
@@ -94,84 +204,123 @@ const Profile: React.FC = () => {
           />
       )}
 
+      {isIconModalOpen && (
+          <IconSelectorModal 
+            user={user}
+            onClose={() => setIsIconModalOpen(false)}
+            onSelect={handleIconChange}
+          />
+      )}
+
       {/* Back Button & Header */}
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-4">
             <button 
                 onClick={() => setSelectedId(null)}
-                className="p-2 rounded-full hover:bg-slate-200 transition-colors bg-white shadow-sm"
+                className="p-2 rounded-full hover:bg-slate-700 transition-colors bg-slate-800 shadow-sm border border-slate-700"
             >
-                <ArrowLeft size={24} className="text-slate-600"/>
+                <ArrowLeft size={24} className="text-slate-300"/>
             </button>
-            <h2 className="text-2xl font-bold text-slate-800">個人詳細データ</h2>
+            <h2 className="text-2xl font-bold text-white">個人詳細データ</h2>
         </div>
         <button 
             onClick={() => setIsSelectorOpen(true)}
-            className="flex items-center gap-2 bg-white px-4 py-2 rounded-lg border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors shadow-sm"
+            className="flex items-center gap-2 bg-slate-800 px-4 py-2 rounded-lg border border-slate-700 text-sm font-bold text-slate-300 hover:bg-slate-700 transition-colors shadow-sm"
         >
             <Search size={16}/> 他の部員を見る
         </button>
       </div>
 
       {/* Main Profile Header */}
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col md:flex-row items-center gap-6 relative overflow-hidden">
-         {/* Background decoration */}
-         <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-bl from-blue-50 to-transparent rounded-full -mr-16 -mt-16 opacity-50 pointer-events-none"></div>
+      <div className={`relative overflow-hidden rounded-3xl bg-slate-900 shadow-xl border ${isFactionWar && isRed ? 'border-red-900/50' : isFactionWar ? 'border-blue-900/50' : 'border-white/10'}`}>
+         {/* Background Gradients */}
+         <div className={`absolute inset-0 opacity-20 ${user.avatarColor} bg-gradient-to-br from-white via-transparent to-transparent mix-blend-overlay`}></div>
+         {isFactionWar && isRed ? (
+            <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-b from-red-600 to-orange-600 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 opacity-20"></div>
+         ) : isFactionWar ? (
+            <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-b from-blue-600 to-cyan-600 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 opacity-20"></div>
+         ) : null}
 
-         <div className={`w-24 h-24 rounded-full ${user.avatarColor} text-white flex items-center justify-center text-4xl font-bold shadow-inner z-10`}>
-            {user.name.charAt(0)}
-         </div>
-         <div className="flex-1 text-center md:text-left z-10">
-            <div className="flex flex-col md:flex-row items-center gap-3 mb-2">
-                <h2 className="font-bold text-3xl text-slate-800">{user.name}</h2>
-                <div className="flex gap-2">
-                    {user.activeTitle && (
-                        <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded text-xs font-bold border border-indigo-200 flex items-center gap-1">
-                            {ACHIEVEMENTS_DATA.find(a => a.id === user.activeTitle)?.name || user.activeTitle}
-                        </span>
-                    )}
-                    {user.isNewMember && (
-                        <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs font-bold border border-green-200">
-                           🔰 新入部員
-                        </span>
-                    )}
+         <div className="relative z-10 p-6 md:p-8 flex flex-col md:flex-row items-center gap-12">
+             
+             {/* Avatar Section */}
+             <div className="relative group cursor-pointer shrink-0" onClick={() => setIsIconModalOpen(true)}>
+                {iconDef.category === 'SHOGI' ? (
+                     <div className="transform transition-transform group-hover:scale-105 group-hover:rotate-3 drop-shadow-2xl">
+                        <ShogiPiece char={iconDef.char} scale={1.2} />
+                     </div>
+                ) : (
+                    <div className={`w-32 h-32 md:w-40 md:h-40 rounded-full ${user.avatarColor} p-1 shadow-2xl ring-4 ring-slate-800 relative`}>
+                        <div className="w-full h-full rounded-full bg-slate-900/50 backdrop-blur-sm flex items-center justify-center text-7xl shadow-inner relative overflow-hidden text-white">
+                            <span className="drop-shadow-md transform group-hover:scale-110 transition-transform duration-300 select-none">
+                                {iconDef.char}
+                            </span>
+                        </div>
+                    </div>
+                )}
+                
+                {isFactionWar && user.isGeneral && (
+                    <div className="absolute -top-6 left-1/2 -translate-x-1/2 z-20">
+                        <Crown size={48} className="text-yellow-400 fill-yellow-400 drop-shadow-lg" />
+                    </div>
+                )}
+                
+                <div className="absolute -bottom-2 -right-2 bg-slate-800 text-white p-2 rounded-full shadow-lg border-2 border-slate-700 group-hover:bg-blue-600 transition-colors z-20">
+                    <Smile size={16} />
                 </div>
-            </div>
-            <div className="text-slate-500 text-sm flex flex-wrap justify-center md:justify-start gap-4">
-                <span className="bg-slate-100 px-2 py-1 rounded">ID: {user.id.substr(0,4)}</span>
-            </div>
-            
-            {/* Title Selector */}
-            <div className="mt-4 flex items-center justify-center md:justify-start gap-2">
-                <Tag size={16} className="text-slate-400" />
-                <label className="text-xs font-bold text-slate-500">称号変更:</label>
-                <select 
-                    className="p-1.5 text-sm border border-slate-300 rounded-lg bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none"
-                    value={user.activeTitle || 'NONE'}
-                    onChange={(e) => handleTitleChange(user.id, e.target.value)}
-                >
-                    <option value="NONE">設定なし</option>
-                    {unlockedAchievements.map(ach => (
-                        <option key={ach.id} value={ach.id}>{ach.name}</option>
-                    ))}
-                </select>
-            </div>
-         </div>
-         
-         {/* Big Stats - Rate & Points Separated */}
-         <div className="flex gap-8 border-t md:border-t-0 md:border-l border-slate-100 pt-4 md:pt-0 md:pl-8 z-10">
-            <div className="text-center">
-                <div className="text-xs text-slate-400 font-bold uppercase flex items-center justify-center gap-1">
-                    <TrendingUp size={12}/> レート (実力)
+             </div>
+             
+             {/* Info Section */}
+             <div className="flex-1 text-center md:text-left min-w-0 w-full">
+                <div className="flex flex-col gap-2 mb-6">
+                    <div className="flex flex-wrap items-center justify-center md:justify-start gap-2">
+                         {user.activeTitle ? (
+                            <span className="px-3 py-1 bg-gradient-to-r from-amber-500/20 to-yellow-500/20 text-yellow-300 rounded-full text-xs font-black shadow-sm flex items-center gap-1 border border-yellow-500/30">
+                                <Award size={12} />
+                                {ACHIEVEMENTS_DATA.find(a => a.id === user.activeTitle)?.name || user.activeTitle}
+                            </span>
+                        ) : (
+                            <span className="px-3 py-1 bg-slate-800 text-slate-500 rounded-full text-xs font-bold border border-slate-700">
+                                称号なし
+                            </span>
+                        )}
+                        {isFactionWar && user.faction && (
+                            <span className={`px-3 py-1 rounded-full text-xs font-black border shadow-sm flex items-center gap-1 ${user.faction === 'RED' ? 'bg-red-900/50 text-red-200 border-red-800' : 'bg-slate-800 text-slate-300 border-slate-600'}`}>
+                               {user.faction === 'RED' ? '紅組 (Red)' : '白組 (White)'}
+                               {user.isGeneral && <Crown size={12} fill="currentColor"/>}
+                            </span>
+                        )}
+                    </div>
+                    <h2 className="font-black text-4xl text-white tracking-tight">{user.name}</h2>
                 </div>
-                <div className="text-4xl font-black text-blue-600">{Math.round(user.rate)}</div>
-            </div>
-            <div className="text-center">
-                <div className="text-xs text-slate-400 font-bold uppercase flex items-center justify-center gap-1">
-                    <Star size={12}/> 総合ポイント
+
+                <div className="flex flex-wrap justify-center md:justify-start gap-4 mb-6">
+                    <div className="bg-slate-950/40 backdrop-blur px-6 py-3 rounded-2xl border border-white/10 shadow-sm flex flex-col items-center min-w-[120px]">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">RATE</span>
+                        <span className="text-3xl font-black text-blue-400">{Math.round(user.rate)}</span>
+                    </div>
+                    <div className="bg-slate-950/40 backdrop-blur px-6 py-3 rounded-2xl border border-white/10 shadow-sm flex flex-col items-center min-w-[120px]">
+                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">POINTS</span>
+                         <span className="text-3xl font-black text-amber-500">{user.totalPoints}</span>
+                    </div>
                 </div>
-                <div className="text-4xl font-black text-amber-500">{user.totalPoints}</div>
-            </div>
+
+                {/* Title Selector */}
+                <div className="flex items-center justify-center md:justify-start gap-2 bg-slate-800/50 p-2 rounded-lg inline-flex border border-white/5">
+                    <Tag size={16} className="text-slate-500 ml-2" />
+                    <label className="text-xs font-bold text-slate-400 shrink-0">称号変更:</label>
+                    <select 
+                        className="p-1 text-sm bg-transparent font-bold text-slate-200 outline-none cursor-pointer"
+                        value={user.activeTitle || 'NONE'}
+                        onChange={(e) => handleTitleChange(user.id, e.target.value)}
+                    >
+                        <option value="NONE" className="bg-slate-800">設定なし</option>
+                        {unlockedAchievements.map(ach => (
+                            <option key={ach.id} value={ach.id} className="bg-slate-800">{ach.name}</option>
+                        ))}
+                    </select>
+                </div>
+             </div>
          </div>
       </div>
 
@@ -180,55 +329,55 @@ const Profile: React.FC = () => {
         <div className="lg:col-span-1 space-y-6">
              <Card title="戦績データ" icon={<TrendingUp size={18}/>}>
                 <div className="space-y-3 text-sm">
-                    <div className="flex justify-between border-b border-slate-100 pb-2">
-                        <span className="text-slate-500">勝率</span>
-                        <span className="font-bold text-slate-800">
+                    <div className="flex justify-between border-b border-white/5 pb-2">
+                        <span className="text-slate-400">勝率</span>
+                        <span className="font-bold text-slate-200">
                             {user.wins + user.losses + user.draws > 0 
                                 ? Math.round((user.wins / (user.wins + user.losses + user.draws)) * 100) 
                                 : 0}%
                         </span>
                     </div>
-                    <div className="flex justify-between border-b border-slate-100 pb-2">
-                        <span className="text-slate-500">活動日数</span>
-                        <span className="font-bold text-slate-800">{user.activityDays || 0} 日</span>
+                    <div className="flex justify-between border-b border-white/5 pb-2">
+                        <span className="text-slate-400">活動日数</span>
+                        <span className="font-bold text-slate-200">{user.activityDays || 0} 日</span>
                     </div>
-                    <div className="flex justify-between border-b border-slate-100 pb-2">
-                        <span className="text-slate-500">現在の連勝</span>
-                        <span className="font-bold text-rose-600">{user.currentStreak} 連勝</span>
+                    <div className="flex justify-between border-b border-white/5 pb-2">
+                        <span className="text-slate-400">現在の連勝</span>
+                        <span className="font-bold text-rose-400">{user.currentStreak} 連勝</span>
                     </div>
-                    <div className="flex justify-between border-b border-slate-100 pb-2">
-                        <span className="text-slate-500">最大連勝</span>
-                        <span className="font-bold text-slate-800">{user.maxStreak} 連勝</span>
+                    <div className="flex justify-between border-b border-white/5 pb-2">
+                        <span className="text-slate-400">最大連勝</span>
+                        <span className="font-bold text-slate-200">{user.maxStreak} 連勝</span>
                     </div>
                      <div className="flex justify-between pb-2">
-                        <span className="text-slate-500">通算成績</span>
-                        <span className="font-bold text-slate-800">{user.wins}勝 {user.losses}敗 {user.draws}分</span>
+                        <span className="text-slate-400">通算成績</span>
+                        <span className="font-bold text-slate-200">{user.wins}勝 {user.losses}敗 {user.draws}分</span>
                     </div>
                 </div>
             </Card>
 
             {/* Rival Analysis Card */}
             {(rivalStats.bestCustomer || rivalStats.nemeses) && (
-                <Card title="ライバル分析" icon={<Swords size={18} className="text-purple-500"/>}>
+                <Card title="ライバル分析" icon={<Swords size={18} className="text-purple-400"/>}>
                     <div className="space-y-4">
                         {rivalStats.bestCustomer && (
-                            <div className="bg-green-50 p-3 rounded-xl border border-green-100">
-                                <div className="flex items-center gap-2 text-xs font-bold text-green-700 uppercase mb-1">
+                            <div className="bg-green-900/20 p-3 rounded-xl border border-green-500/20">
+                                <div className="flex items-center gap-2 text-xs font-bold text-green-400 uppercase mb-1">
                                     <Crown size={14} /> お得意様 (最も勝ち越し)
                                 </div>
-                                <div className="font-bold text-slate-800">{rivalStats.bestCustomer.opponentName}</div>
-                                <div className="text-xs text-slate-500">
+                                <div className="font-bold text-slate-200">{rivalStats.bestCustomer.opponentName}</div>
+                                <div className="text-xs text-slate-400">
                                     勝率 {Math.round(rivalStats.bestCustomer.winRate * 100)}% ({rivalStats.bestCustomer.wins}勝 {rivalStats.bestCustomer.losses}敗)
                                 </div>
                             </div>
                         )}
                          {rivalStats.nemeses && (
-                            <div className="bg-red-50 p-3 rounded-xl border border-red-100">
-                                <div className="flex items-center gap-2 text-xs font-bold text-red-700 uppercase mb-1">
+                            <div className="bg-red-900/20 p-3 rounded-xl border border-red-500/20">
+                                <div className="flex items-center gap-2 text-xs font-bold text-red-400 uppercase mb-1">
                                     <Skull size={14} /> 天敵 (最も負け越し)
                                 </div>
-                                <div className="font-bold text-slate-800">{rivalStats.nemeses.opponentName}</div>
-                                <div className="text-xs text-slate-500">
+                                <div className="font-bold text-slate-200">{rivalStats.nemeses.opponentName}</div>
+                                <div className="text-xs text-slate-400">
                                     勝率 {Math.round(rivalStats.nemeses.winRate * 100)}% ({rivalStats.nemeses.wins}勝 {rivalStats.nemeses.losses}敗)
                                 </div>
                             </div>
@@ -242,35 +391,58 @@ const Profile: React.FC = () => {
                 <div className="space-y-4">
                     <div>
                         <div className="flex justify-between text-sm mb-1">
-                            <span className="font-bold text-slate-600">対局で獲得</span>
-                            <span className="font-bold text-slate-800">{user.pointsMatch || 0} pt</span>
+                            <span className="font-bold text-slate-400">対局で獲得</span>
+                            <span className="font-bold text-slate-200">{user.pointsMatch || 0} pt</span>
                         </div>
-                        <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                        <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
                             <div className="h-full bg-blue-500 rounded-full" style={{ width: getBarWidth(user.pointsMatch || 0) }}></div>
                         </div>
                     </div>
                     <div>
                         <div className="flex justify-between text-sm mb-1">
-                            <span className="font-bold text-slate-600">出席で獲得</span>
-                            <span className="font-bold text-slate-800">{user.pointsAttendance || 0} pt</span>
+                            <span className="font-bold text-slate-400">出席で獲得</span>
+                            <span className="font-bold text-slate-200">{user.pointsAttendance || 0} pt</span>
                         </div>
-                        <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                        <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
                             <div className="h-full bg-green-500 rounded-full" style={{ width: getBarWidth(user.pointsAttendance || 0) }}></div>
                         </div>
                     </div>
                     <div>
                         <div className="flex justify-between text-sm mb-1">
-                            <span className="font-bold text-slate-600">特別付与など</span>
-                            <span className="font-bold text-slate-800">{user.pointsSpecial || 0} pt</span>
+                            <span className="font-bold text-slate-400">特別付与など</span>
+                            <span className="font-bold text-slate-200">{user.pointsSpecial || 0} pt</span>
                         </div>
-                        <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                        <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
                             <div className="h-full bg-purple-500 rounded-full" style={{ width: getBarWidth(user.pointsSpecial || 0) }}></div>
                         </div>
                     </div>
-                    <div className="pt-2 text-[10px] text-slate-400 text-center border-t border-slate-50 mt-2">
+                    <div className="pt-2 text-[10px] text-slate-500 text-center border-t border-white/5 mt-2">
                         すべての合計: {user.totalPoints} pt
                     </div>
                 </div>
+            </Card>
+
+            <Card title="最近のポイント履歴" icon={<Calendar size={18}/>}>
+                 <div className="space-y-0">
+                    {userLogs.length > 0 ? userLogs.map(l => (
+                        <div key={l.id} className="flex items-center justify-between p-3 border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors">
+                            <div className="flex flex-col">
+                                <span className="text-[10px] text-slate-400">
+                                    {new Date(l.date).toLocaleString('ja-JP', {month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit'})}
+                                </span>
+                                <span className="font-bold text-sm text-slate-300">
+                                    {l.type === ActivityType.ATTENDANCE ? '出席' : 
+                                     l.type === ActivityType.MATCH_WIN ? '対局勝利' :
+                                     l.type === ActivityType.MATCH_LOSS ? '対局参加' :
+                                     l.type === ActivityType.CONTRIBUTION ? '特別貢献' : 'その他'}
+                                </span>
+                            </div>
+                            <span className="font-bold text-amber-500">+{l.points}</span>
+                        </div>
+                    )) : (
+                        <div className="text-center text-slate-500 text-sm py-4">履歴がありません</div>
+                    )}
+                 </div>
             </Card>
         </div>
 
@@ -280,18 +452,18 @@ const Profile: React.FC = () => {
                 <div className="h-64 w-full">
                     <ResponsiveContainer width="100%" height="100%">
                         <LineChart data={graphData}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                            <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
                             <XAxis dataKey="date" hide />
                             <YAxis domain={['auto', 'auto']} stroke="#94a3b8" fontSize={12} />
                             <Tooltip 
-                                contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                                contentStyle={{ borderRadius: '12px', border: 'none', backgroundColor: '#1e293b', color: '#fff', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.5)' }}
                             />
                             <Line 
                                 type="monotone" 
                                 dataKey="rate" 
-                                stroke="#2563eb" 
+                                stroke="#3b82f6" 
                                 strokeWidth={3} 
-                                dot={{ r: 4, fill: '#2563eb' }} 
+                                dot={{ r: 4, fill: '#3b82f6' }} 
                                 activeDot={{ r: 6 }} 
                             />
                         </LineChart>
@@ -303,42 +475,45 @@ const Profile: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-60 overflow-y-auto pr-1">
                     {unlockedAchievements.length > 0 ? (
                         unlockedAchievements.map(ach => (
-                            <div key={ach.id} className="flex items-center gap-2 p-2 bg-indigo-50 rounded-lg border border-indigo-100">
-                                <Award size={16} className="text-indigo-600 shrink-0" />
+                            <div key={ach.id} className="flex items-center gap-2 p-2 bg-indigo-900/20 rounded-lg border border-indigo-500/20">
+                                <Award size={16} className="text-indigo-400 shrink-0" />
                                 <div>
-                                    <div className="text-xs font-bold text-slate-800">{ach.name}</div>
-                                    <div className="text-[10px] text-slate-500">{ach.description}</div>
+                                    <div className="text-xs font-bold text-slate-200">{ach.name}</div>
+                                    <div className="text-[10px] text-slate-400">{ach.description}</div>
                                 </div>
                             </div>
                         ))
                     ) : (
-                        <div className="col-span-2 text-center text-slate-400 py-4 text-sm">
+                        <div className="col-span-2 text-center text-slate-500 py-4 text-sm">
                             まだ称号を獲得していません。<br/>対局や活動を重ねてゲットしよう！
                         </div>
                     )}
                 </div>
             </Card>
 
-            <Card title="最近の対局" icon={<Calendar size={18}/>}>
+            <Card title="最近の対局" icon={<Swords size={18}/>}>
                 <div className="space-y-0">
                     {userMatches.length > 0 ? userMatches.map(m => {
                          const res = getMatchResult(m);
                          return (
-                            <div key={m.id} className="flex items-center justify-between p-3 border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors">
+                            <div key={m.id} className="flex items-center justify-between p-3 border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors">
                                 <div>
-                                    <div className="font-bold text-sm text-slate-700">vs {getOpponentName(m)}</div>
-                                    <div className="text-xs text-slate-400">{new Date(m.date).toLocaleDateString('ja-JP')}</div>
+                                    <div className="font-bold text-sm text-slate-300 flex items-center gap-2">
+                                        vs {getOpponentName(m)}
+                                        {m.isDuel && <span className="bg-purple-900/30 text-purple-300 text-[10px] px-1.5 py-0.5 rounded font-black border border-purple-500/30">DUEL</span>}
+                                    </div>
+                                    <div className="text-xs text-slate-500">{new Date(m.date).toLocaleDateString('ja-JP')}</div>
                                 </div>
                                 <div className={`px-3 py-1 rounded-full text-xs font-bold ${
-                                    res === '勝ち' ? 'bg-green-100 text-green-700' : 
-                                    res === '負け' ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-600'
+                                    res === '勝ち' ? 'bg-green-900/30 text-green-400' : 
+                                    res === '負け' ? 'bg-red-900/30 text-red-400' : 'bg-slate-800 text-slate-400'
                                 }`}>
                                     {res}
                                 </div>
                             </div>
                          );
                     }) : (
-                        <div className="text-center text-slate-400 text-sm py-4">記録がありません</div>
+                        <div className="text-center text-slate-500 text-sm py-4">記録がありません</div>
                     )}
                 </div>
             </Card>

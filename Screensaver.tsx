@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { getUsers } from './storage';
 import { User } from './types';
@@ -65,40 +64,59 @@ export const Screensaver: React.FC<ScreensaverProps> = ({ onDismiss }) => {
         </div>
 
         <div className="space-y-4 w-full">
-          {topUsers.map((user, index) => (
-            <div 
-                key={user.id} 
-                className="flex items-center p-6 bg-white/10 backdrop-blur-md rounded-2xl border border-white/10 transform transition-all duration-500 hover:scale-105"
-                style={{ animation: `slideIn 0.5s ease-out forwards`, animationDelay: `${index * 0.1}s`, opacity: 0 }}
-            >
-                <div className={`
-                    w-16 h-16 rounded-full flex items-center justify-center text-2xl font-black mr-6 shadow-lg
-                    ${index === 0 ? 'bg-gradient-to-br from-yellow-300 to-yellow-600 text-white' : 
-                      index === 1 ? 'bg-gradient-to-br from-slate-300 to-slate-500 text-white' : 
-                      index === 2 ? 'bg-gradient-to-br from-amber-600 to-amber-800 text-white' : 
-                      'bg-slate-700 text-slate-300'}
-                `}>
-                    {index + 1}
-                </div>
-                <div className="flex-1 text-left">
-                    <div className="text-3xl font-bold tracking-tight">{user.name}</div>
-                    <div className="text-sm text-slate-400 flex gap-3">
-                        {user.isNewMember && <span className="text-green-400 font-bold">新入部員</span>}
-                        {user.currentStreak >= 3 && <span className="text-rose-400 font-bold">{user.currentStreak} 連勝中</span>}
+          {(() => {
+              let currentRank = 1;
+              return topUsers.map((user, index) => {
+                  // Calculate Rank with Tie-breaking logic
+                  if (index > 0) {
+                      const prev = topUsers[index - 1];
+                      const prevScore = Math.floor(mode === 'RATE' ? prev.rate : mode === 'POINTS' ? prev.monthlyPoints : prev.activityDays);
+                      const myScore = Math.floor(mode === 'RATE' ? user.rate : mode === 'POINTS' ? user.monthlyPoints : user.activityDays);
+                      
+                      // If strict less than, increment rank. If equal, rank stays same.
+                      if (myScore < prevScore) {
+                          currentRank = index + 1;
+                      }
+                  } else {
+                      currentRank = 1;
+                  }
+
+                  return (
+                    <div 
+                        key={user.id} 
+                        className="flex items-center p-6 bg-white/10 backdrop-blur-md rounded-2xl border border-white/10 transform transition-all duration-500 hover:scale-105"
+                        style={{ animation: `slideIn 0.5s ease-out forwards`, animationDelay: `${index * 0.1}s`, opacity: 0 }}
+                    >
+                        <div className={`
+                            w-16 h-16 rounded-full flex items-center justify-center text-2xl font-black mr-6 shadow-lg
+                            ${currentRank === 1 ? 'bg-gradient-to-br from-yellow-300 to-yellow-600 text-white' : 
+                              currentRank === 2 ? 'bg-gradient-to-br from-slate-300 to-slate-500 text-white' : 
+                              currentRank === 3 ? 'bg-gradient-to-br from-amber-600 to-amber-800 text-white' : 
+                              'bg-slate-700 text-slate-300'}
+                        `}>
+                            {currentRank}
+                        </div>
+                        <div className="flex-1 text-left">
+                            <div className="text-3xl font-bold tracking-tight">{user.name}</div>
+                            <div className="text-sm text-slate-400 flex gap-3">
+                                {user.isNewMember && <span className="text-green-400 font-bold">新入部員</span>}
+                                {user.currentStreak >= 3 && <span className="text-rose-400 font-bold">{user.currentStreak} 連勝中</span>}
+                            </div>
+                        </div>
+                        <div className="text-right">
+                            <div className="text-4xl font-black font-mono">
+                                {mode === 'RATE' ? Math.round(user.rate) : 
+                                 mode === 'POINTS' ? user.monthlyPoints :
+                                 user.activityDays}
+                            </div>
+                            <div className="text-xs text-slate-400 uppercase font-bold tracking-wider">
+                                {mode === 'RATE' ? 'RATE' : mode === 'POINTS' ? 'POINTS' : 'DAYS'}
+                            </div>
+                        </div>
                     </div>
-                </div>
-                <div className="text-right">
-                    <div className="text-4xl font-black font-mono">
-                        {mode === 'RATE' ? Math.round(user.rate) : 
-                         mode === 'POINTS' ? user.monthlyPoints :
-                         user.activityDays}
-                    </div>
-                    <div className="text-xs text-slate-400 uppercase font-bold tracking-wider">
-                        {mode === 'RATE' ? 'RATE' : mode === 'POINTS' ? 'POINTS' : 'DAYS'}
-                    </div>
-                </div>
-            </div>
-          ))}
+                  );
+              });
+          })()}
         </div>
 
         <div className="mt-12 text-slate-500 animate-pulse">

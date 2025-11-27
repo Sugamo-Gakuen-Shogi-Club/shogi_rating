@@ -1,4 +1,5 @@
 
+
 export enum ActivityType {
   MATCH_WIN = 'MATCH_WIN',
   MATCH_LOSS = 'MATCH_LOSS',
@@ -12,13 +13,37 @@ export interface AchievementDef {
   id: string;
   name: string;
   description: string;
-  conditionType: 'WINS' | 'STREAK' | 'RATE' | 'DAYS' | 'MATCHES';
+  conditionType: 'WINS' | 'STREAK' | 'RATE' | 'DAYS' | 'MATCHES' | 'SPECIAL';
   threshold: number;
+}
+
+export interface IconDef {
+  id: string;
+  char: string; // Emoji or Character. If special ID 'DEFAULT_INITIAL', handled dynamically.
+  name: string;
+  conditionDescription: string;
+  type: 'DEFAULT' | 'RATE' | 'WINS' | 'STREAK' | 'SPECIAL' | 'MATCHES';
+  category: 'DEFAULT' | 'SHOGI' | 'CHESS' | 'SPECIAL' | 'RANK';
+  threshold?: number;
 }
 
 export interface RateHistoryPoint {
   date: string;
   rate: number;
+}
+
+// 5 Seasons definition (Updated)
+export enum Season {
+  TERM_1_EARLY = '1学期前半',
+  TERM_1_LATE = '1学期後半',
+  TERM_2_EARLY = '2学期前半',
+  TERM_2_LATE = '2学期後半',
+  TERM_3 = '3学期'
+}
+
+export enum EventType {
+  STANDARD = '通常イベント',
+  FACTION_WAR = '紅白戦'
 }
 
 export interface User {
@@ -27,14 +52,22 @@ export interface User {
   reading?: string; // Hiragana reading for sorting/filtering
   isNewMember: boolean;
   rate: number;
+  faction?: 'RED' | 'WHITE'; // Team assignment
+  isGeneral: boolean; // Faction Leader (Taisho)
   
+  // Icon System
+  activeIconId: string;
+  unlockedIcons: string[];
+
   // Point Breakdown
   totalPoints: number;      // Sum of below
   pointsMatch: number;      // Points from matches
   pointsAttendance: number; // Points from attendance
   pointsSpecial: number;    // Points from admin/contribution
 
-  monthlyPoints: number;
+  monthlyPoints: number; // Resets monthly
+  eventPoints: number;   // Resets per event, used for Faction War specific scoring
+
   currentStreak: number; // Winning streak
   maxStreak: number;
   wins: number;
@@ -45,7 +78,7 @@ export interface User {
   rateHistory: RateHistoryPoint[];
   achievements: string[]; // Array of Achievement IDs
   activeTitle: string | null; // Currently selected title
-  avatarColor: string; // Just for UI
+  avatarColor: string; // Background gradient class
 }
 
 export interface MatchRecord {
@@ -58,14 +91,18 @@ export interface MatchRecord {
   p2RateChange: number;
   p1PointsEarned: number;
   p2PointsEarned: number;
+  isDuel?: boolean; // General vs General
 }
 
 export interface SystemSettings {
   adminPin: string;
   // Event config
   eventName: string | null;
+  eventType: EventType;
   eventEndsAt: string | null; // ISO Date string
   eventMultiplier: number;
+  
+  currentSeason: Season; // Current Season Context
   lastMonthlyReset: string;
 }
 
@@ -100,11 +137,17 @@ export interface MatchProcessResult {
   
   newAchievementsP1: AchievementDef[];
   newAchievementsP2: AchievementDef[];
+  
+  newIconsP1: IconDef[];
+  newIconsP2: IconDef[];
+  
+  isDuel: boolean;
 }
 
 export interface AttendanceResult {
   success: boolean;
   newAchievements: AchievementDef[];
+  newIcons: IconDef[];
   message: string;
 }
 
@@ -114,4 +157,14 @@ export interface BackupData {
   settings: SystemSettings;
   logs: ActivityLog[];
   timestamp: string;
+}
+
+export interface RivalData {
+  opponentId: string;
+  opponentName: string;
+  wins: number;
+  losses: number;
+  draws: number;
+  total: number;
+  winRate: number;
 }

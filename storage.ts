@@ -1,5 +1,6 @@
 
-import { User, MatchRecord, SystemSettings, ActivityLog, ActivityType, AchievementDef, MatchProcessResult, AttendanceResult, BackupData, PointBreakdown } from './types';
+
+import { User, MatchRecord, SystemSettings, ActivityLog, ActivityType, AchievementDef, MatchProcessResult, AttendanceResult, BackupData, PointBreakdown, EventType, Season, IconDef, RivalData } from './types';
 
 const USERS_KEY = 'club_rivals_users_v2';
 const MATCHES_KEY = 'club_rivals_matches';
@@ -10,13 +11,19 @@ const LOGS_KEY = 'club_rivals_logs';
 const DEFAULT_SETTINGS: SystemSettings = {
   adminPin: '1123',
   eventName: null,
+  eventType: EventType.STANDARD,
   eventEndsAt: null,
   eventMultiplier: 2,
+  currentSeason: Season.TERM_1_EARLY,
   lastMonthlyReset: new Date().toISOString(),
 };
 
 // Achievements Definition
 export const ACHIEVEMENTS_DATA: AchievementDef[] = [
+  // Faction / Special
+  { id: 'FACTION_GENERAL', name: '大将軍', description: 'チームの大将に任命される', conditionType: 'SPECIAL', threshold: 1 },
+  { id: 'DUEL_VICTORY', name: '一騎討ち', description: '敵将との直接対決を制する', conditionType: 'SPECIAL', threshold: 1 },
+
   // Matches
   { id: 'START_DASH', name: 'スタートダッシュ', description: '記念すべき最初の対局', conditionType: 'MATCHES', threshold: 1 },
   { id: 'MATCHES_10', name: '駆け出し棋士', description: '対局数10回到達', conditionType: 'MATCHES', threshold: 10 },
@@ -48,7 +55,37 @@ export const ACHIEVEMENTS_DATA: AchievementDef[] = [
   { id: 'DAYS_100', name: '生ける伝説', description: '活動日数100日', conditionType: 'DAYS', threshold: 100 },
 ];
 
-// Mapping for auto-furigana (approximation)
+export const ICONS_DATA: IconDef[] = [
+    { id: 'DEFAULT_INITIAL', char: '名', name: '頭文字', conditionDescription: 'デフォルト', type: 'DEFAULT', category: 'DEFAULT' },
+    { id: 'DEFAULT_SMILE', char: '🙂', name: 'スマイル', conditionDescription: 'デフォルト', type: 'DEFAULT', category: 'DEFAULT' },
+    // SHOGI PIECES - Updated to Full Kanji for realistic look
+    { id: 'SHOGI_FU', char: '歩兵', name: '歩兵', conditionDescription: '最初から所持', type: 'DEFAULT', category: 'SHOGI' },
+    { id: 'SHOGI_TO', char: 'と金', name: 'と金', conditionDescription: '対局数3回', type: 'MATCHES', threshold: 3, category: 'SHOGI' },
+    { id: 'SHOGI_KY', char: '香車', name: '香車', conditionDescription: '対局数5回', type: 'MATCHES', threshold: 5, category: 'SHOGI' },
+    { id: 'SHOGI_KE', char: '桂馬', name: '桂馬', conditionDescription: '勝利数3回', type: 'WINS', threshold: 3, category: 'SHOGI' },
+    { id: 'SHOGI_GI', char: '銀将', name: '銀将', conditionDescription: '勝利数5回', type: 'WINS', threshold: 5, category: 'SHOGI' },
+    { id: 'SHOGI_KI', char: '金将', name: '金将', conditionDescription: '勝利数10回', type: 'WINS', threshold: 10, category: 'SHOGI' },
+    { id: 'SHOGI_KA', char: '角行', name: '角行', conditionDescription: 'レート1100到達', type: 'RATE', threshold: 1100, category: 'SHOGI' },
+    { id: 'SHOGI_HI', char: '飛車', name: '飛車', conditionDescription: 'レート1200到達', type: 'RATE', threshold: 1200, category: 'SHOGI' },
+    { id: 'SHOGI_OU', char: '王将', name: '王将', conditionDescription: 'レート1300到達', type: 'RATE', threshold: 1300, category: 'SHOGI' },
+    { id: 'SHOGI_RYU', char: '龍王', name: '龍王', conditionDescription: 'レート1400到達', type: 'RATE', threshold: 1400, category: 'SHOGI' },
+    
+    // CHESS PIECES
+    { id: 'CHESS_PAWN', char: '♟️', name: 'ポーン', conditionDescription: '勝利数30回', type: 'WINS', threshold: 30, category: 'CHESS' },
+    { id: 'CHESS_KNIGHT', char: '♞', name: 'ナイト', conditionDescription: 'レート1500到達', type: 'RATE', threshold: 1500, category: 'CHESS' },
+    { id: 'CHESS_BISHOP', char: '♝', name: 'ビショップ', conditionDescription: 'レート1600到達', type: 'RATE', threshold: 1600, category: 'CHESS' },
+    { id: 'CHESS_ROOK', char: '♜', name: 'ルーク', conditionDescription: 'レート1700到達', type: 'RATE', threshold: 1700, category: 'CHESS' },
+    { id: 'CHESS_QUEEN', char: '♛', name: 'クイーン', conditionDescription: 'レート1800到達', type: 'RATE', threshold: 1800, category: 'CHESS' },
+    { id: 'CHESS_KING', char: '♚', name: 'キング', conditionDescription: 'レート2000到達', type: 'RATE', threshold: 2000, category: 'CHESS' },
+    
+    // SPECIAL
+    { id: 'STREAK_5', char: '⚡', name: '疾風', conditionDescription: '5連勝達成', type: 'STREAK', threshold: 5, category: 'SPECIAL' },
+    { id: 'STREAK_10', char: '👑', name: '無双', conditionDescription: '10連勝達成', type: 'STREAK', threshold: 10, category: 'SPECIAL' },
+    { id: 'WINS_50', char: '🔥', name: '闘神', conditionDescription: '50勝達成', type: 'WINS', threshold: 50, category: 'SPECIAL' },
+    { id: 'SPECIAL_GENERAL', char: '👺', name: '大将軍', conditionDescription: 'チーム大将に任命', type: 'SPECIAL', category: 'SPECIAL' },
+    { id: 'SPECIAL_DUEL', char: '⚜️', name: '決闘者', conditionDescription: '一騎討ちで勝利', type: 'SPECIAL', category: 'SPECIAL' },
+];
+
 const NAME_READINGS: Record<string, string> = {
     "熱田　　望": "あつた のぞむ",
     "池田　大翔": "いけだ ひろと",
@@ -90,7 +127,6 @@ const NAME_READINGS: Record<string, string> = {
     "龍口　直史": "たつぐち なおふみ"
 };
 
-// Member List Data
 const INITIAL_MEMBERS = [
   // 中１ (New Members)
   { name: "熱田　　望", isNew: true },
@@ -158,35 +194,33 @@ export const isEventActive = (): boolean => {
   return new Date() < new Date(settings.eventEndsAt);
 };
 
-// Helper to guess reading if not present
 const guessReading = (name: string): string => {
-    // Normalize spaces
     const cleanName = name.replace(/\s+/g, ' ');
-    // Try exact match
     if (NAME_READINGS[cleanName]) return NAME_READINGS[cleanName];
-    
-    // Fallback: try matching by stripping spaces
     const tightName = name.replace(/\s+/g, '');
     for (const [key, val] of Object.entries(NAME_READINGS)) {
         if (key.replace(/\s+/g, '') === tightName) return val;
     }
-    
-    return ''; // Unknown
+    return '';
 };
 
 export const getUsers = (): User[] => {
   const u = localStorage.getItem(USERS_KEY);
   if (!u) return [];
   
-  // Migration for existing data (ensure new fields exist)
   const users: User[] = JSON.parse(u);
   return users.map(user => ({
     ...user,
     pointsMatch: user.pointsMatch ?? 0,
     pointsAttendance: user.pointsAttendance ?? 0,
     pointsSpecial: user.pointsSpecial ?? 0,
-    // Inject reading if missing (important for the 50-sound keyboard)
-    reading: user.reading || guessReading(user.name)
+    monthlyPoints: user.monthlyPoints ?? 0,
+    eventPoints: user.eventPoints ?? 0, 
+    reading: user.reading || guessReading(user.name),
+    faction: user.faction || 'WHITE',
+    isGeneral: user.isGeneral || false,
+    unlockedIcons: Array.from(new Set([...(user.unlockedIcons || []), 'DEFAULT_INITIAL', 'DEFAULT_SMILE', 'SHOGI_FU'])),
+    activeIconId: user.activeIconId || 'DEFAULT_INITIAL'
   }));
 };
 
@@ -201,7 +235,7 @@ export const getMatches = (): MatchRecord[] => {
 
 export const addMatch = (match: MatchRecord) => {
   const matches = getMatches();
-  matches.unshift(match); // Newest first
+  matches.unshift(match);
   localStorage.setItem(MATCHES_KEY, JSON.stringify(matches));
 };
 
@@ -222,10 +256,23 @@ export const addLog = (log: ActivityLog) => {
 
 // --- Logic Helpers ---
 
-// Check and unlock achievements
-const checkAchievements = (user: User): AchievementDef[] => {
-  const unlocked: AchievementDef[] = [];
+export const getUserAvatarChar = (user: User): string => {
+    if (user.activeIconId === 'DEFAULT_INITIAL') {
+        return user.name.charAt(0);
+    }
+    const icon = ICONS_DATA.find(i => i.id === user.activeIconId);
+    return icon ? icon.char : user.name.charAt(0);
+}
+
+export const getUserIconDef = (iconId: string): IconDef => {
+    return ICONS_DATA.find(i => i.id === iconId) || ICONS_DATA[0];
+}
+
+const checkAchievementsAndIcons = (user: User, matchContext?: { isDuelWin: boolean }): { newAchievements: AchievementDef[], newIcons: any[] } => {
+  const newAchievements: AchievementDef[] = [];
+  const newIcons: any[] = [];
   
+  // 1. Achievements
   ACHIEVEMENTS_DATA.forEach(ach => {
     if (user.achievements.includes(ach.id)) return;
 
@@ -236,43 +283,135 @@ const checkAchievements = (user: User): AchievementDef[] => {
       case 'RATE': met = user.rate >= ach.threshold; break;
       case 'DAYS': met = user.activityDays >= ach.threshold; break;
       case 'MATCHES': met = (user.wins + user.losses + user.draws) >= ach.threshold; break;
+      case 'SPECIAL': 
+        if (ach.id === 'FACTION_GENERAL') met = user.isGeneral;
+        if (ach.id === 'DUEL_VICTORY') met = !!matchContext?.isDuelWin;
+        break;
     }
 
     if (met) {
       user.achievements.push(ach.id);
-      unlocked.push(ach);
-      // Auto-set first title if none set
-      if (!user.activeTitle) {
-          user.activeTitle = ach.id;
-      }
+      newAchievements.push(ach);
+      if (!user.activeTitle) user.activeTitle = ach.id;
     }
   });
-  return unlocked;
+
+  // 2. Icons
+  ICONS_DATA.forEach(icon => {
+      if (icon.type === 'DEFAULT') return;
+      if (user.unlockedIcons.includes(icon.id)) return;
+
+      let met = false;
+      switch (icon.type) {
+          case 'RATE': met = user.rate >= (icon.threshold || 9999); break;
+          case 'WINS': met = user.wins >= (icon.threshold || 9999); break;
+          case 'MATCHES': met = (user.wins + user.losses + user.draws) >= (icon.threshold || 9999); break;
+          case 'STREAK': met = user.currentStreak >= (icon.threshold || 9999); break;
+          case 'SPECIAL':
+            if (icon.id === 'SPECIAL_GENERAL') met = user.isGeneral;
+            if (icon.id === 'SPECIAL_DUEL') met = user.achievements.includes('DUEL_VICTORY') || !!matchContext?.isDuelWin;
+            break;
+      }
+
+      if (met) {
+          user.unlockedIcons.push(icon.id);
+          newIcons.push(icon);
+      }
+  });
+
+  return { newAchievements, newIcons };
 };
 
 export const updateUserTitle = (userId: string, titleId: string | null) => {
   const users = getUsers();
   const user = users.find(u => u.id === userId);
   if (!user) return;
-  
-  // Verify ownership
   if (titleId && !user.achievements.includes(titleId)) return;
-
   user.activeTitle = titleId;
   saveUsers(users);
 };
 
-export interface RivalData {
-    opponentId: string;
-    opponentName: string;
-    wins: number;
-    losses: number;
-    draws: number;
-    total: number;
-    winRate: number;
+export const updateUserIcon = (userId: string, iconId: string) => {
+    const users = getUsers();
+    const user = users.find(u => u.id === userId);
+    if (!user) return;
+    if (!user.unlockedIcons.includes(iconId)) return;
+    user.activeIconId = iconId;
+    saveUsers(users);
 }
 
-// Calculate Rival Stats
+export const balanceFactions = (users: User[]): User[] => {
+    const scoredUsers = users.map(u => ({
+        ...u,
+        _powerScore: u.rate + (u.activityDays * 50)
+    }));
+
+    scoredUsers.sort((a, b) => b._powerScore - a._powerScore);
+
+    let redScore = 0;
+    let whiteScore = 0;
+    const balancedUsers = scoredUsers.map((u) => {
+        let faction: 'RED' | 'WHITE';
+        if (redScore <= whiteScore) {
+            faction = 'RED';
+            redScore += u._powerScore;
+        } else {
+            faction = 'WHITE';
+            whiteScore += u._powerScore;
+        }
+        return { ...u, faction, _powerScore: undefined }; 
+    });
+
+    return balancedUsers;
+};
+
+export const assignGenerals = (redGeneralId: string, whiteGeneralId: string) => {
+    const users = getUsers();
+    users.forEach(u => {
+        u.isGeneral = false;
+    });
+
+    const red = users.find(u => u.id === redGeneralId);
+    if (red) {
+        red.isGeneral = true;
+        red.faction = 'RED';
+        checkAchievementsAndIcons(red);
+    }
+
+    const white = users.find(u => u.id === whiteGeneralId);
+    if (white) {
+        white.isGeneral = true;
+        white.faction = 'WHITE';
+        checkAchievementsAndIcons(white);
+    }
+    
+    saveUsers(users);
+}
+
+export const resetEventPoints = () => {
+    const users = getUsers();
+    users.forEach(u => u.eventPoints = 0);
+    saveUsers(users);
+}
+
+export const toggleGeneral = (userId: string) => {
+    const users = getUsers();
+    const user = users.find(u => u.id === userId);
+    if (!user) return;
+
+    if (!user.isGeneral) {
+        users.forEach(u => {
+            if (u.faction === user.faction && u.isGeneral) u.isGeneral = false;
+        });
+        user.isGeneral = true;
+    } else {
+        user.isGeneral = false;
+    }
+    
+    checkAchievementsAndIcons(user);
+    saveUsers(users);
+}
+
 export const getRivalryStats = (userId: string): { bestCustomer: RivalData | null, nemeses: RivalData | null } => {
     const matches = getMatches();
     const users = getUsers();
@@ -303,7 +442,7 @@ export const getRivalryStats = (userId: string): { bestCustomer: RivalData | nul
 
     statsMap.forEach((val, key) => {
         const total = val.wins + val.losses + val.draws;
-        if (total < 3) return; // Need minimum sample size
+        if (total < 3) return; 
 
         const oppName = users.find(u => u.id === key)?.name || 'Unknown';
         const data: RivalData = {
@@ -316,12 +455,10 @@ export const getRivalryStats = (userId: string): { bestCustomer: RivalData | nul
             winRate: val.wins / total
         };
 
-        // Best Customer: Most wins, >50% win rate
         if (!bestCustomer || (data.wins > bestCustomer.wins)) {
             if (data.wins > data.losses) bestCustomer = data;
         }
 
-        // Nemesis: Most losses
         if (!nemeses || (data.losses > nemeses.losses)) {
              if (data.losses >= data.wins) nemeses = data;
         }
@@ -331,33 +468,24 @@ export const getRivalryStats = (userId: string): { bestCustomer: RivalData | nul
 }
 
 // --- Game Logic ---
-
 const K_FACTOR = 32;
 
 export const calculateEloChange = (playerRate: number, opponentRate: number, actualScore: number): number => {
   const expectedScore = 1 / (1 + 10 ** ((opponentRate - playerRate) / 400));
   
   if (actualScore === 1) {
-      // WIN: Standard calculation but ensure good reward
       let change = K_FACTOR * (actualScore - expectedScore);
-      
-      // Giant Killing Bonus (1.5x) if winning against opponent with 100+ higher rate
       if (opponentRate - playerRate >= 100) {
         change = change * 1.5; 
       }
-      
-      // Minimum gain of 10 for a win to feel good
       return Math.max(10, Math.round(change));
   } else if (actualScore === 0.5) {
-      // DRAW: Fixed gain
       return 5;
   } else {
-      // LOSS: "Even if you lose, rate goes up" -> Fixed small gain
       return 2;
   }
 };
 
-// Calculate point details for a player in a match
 const calculateMatchPoints = (
     resultType: 'WIN' | 'LOSS' | 'DRAW',
     currentStreak: number,
@@ -369,8 +497,6 @@ const calculateMatchPoints = (
     else if (resultType === 'LOSS') base = 5;
     else base = 7;
     
-    // Multiplier applies to base points
-    // (Usually events double the win points)
     const effectiveBase = base * multiplier;
 
     let streakBonus = 0;
@@ -394,11 +520,9 @@ const calculateMatchPoints = (
     };
 };
 
-// Anti-Spam: Check cooldown between specific pair
 const validateMatchCooldown = (p1Id: string, p2Id: string) => {
     const matches = getMatches();
-    // Look for a match between these two in the last 5 minutes
-    const COOLDOWN_MINUTES = 5;
+    const COOLDOWN_MINUTES = 1; 
     const now = new Date().getTime();
     
     const recentMatch = matches.find(m => {
@@ -421,7 +545,6 @@ export const processMatch = (
   p2Id: string,
   result: 'PLAYER1_WIN' | 'PLAYER2_WIN' | 'DRAW'
 ): MatchProcessResult => {
-  // 0. Validate
   validateMatchCooldown(p1Id, p2Id);
 
   const users = getUsers();
@@ -431,20 +554,21 @@ export const processMatch = (
 
   if (!p1 || !p2) throw new Error("User not found");
 
-  // 1. Elo Calculation
+  const isDuel = p1.isGeneral && p2.isGeneral && p1.faction !== p2.faction;
+
   let p1Score = 0.5;
   if (result === 'PLAYER1_WIN') p1Score = 1;
   if (result === 'PLAYER2_WIN') p1Score = 0;
   const p2Score = 1 - p1Score;
 
-  // Calculate changes (always positive now based on rules)
   const p1RateDelta = calculateEloChange(p1.rate, p2.rate, p1Score);
   const p2RateDelta = calculateEloChange(p2.rate, p1.rate, p2Score);
 
-  // 2. Point Calculation
   const activeEvent = isEventActive();
   const multiplier = activeEvent ? settings.eventMultiplier : 1;
   const isNewMemberInvolved = p1.isNewMember || p2.isNewMember;
+
+  const isInterFactionMatch = activeEvent && settings.eventType === EventType.FACTION_WAR && p1.faction !== p2.faction;
 
   let p1ResType: 'WIN' | 'LOSS' | 'DRAW' = 'DRAW';
   if (result === 'PLAYER1_WIN') p1ResType = 'WIN';
@@ -457,17 +581,19 @@ export const processMatch = (
   const p1PointsDetail = calculateMatchPoints(p1ResType, p1.currentStreak, isNewMemberInvolved, multiplier);
   const p2PointsDetail = calculateMatchPoints(p2ResType, p2.currentStreak, isNewMemberInvolved, multiplier);
 
-  // 3. Update Objects
   const date = getTimestamp();
 
-  const updateUserStats = (u: User, won: boolean, draw: boolean, rateChange: number, pointsDetail: PointBreakdown) => {
+  const updateUserStats = (u: User, won: boolean, draw: boolean, rateChange: number, pointsDetail: PointBreakdown, duelWin: boolean, isInterFaction: boolean) => {
     u.rate += rateChange; 
     u.rateHistory.push({ date, rate: u.rate });
     
-    // Point Updates
     u.totalPoints += pointsDetail.total;
     u.monthlyPoints += pointsDetail.total;
     u.pointsMatch = (u.pointsMatch || 0) + pointsDetail.total;
+
+    if (isInterFaction) {
+        u.eventPoints = (u.eventPoints || 0) + pointsDetail.total;
+    }
     
     if (draw) {
       u.draws += 1;
@@ -481,11 +607,11 @@ export const processMatch = (
       u.currentStreak = 0;
     }
 
-    return checkAchievements(u);
+    return checkAchievementsAndIcons(u, { isDuelWin: duelWin });
   };
 
-  const newAchievementsP1 = updateUserStats(p1, result === 'PLAYER1_WIN', result === 'DRAW', p1RateDelta, p1PointsDetail);
-  const newAchievementsP2 = updateUserStats(p2, result === 'PLAYER2_WIN', result === 'DRAW', p2RateDelta, p2PointsDetail);
+  const resultsP1 = updateUserStats(p1, result === 'PLAYER1_WIN', result === 'DRAW', p1RateDelta, p1PointsDetail, isDuel && result === 'PLAYER1_WIN', isInterFactionMatch);
+  const resultsP2 = updateUserStats(p2, result === 'PLAYER2_WIN', result === 'DRAW', p2RateDelta, p2PointsDetail, isDuel && result === 'PLAYER2_WIN', isInterFactionMatch);
 
   saveUsers(users);
 
@@ -498,7 +624,8 @@ export const processMatch = (
     p1RateChange: p1RateDelta,
     p2RateChange: p2RateDelta,
     p1PointsEarned: p1PointsDetail.total,
-    p2PointsEarned: p2PointsDetail.total
+    p2PointsEarned: p2PointsDetail.total,
+    isDuel
   };
   addMatch(matchRecord);
 
@@ -507,7 +634,7 @@ export const processMatch = (
     userId: p1Id,
     type: result === 'PLAYER1_WIN' ? ActivityType.MATCH_WIN : result === 'DRAW' ? ActivityType.MATCH_DRAW : ActivityType.MATCH_LOSS,
     points: p1PointsDetail.total,
-    description: `Match vs ${p2.name}`,
+    description: isDuel ? `Duel vs ${p2.name}` : `Match vs ${p2.name}`,
     date
   });
   addLog({
@@ -515,7 +642,7 @@ export const processMatch = (
     userId: p2Id,
     type: result === 'PLAYER2_WIN' ? ActivityType.MATCH_WIN : result === 'DRAW' ? ActivityType.MATCH_DRAW : ActivityType.MATCH_LOSS,
     points: p2PointsDetail.total,
-    description: `Match vs ${p1.name}`,
+    description: isDuel ? `Duel vs ${p1.name}` : `Match vs ${p1.name}`,
     date
   });
 
@@ -526,8 +653,11 @@ export const processMatch = (
     p2PointsEarned: p2PointsDetail.total,
     p1PointsDetail,
     p2PointsDetail,
-    newAchievementsP1,
-    newAchievementsP2
+    newAchievementsP1: resultsP1.newAchievements,
+    newAchievementsP2: resultsP2.newAchievements,
+    newIconsP1: resultsP1.newIcons,
+    newIconsP2: resultsP2.newIcons,
+    isDuel
   };
 };
 
@@ -546,12 +676,10 @@ export const deleteMatch = (matchId: string) => {
         p1.rate -= match.p1RateChange;
         p1.totalPoints -= match.p1PointsEarned;
         p1.monthlyPoints -= match.p1PointsEarned;
+        if (p1.eventPoints > 0) p1.eventPoints = Math.max(0, p1.eventPoints - match.p1PointsEarned);
+
         p1.pointsMatch = (p1.pointsMatch || match.p1PointsEarned) - match.p1PointsEarned;
-
-        // Remove last rate history point if it matches (imperfect but sufficient for simple undo)
         if (p1.rateHistory.length > 1) p1.rateHistory.pop();
-
-        // Revert Stats (Approximate: Streak is hard to revert perfectly without full history replay)
         if (match.result === 'PLAYER1_WIN') { p1.wins--; p2.losses--; }
         else if (match.result === 'PLAYER2_WIN') { p1.losses--; p2.wins--; }
         else { p1.draws--; p2.draws--; }
@@ -560,14 +688,14 @@ export const deleteMatch = (matchId: string) => {
         p2.rate -= match.p2RateChange;
         p2.totalPoints -= match.p2PointsEarned;
         p2.monthlyPoints -= match.p2PointsEarned;
+        if (p2.eventPoints > 0) p2.eventPoints = Math.max(0, p2.eventPoints - match.p2PointsEarned);
+        
         p2.pointsMatch = (p2.pointsMatch || match.p2PointsEarned) - match.p2PointsEarned;
-
         if (p2.rateHistory.length > 1) p2.rateHistory.pop();
 
         saveUsers(users);
     }
 
-    // Remove match
     matches.splice(matchIndex, 1);
     saveMatches(matches);
 }
@@ -575,12 +703,11 @@ export const deleteMatch = (matchId: string) => {
 export const recordAttendance = (userId: string): AttendanceResult => {
   const users = getUsers();
   const user = users.find(u => u.id === userId);
-  if (!user) return { success: false, newAchievements: [], message: 'ユーザーが見つかりません' };
+  if (!user) return { success: false, newAchievements: [], newIcons: [], message: 'ユーザーが見つかりません' };
 
   const today = new Date().toISOString().split('T')[0];
   const last = user.lastAttendance ? new Date(user.lastAttendance).toISOString().split('T')[0] : null;
-
-  if (today === last) return { success: false, newAchievements: [], message: '本日はすでに出席済みです' };
+  if (today === last) return { success: false, newAchievements: [], newIcons: [], message: '本日はすでに出席済みです' };
 
   user.lastAttendance = new Date().toISOString();
   user.totalPoints += 5;
@@ -588,7 +715,7 @@ export const recordAttendance = (userId: string): AttendanceResult => {
   user.pointsAttendance = (user.pointsAttendance || 0) + 5;
   user.activityDays = (user.activityDays || 0) + 1;
   
-  const newAchievements = checkAchievements(user);
+  const results = checkAchievementsAndIcons(user);
   saveUsers(users);
   
   addLog({
@@ -600,7 +727,12 @@ export const recordAttendance = (userId: string): AttendanceResult => {
     date: new Date().toISOString()
   });
 
-  return { success: true, newAchievements, message: '出席を記録しました！ (+5 pt)' };
+  return { 
+      success: true, 
+      newAchievements: results.newAchievements, 
+      newIcons: results.newIcons, 
+      message: '出席を記録しました！ (+5 pt)' 
+  };
 };
 
 export const manualPointAdjustment = (userId: string, points: number, reason: string) => {
@@ -612,7 +744,7 @@ export const manualPointAdjustment = (userId: string, points: number, reason: st
     user.monthlyPoints += points;
     user.pointsSpecial = (user.pointsSpecial || 0) + points;
     
-    checkAchievements(user);
+    checkAchievementsAndIcons(user);
     saveUsers(users);
 
     addLog({
@@ -628,17 +760,14 @@ export const manualPointAdjustment = (userId: string, points: number, reason: st
 export const resetMonthly = () => {
     const users = getUsers();
     const settings = getSettings();
-    
     users.forEach(u => {
         u.monthlyPoints = 0;
     });
     settings.lastMonthlyReset = new Date().toISOString();
-    
     saveUsers(users);
     saveSettings(settings);
 }
 
-// --- Backup & Restore ---
 export const exportData = (): string => {
     const data: BackupData = {
         users: getUsers(),
@@ -654,7 +783,6 @@ export const importData = (jsonString: string): boolean => {
     try {
         const data: BackupData = JSON.parse(jsonString);
         if (!data.users || !data.matches) throw new Error("Invalid Data");
-        
         saveUsers(data.users);
         localStorage.setItem(MATCHES_KEY, JSON.stringify(data.matches));
         if (data.settings) saveSettings(data.settings);
@@ -671,9 +799,11 @@ export const seedData = () => {
     const users: User[] = INITIAL_MEMBERS.map((m, idx) => ({
       id: `u${idx + 100}`,
       name: m.name.replace(/\s+/g, ' '),
-      reading: guessReading(m.name), // Add reading
+      reading: guessReading(m.name), 
       isNewMember: m.isNew,
       rate: 1000,
+      faction: idx % 2 === 0 ? 'RED' : 'WHITE',
+      isGeneral: false, 
       
       totalPoints: 0,
       pointsMatch: 0,
@@ -681,6 +811,7 @@ export const seedData = () => {
       pointsSpecial: 0,
 
       monthlyPoints: 0,
+      eventPoints: 0,
       currentStreak: 0,
       maxStreak: 0,
       wins: 0,
@@ -691,9 +822,11 @@ export const seedData = () => {
       rateHistory: [{ date: new Date().toISOString(), rate: 1000 }],
       achievements: [],
       activeTitle: null,
-      avatarColor: `bg-${['red','blue','green','yellow','purple','pink','indigo','teal'][idx % 8]}-500`
+      avatarColor: `bg-${['red','blue','green','yellow','purple','pink','indigo','teal'][idx % 8]}-500`,
+      
+      unlockedIcons: ['DEFAULT_INITIAL', 'DEFAULT_SMILE', 'SHOGI_FU'],
+      activeIconId: 'DEFAULT_INITIAL'
     }));
     saveUsers(users);
-    console.log('Seeded new member data');
   }
 };

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { getUsers, processMatch, getSettings } from './storage';
-import { User, MatchProcessResult, AchievementDef, PointBreakdown } from './types';
+import { getUsers, processMatch, getSettings, getUserAvatarChar } from './storage';
+import { User, MatchProcessResult, AchievementDef, PointBreakdown, IconDef } from './types';
 import { NumPad } from './NumPad';
 import { Trophy, Minus, TrendingUp, Star, Search, User as UserIcon } from 'lucide-react';
 import { AchievementPopup } from './AchievementPopup';
@@ -103,9 +103,9 @@ const MatchEntry: React.FC = () => {
   const BreakdownItem: React.FC<{ label: string, value: number }> = ({ label, value }) => {
     if (value <= 0) return null;
     return (
-      <div className="flex justify-between text-xs text-slate-600">
+      <div className="flex justify-between text-xs text-slate-400">
         <span>{label}</span>
-        <span className="font-bold">+{value}</span>
+        <span className="font-bold text-slate-300">+{value}</span>
       </div>
     );
   };
@@ -117,29 +117,29 @@ const MatchEntry: React.FC = () => {
     pointTotal: number,
     pointDetail: PointBreakdown
   }> = ({ name, label, rateChange, pointTotal, pointDetail }) => (
-    <div className="flex-1 relative p-4 bg-slate-50 rounded-2xl border border-slate-100">
-        <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-slate-200 text-slate-600 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">
+    <div className="flex-1 relative p-4 bg-slate-800/50 rounded-2xl border border-white/10">
+        <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-slate-700 text-slate-300 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase border border-slate-600">
             {label}
         </div>
-        <div className="font-black text-xl text-slate-800 mb-4 text-center">{name}</div>
+        <div className="font-black text-xl text-white mb-4 text-center">{name}</div>
         
         <div className="flex flex-col gap-4">
             {/* Rate Section */}
-            <div className="bg-white p-3 rounded-xl border border-blue-100 shadow-sm">
+            <div className="bg-slate-900/50 p-3 rounded-xl border border-blue-500/20 shadow-sm">
                 <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-bold text-blue-600 uppercase flex items-center gap-1">
+                    <span className="text-xs font-bold text-blue-400 uppercase flex items-center gap-1">
                         <TrendingUp size={12}/> レート (実力)
                     </span>
                 </div>
                 <div className="text-center">
-                    <span className="text-3xl font-black text-blue-600">+{rateChange}</span>
+                    <span className="text-3xl font-black text-blue-500">+{rateChange}</span>
                 </div>
             </div>
 
             {/* Points Section */}
-            <div className="bg-white p-3 rounded-xl border border-amber-100 shadow-sm">
+            <div className="bg-slate-900/50 p-3 rounded-xl border border-amber-500/20 shadow-sm">
                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-bold text-amber-600 uppercase flex items-center gap-1">
+                    <span className="text-xs font-bold text-amber-500 uppercase flex items-center gap-1">
                         <Star size={12}/> ポイント (活動)
                     </span>
                 </div>
@@ -148,12 +148,12 @@ const MatchEntry: React.FC = () => {
                 </div>
                 
                 {/* Breakdown */}
-                <div className="border-t border-slate-100 pt-2 space-y-1">
+                <div className="border-t border-white/10 pt-2 space-y-1">
                     <BreakdownItem label="基本ポイント" value={pointDetail.base} />
                     <BreakdownItem label="連勝ボーナス" value={pointDetail.streakBonus} />
                     <BreakdownItem label="新入部員交流" value={pointDetail.newMemberBonus} />
                     {pointDetail.eventMultiplier > 1 && (
-                        <div className="text-[10px] text-center text-indigo-500 font-bold">イベント倍率 x{pointDetail.eventMultiplier} 適用済</div>
+                        <div className="text-[10px] text-center text-indigo-400 font-bold">イベント倍率 x{pointDetail.eventMultiplier} 適用済</div>
                     )}
                 </div>
             </div>
@@ -167,14 +167,14 @@ const MatchEntry: React.FC = () => {
         <AchievementPopup items={newAchievements} onClose={() => setNewAchievements([])} />
         
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-gradient-to-b from-blue-50/50 to-transparent"></div>
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-gradient-to-b from-blue-900/20 to-transparent"></div>
         </div>
 
         <Trophy size={80} className="text-yellow-400 mb-6 animate-float drop-shadow-xl" />
-        <h2 className="text-4xl font-black text-slate-800 mb-2 tracking-tight">MATCH RECORDED!</h2>
-        <p className="text-slate-500 mb-8 font-medium">対戦結果を記録しました</p>
+        <h2 className="text-4xl font-black text-white mb-2 tracking-tight">MATCH RECORDED!</h2>
+        <p className="text-slate-400 mb-8 font-medium">対戦結果を記録しました</p>
 
-        <div className="bg-white p-8 rounded-3xl shadow-2xl border border-slate-100 w-full max-w-3xl transform transition-all hover:scale-[1.01]">
+        <div className="bg-slate-900/80 p-8 rounded-3xl shadow-2xl border border-white/10 w-full max-w-3xl transform transition-all hover:scale-[1.01] backdrop-blur-xl">
           <div className="flex flex-col md:flex-row items-stretch justify-between gap-8">
              
              <PlayerResultCard 
@@ -186,7 +186,7 @@ const MatchEntry: React.FC = () => {
              />
 
              <div className="flex items-center justify-center">
-                <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center font-black text-slate-300 text-lg border-4 border-white shadow-sm">VS</div>
+                <div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center font-black text-slate-500 text-lg border-4 border-slate-700 shadow-sm">VS</div>
              </div>
 
              <PlayerResultCard 
@@ -200,7 +200,7 @@ const MatchEntry: React.FC = () => {
           
           <button 
             onClick={() => setSuccessData(null)}
-            className="w-full mt-8 bg-slate-900 text-white py-4 rounded-xl font-bold hover:bg-slate-800 active:scale-95 transition-transform shadow-lg shadow-slate-900/20"
+            className="w-full mt-8 bg-white text-slate-900 py-4 rounded-xl font-bold hover:bg-slate-200 active:scale-95 transition-transform shadow-lg"
           >
             次の対戦へ
           </button>
@@ -213,19 +213,23 @@ const MatchEntry: React.FC = () => {
   const getAvatar = (userId: string) => {
       const u = users.find(user => user.id === userId);
       if (!u) return null;
+      const avatarChar = getUserAvatarChar(u);
+
       return (
         <div className="flex flex-col items-center animate-pop-in">
-          <div className={`w-20 h-20 md:w-24 md:h-24 rounded-full ${u.avatarColor} flex items-center justify-center text-white font-bold text-3xl md:text-4xl shadow-lg border-4 border-white mb-2`}>
-              {u.name.charAt(0)}
+          <div className={`w-24 h-24 md:w-32 md:h-32 rounded-full ${u.avatarColor} p-1 shadow-lg border-4 border-slate-700 mb-3`}>
+              <div className="w-full h-full rounded-full bg-slate-900/50 backdrop-blur-[1px] flex items-center justify-center text-4xl md:text-5xl text-white">
+                  {avatarChar}
+              </div>
           </div>
-          <div className="font-bold text-lg text-slate-800">{u.name}</div>
-          <div className="font-mono text-sm text-slate-500">Rate: {Math.round(u.rate)}</div>
+          <div className="font-bold text-lg text-white">{u.name}</div>
+          <div className="font-mono text-sm text-slate-400">Rate: {Math.round(u.rate)}</div>
         </div>
       );
   };
 
   return (
-    <div className="max-w-4xl mx-auto pb-12">
+    <div className="max-w-4xl mx-auto pb-20">
       {modalTarget && (
           <UserSelector 
             users={users}
@@ -242,16 +246,16 @@ const MatchEntry: React.FC = () => {
       )}
 
       <div className="mb-8 text-center">
-        <h2 className="text-4xl font-black text-slate-800 tracking-tight uppercase flex items-center justify-center gap-3">
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">Versus</span> Mode
+        <h2 className="text-4xl font-black text-white tracking-tight uppercase flex items-center justify-center gap-3">
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400">Versus</span> Mode
         </h2>
-        <p className="text-slate-500 font-medium">対戦結果を入力してください</p>
+        <p className="text-slate-400 font-medium">対戦結果を入力してください</p>
       </div>
 
       {/* VS Screen Layout */}
       <div className="relative">
         {/* Background VS Text */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[200px] font-black text-slate-100 select-none pointer-events-none opacity-50">VS</div>
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[200px] font-black text-white/5 select-none pointer-events-none">VS</div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-12 relative z-10">
             
@@ -259,21 +263,21 @@ const MatchEntry: React.FC = () => {
             <div 
                 onClick={() => setModalTarget('p1')}
                 className={`
-                    relative p-6 rounded-3xl border-4 transition-all duration-300 cursor-pointer group min-h-[280px] flex flex-col justify-center
-                    ${result === 'PLAYER1_WIN' ? 'bg-red-50 border-red-500 shadow-xl shadow-red-500/20 scale-105 z-20' : 
-                      result === 'DRAW' ? 'bg-slate-50 border-slate-300 opacity-80' :
-                      result === 'PLAYER2_WIN' ? 'bg-slate-100 border-slate-200 opacity-60 grayscale blur-[1px]' :
-                      'bg-white border-slate-200 hover:border-red-400 hover:shadow-lg'
+                    relative p-6 rounded-[2rem] border-4 transition-all duration-300 cursor-pointer group min-h-[280px] flex flex-col justify-center
+                    ${result === 'PLAYER1_WIN' ? 'bg-red-950/30 border-red-500 shadow-xl shadow-red-500/20 scale-105 z-20 backdrop-blur-md' : 
+                      result === 'DRAW' ? 'bg-slate-800/50 border-slate-600 opacity-80 backdrop-blur-md' :
+                      result === 'PLAYER2_WIN' ? 'bg-slate-900/50 border-slate-800 opacity-60 grayscale blur-[1px]' :
+                      'bg-slate-800/50 border-slate-700 hover:border-red-400 hover:shadow-lg backdrop-blur-md'
                     }
                 `}
             >
-                <div className="absolute -top-4 left-6 bg-red-500 text-white px-4 py-1 rounded-full font-black tracking-wider shadow-md uppercase text-sm flex items-center gap-2">
+                <div className="absolute -top-4 left-6 bg-red-600 text-white px-4 py-1 rounded-full font-black tracking-wider shadow-md uppercase text-sm flex items-center gap-2 border border-red-400">
                     Player 1 <Search size={14} className="opacity-70"/>
                 </div>
                 <div className="flex flex-col items-center py-6">
                     {p1 ? getAvatar(p1) : (
-                        <div className="flex flex-col items-center text-slate-300 group-hover:text-red-400 transition-colors">
-                            <div className="w-24 h-24 rounded-full bg-slate-100 flex items-center justify-center mb-4">
+                        <div className="flex flex-col items-center text-slate-500 group-hover:text-red-400 transition-colors">
+                            <div className="w-24 h-24 rounded-full bg-slate-800/50 flex items-center justify-center mb-4 border-2 border-slate-700 border-dashed">
                                 <UserIcon size={40}/>
                             </div>
                             <div className="font-bold text-lg">タップして選択</div>
@@ -283,18 +287,18 @@ const MatchEntry: React.FC = () => {
                     {p1 && result !== 'PLAYER1_WIN' && result !== 'DRAW' && (
                         <button 
                             onClick={(e) => { e.stopPropagation(); setResult('PLAYER1_WIN'); }}
-                            className="mt-6 px-8 py-3 bg-red-500 text-white rounded-full font-black shadow-lg hover:bg-red-600 active:scale-95 transition-all uppercase tracking-wider"
+                            className="mt-6 px-8 py-3 bg-red-600 text-white rounded-full font-black shadow-lg hover:bg-red-500 active:scale-95 transition-all uppercase tracking-wider border border-red-400"
                         >
                             Winner
                         </button>
                     )}
-                    {result === 'PLAYER1_WIN' && <div className="mt-6 text-red-600 font-black text-2xl uppercase tracking-widest animate-pulse">Victory</div>}
+                    {result === 'PLAYER1_WIN' && <div className="mt-6 text-red-500 font-black text-2xl uppercase tracking-widest animate-pulse drop-shadow-md">Victory</div>}
                 </div>
             </div>
 
-            {/* Center VS Badge (Mobile only, or float) */}
+            {/* Center VS Badge */}
             <div className="md:absolute md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 z-30 flex justify-center my-4 md:my-0">
-                <div className="bg-slate-900 text-white w-16 h-16 rounded-full flex items-center justify-center font-black text-2xl border-4 border-white shadow-xl italic">
+                <div className="bg-slate-900 text-white w-16 h-16 rounded-full flex items-center justify-center font-black text-2xl border-4 border-slate-700 shadow-xl italic">
                     VS
                 </div>
             </div>
@@ -303,21 +307,21 @@ const MatchEntry: React.FC = () => {
             <div 
                  onClick={() => setModalTarget('p2')}
                  className={`
-                    relative p-6 rounded-3xl border-4 transition-all duration-300 cursor-pointer group min-h-[280px] flex flex-col justify-center
-                    ${result === 'PLAYER2_WIN' ? 'bg-blue-50 border-blue-500 shadow-xl shadow-blue-500/20 scale-105 z-20' : 
-                      result === 'DRAW' ? 'bg-slate-50 border-slate-300 opacity-80' :
-                      result === 'PLAYER1_WIN' ? 'bg-slate-100 border-slate-200 opacity-60 grayscale blur-[1px]' :
-                      'bg-white border-slate-200 hover:border-blue-400 hover:shadow-lg'
+                    relative p-6 rounded-[2rem] border-4 transition-all duration-300 cursor-pointer group min-h-[280px] flex flex-col justify-center
+                    ${result === 'PLAYER2_WIN' ? 'bg-blue-950/30 border-blue-500 shadow-xl shadow-blue-500/20 scale-105 z-20 backdrop-blur-md' : 
+                      result === 'DRAW' ? 'bg-slate-800/50 border-slate-600 opacity-80 backdrop-blur-md' :
+                      result === 'PLAYER1_WIN' ? 'bg-slate-900/50 border-slate-800 opacity-60 grayscale blur-[1px]' :
+                      'bg-slate-800/50 border-slate-700 hover:border-blue-400 hover:shadow-lg backdrop-blur-md'
                     }
                 `}
             >
-                <div className="absolute -top-4 right-6 bg-blue-500 text-white px-4 py-1 rounded-full font-black tracking-wider shadow-md uppercase text-sm flex items-center gap-2">
+                <div className="absolute -top-4 right-6 bg-blue-600 text-white px-4 py-1 rounded-full font-black tracking-wider shadow-md uppercase text-sm flex items-center gap-2 border border-blue-400">
                      <Search size={14} className="opacity-70"/> Player 2
                 </div>
                 <div className="flex flex-col items-center py-6">
                     {p2 ? getAvatar(p2) : (
-                        <div className="flex flex-col items-center text-slate-300 group-hover:text-blue-400 transition-colors">
-                             <div className="w-24 h-24 rounded-full bg-slate-100 flex items-center justify-center mb-4">
+                        <div className="flex flex-col items-center text-slate-500 group-hover:text-blue-400 transition-colors">
+                             <div className="w-24 h-24 rounded-full bg-slate-800/50 flex items-center justify-center mb-4 border-2 border-slate-700 border-dashed">
                                 <UserIcon size={40}/>
                             </div>
                             <div className="font-bold text-lg">タップして選択</div>
@@ -327,12 +331,12 @@ const MatchEntry: React.FC = () => {
                     {p2 && result !== 'PLAYER2_WIN' && result !== 'DRAW' && (
                         <button 
                              onClick={(e) => { e.stopPropagation(); setResult('PLAYER2_WIN'); }}
-                            className="mt-6 px-8 py-3 bg-blue-500 text-white rounded-full font-black shadow-lg hover:bg-blue-600 active:scale-95 transition-all uppercase tracking-wider"
+                            className="mt-6 px-8 py-3 bg-blue-600 text-white rounded-full font-black shadow-lg hover:bg-blue-500 active:scale-95 transition-all uppercase tracking-wider border border-blue-400"
                         >
                             Winner
                         </button>
                     )}
-                     {result === 'PLAYER2_WIN' && <div className="mt-6 text-blue-600 font-black text-2xl uppercase tracking-widest animate-pulse">Victory</div>}
+                     {result === 'PLAYER2_WIN' && <div className="mt-6 text-blue-500 font-black text-2xl uppercase tracking-widest animate-pulse drop-shadow-md">Victory</div>}
                 </div>
             </div>
         </div>
@@ -343,8 +347,8 @@ const MatchEntry: React.FC = () => {
                 onClick={() => setResult(result === 'DRAW' ? null : 'DRAW')}
                 className={`px-8 py-3 rounded-full font-bold border-2 transition-all active:scale-95 flex items-center gap-2 ${
                     result === 'DRAW' 
-                    ? 'bg-slate-700 text-white border-slate-700 shadow-lg' 
-                    : 'bg-white text-slate-400 border-slate-300 hover:border-slate-400'
+                    ? 'bg-slate-700 text-white border-slate-600 shadow-lg' 
+                    : 'bg-slate-800 text-slate-400 border-slate-700 hover:border-slate-500'
                 }`}
             >
                 <Minus size={20}/> 引き分け (Draw)
@@ -353,19 +357,19 @@ const MatchEntry: React.FC = () => {
 
         {/* Confirmation Area */}
         <div className={`mt-8 transition-all duration-500 ${p1 && p2 && result ? 'opacity-100 translate-y-0' : 'opacity-50 translate-y-4 grayscale pointer-events-none'}`}>
-             <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xl max-w-xl mx-auto">
+             <div className="bg-slate-800/80 p-6 rounded-3xl border border-white/10 shadow-xl max-w-xl mx-auto backdrop-blur-md">
                  <div className="flex flex-col gap-4">
                      <div>
                          <div className="flex items-center justify-between mb-2">
                             <label className="block text-xs font-bold text-slate-400 uppercase">Admin PIN</label>
-                            <div className="text-xs font-mono bg-slate-100 px-2 rounded text-slate-500">入力</div>
+                            <div className="text-xs font-mono bg-slate-900 px-2 rounded text-slate-500 border border-slate-700">入力</div>
                          </div>
                         <input 
                             type="password" 
                             value={pin}
                             readOnly
                             placeholder="PIN"
-                            className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 font-mono text-lg text-center tracking-widest cursor-default outline-none"
+                            className="w-full p-3 rounded-xl border border-slate-600 bg-slate-900 font-mono text-lg text-white text-center tracking-widest cursor-default outline-none"
                             maxLength={4}
                         />
                         <NumPad value={pin} onChange={setPin} maxLength={4} />
@@ -374,7 +378,7 @@ const MatchEntry: React.FC = () => {
                      <button 
                         onClick={handleSubmit}
                         disabled={isSubmitting || !p1 || !p2 || !result || pin.length < 4}
-                        className="w-full h-[60px] bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-black text-lg shadow-lg hover:shadow-xl transition-all active:scale-95 disabled:opacity-50 disabled:scale-100"
+                        className="w-full h-[60px] bg-white hover:bg-slate-200 text-slate-900 rounded-xl font-black text-lg shadow-lg hover:shadow-xl transition-all active:scale-95 disabled:opacity-50 disabled:scale-100"
                     >
                         {isSubmitting ? 'Processing...' : '記録する'}
                     </button>
