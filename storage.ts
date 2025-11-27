@@ -1,5 +1,3 @@
-
-
 import { User, MatchRecord, SystemSettings, ActivityLog, ActivityType, AchievementDef, MatchProcessResult, AttendanceResult, BackupData, PointBreakdown, EventType, Season, IconDef, RivalData } from './types';
 
 const USERS_KEY = 'club_rivals_users_v2';
@@ -58,7 +56,7 @@ export const ACHIEVEMENTS_DATA: AchievementDef[] = [
 export const ICONS_DATA: IconDef[] = [
     { id: 'DEFAULT_INITIAL', char: '名', name: '頭文字', conditionDescription: 'デフォルト', type: 'DEFAULT', category: 'DEFAULT' },
     { id: 'DEFAULT_SMILE', char: '🙂', name: 'スマイル', conditionDescription: 'デフォルト', type: 'DEFAULT', category: 'DEFAULT' },
-    // SHOGI PIECES - Updated to Full Kanji for realistic look
+    // SHOGI PIECES - Full Kanji names
     { id: 'SHOGI_FU', char: '歩兵', name: '歩兵', conditionDescription: '最初から所持', type: 'DEFAULT', category: 'SHOGI' },
     { id: 'SHOGI_TO', char: 'と金', name: 'と金', conditionDescription: '対局数3回', type: 'MATCHES', threshold: 3, category: 'SHOGI' },
     { id: 'SHOGI_KY', char: '香車', name: '香車', conditionDescription: '対局数5回', type: 'MATCHES', threshold: 5, category: 'SHOGI' },
@@ -69,7 +67,8 @@ export const ICONS_DATA: IconDef[] = [
     { id: 'SHOGI_HI', char: '飛車', name: '飛車', conditionDescription: 'レート1200到達', type: 'RATE', threshold: 1200, category: 'SHOGI' },
     { id: 'SHOGI_OU', char: '王将', name: '王将', conditionDescription: 'レート1300到達', type: 'RATE', threshold: 1300, category: 'SHOGI' },
     { id: 'SHOGI_RYU', char: '龍王', name: '龍王', conditionDescription: 'レート1400到達', type: 'RATE', threshold: 1400, category: 'SHOGI' },
-    
+    { id: 'SHOGI_UMA', char: '龍馬', name: '龍馬', conditionDescription: 'レート1400到達', type: 'RATE', threshold: 1400, category: 'SHOGI' },
+
     // CHESS PIECES
     { id: 'CHESS_PAWN', char: '♟️', name: 'ポーン', conditionDescription: '勝利数30回', type: 'WINS', threshold: 30, category: 'CHESS' },
     { id: 'CHESS_KNIGHT', char: '♞', name: 'ナイト', conditionDescription: 'レート1500到達', type: 'RATE', threshold: 1500, category: 'CHESS' },
@@ -257,11 +256,15 @@ export const addLog = (log: ActivityLog) => {
 // --- Logic Helpers ---
 
 export const getUserAvatarChar = (user: User): string => {
-    if (user.activeIconId === 'DEFAULT_INITIAL') {
+    if (!user.activeIconId || user.activeIconId === 'DEFAULT_INITIAL') {
         return user.name.charAt(0);
     }
     const icon = ICONS_DATA.find(i => i.id === user.activeIconId);
-    return icon ? icon.char : user.name.charAt(0);
+    if (!icon) return user.name.charAt(0);
+    
+    // If it's a Shogi/Chess piece, return the char.
+    // If it's a special icon that relies on emoji/char, return it.
+    return icon.char;
 }
 
 export const getUserIconDef = (iconId: string): IconDef => {
@@ -340,29 +343,76 @@ export const updateUserIcon = (userId: string, iconId: string) => {
     saveUsers(users);
 }
 
-export const balanceFactions = (users: User[]): User[] => {
+// ----------------------------------------------------
+// New Team Balance Logic
+// Weight: Rate (Skill) vs Activity Days (Contribution)
+// New Request: "Heavily prioritize Activity Days"
+// Formula: Score = (Rate * 0.3) + (ActivityDays * 300)
+// ----------------------------------------------------
+const calculatePowerScore = (user: User): number => {
+    const baseRate = user.rate || 1000;
+    const days = user.activityDays || 0;
+    // Strong focus on days. 10 days = 3000 pts. 
+    // Rate 1500 * 0.3 = 450 pts.
+    // Result: A low rate player who comes every day > High rate ghost.
+    return (baseRate * 0.3) + (days * 300);
+};
+
+export const getFactionBalanceSimulation = (users: User[]) => {
     const scoredUsers = users.map(u => ({
         ...u,
-        _powerScore: u.rate + (u.activityDays * 50)
+        _powerScore: calculatePowerScore(u)
     }));
-
+    
+    // Sort high to low
     scoredUsers.sort((a, b) => b._powerScore - a._powerScore);
 
+    const red: typeof scoredUsers = [];
+    const white: typeof scoredUsers = [];
     let redScore = 0;
     let whiteScore = 0;
-    const balancedUsers = scoredUsers.map((u) => {
-        let faction: 'RED' | 'WHITE';
+
+    // Greedy allocation
+    scoredUsers.forEach(u => {
         if (redScore <= whiteScore) {
-            faction = 'RED';
+            red.push(u);
             redScore += u._powerScore;
         } else {
-            faction = 'WHITE';
+            white.push(u);
             whiteScore += u._powerScore;
         }
-        return { ...u, faction, _powerScore: undefined }; 
     });
 
-    return balancedUsers;
+    const getStats = (list: User[]) => ({
+        count: list.length,
+        avgRate: list.length ? Math.round(list.reduce((acc, c) => acc + c.rate, 0) / list.length) : 0,
+        totalDays: list.reduce((acc, c) => acc + (c.activityDays||0), 0)
+    });
+
+    return {
+        redUsers: red,
+        whiteUsers: white,
+        redStats: getStats(red),
+        whiteStats: getStats(white)
+    };
+}
+
+export const balanceFactions = (users: User[]): User[] => {
+    const simulation = getFactionBalanceSimulation(users);
+    
+    // Apply Faction
+    const newUsers = [...users];
+    
+    simulation.redUsers.forEach(su => {
+        const u = newUsers.find(nu => nu.id === su.id);
+        if(u) u.faction = 'RED';
+    });
+    simulation.whiteUsers.forEach(su => {
+        const u = newUsers.find(nu => nu.id === su.id);
+        if(u) u.faction = 'WHITE';
+    });
+
+    return newUsers;
 };
 
 export const assignGenerals = (redGeneralId: string, whiteGeneralId: string) => {

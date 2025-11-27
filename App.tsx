@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { HashRouter, Routes, Route, useLocation, Link } from 'react-router-dom';
 import { Home, Trophy, User as UserIcon, Settings, PlusCircle, BookOpen } from 'lucide-react';

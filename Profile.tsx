@@ -1,13 +1,53 @@
-
 import React, { useState, useEffect } from 'react';
 import { getUsers, getMatches, ACHIEVEMENTS_DATA, updateUserTitle, getRivalryStats, ICONS_DATA, updateUserIcon, getUserAvatarChar, getLogs, getSettings, isEventActive, getUserIconDef } from './storage';
 import { User, MatchRecord, IconDef, ActivityLog, ActivityType, EventType, RivalData } from './types';
 import { Card } from './Card';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Award, TrendingUp, Calendar, ArrowLeft, Tag, Star, Crown, Swords, Search, Skull, Smile, Lock, Grid, Shield } from 'lucide-react';
+import { Award, TrendingUp, Calendar, ArrowLeft, Tag, Star, Crown, Swords, Search, Skull, Smile, Lock, Grid, Shield, List } from 'lucide-react';
 import { UserSelector } from './UserSelector';
 import { useNavigate } from 'react-router-dom';
 import { ShogiPiece } from './ShogiPiece';
+
+// Title Collection Modal
+const TitleCollectionModal: React.FC<{ user: User, onClose: () => void }> = ({ user, onClose }) => {
+    return (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-in fade-in zoom-in duration-200">
+            <div className="bg-slate-900 w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden border border-white/10 flex flex-col max-h-[90vh]">
+                <div className="p-4 border-b border-white/5 bg-slate-800 flex items-center justify-between shrink-0">
+                     <h3 className="text-lg font-black text-white flex items-center gap-2">
+                         <Award className="text-yellow-500" /> 称号コレクション
+                     </h3>
+                     <button onClick={onClose} className="p-2 bg-slate-700 text-slate-300 rounded-full hover:bg-slate-600 transition-colors">
+                         <ArrowLeft size={20} />
+                     </button>
+                </div>
+                <div className="p-4 overflow-y-auto bg-slate-900 space-y-2">
+                    {ACHIEVEMENTS_DATA.map(ach => {
+                        const isUnlocked = user.achievements.includes(ach.id);
+                        return (
+                            <div key={ach.id} className={`p-3 rounded-xl border flex items-center justify-between ${isUnlocked ? 'bg-indigo-900/20 border-indigo-500/30' : 'bg-slate-800/50 border-slate-700/50 opacity-60'}`}>
+                                <div className="flex items-center gap-3">
+                                    <div className={`p-2 rounded-lg ${isUnlocked ? 'bg-indigo-500 text-white' : 'bg-slate-700 text-slate-500'}`}>
+                                        <Award size={20} />
+                                    </div>
+                                    <div>
+                                        <div className={`font-bold ${isUnlocked ? 'text-white' : 'text-slate-400'}`}>{ach.name}</div>
+                                        <div className="text-xs text-slate-500">{ach.description}</div>
+                                    </div>
+                                </div>
+                                {isUnlocked ? (
+                                    <span className="text-xs font-bold text-green-400 bg-green-900/20 px-2 py-1 rounded">獲得済</span>
+                                ) : (
+                                    <Lock size={16} className="text-slate-600" />
+                                )}
+                            </div>
+                        )
+                    })}
+                </div>
+            </div>
+        </div>
+    );
+};
 
 // Icon Selector Modal
 const IconSelectorModal: React.FC<{
@@ -78,15 +118,15 @@ const IconSelectorModal: React.FC<{
                                     {icon.category === 'SHOGI' ? (
                                         <ShogiPiece char={icon.char} scale={0.6} shadow={false} />
                                     ) : (
-                                        <div className="text-3xl text-white">{icon.char}</div>
+                                        <div className="text-3xl text-white font-serif-jp">{icon.char}</div>
                                     )}
                                 </div>
                                 
-                                {isUnlocked ? (
-                                    <div className="text-[10px] font-bold truncate w-full text-center leading-tight text-slate-300">
-                                        {icon.name}
-                                    </div>
-                                ) : (
+                                <div className="text-[10px] font-bold truncate w-full text-center leading-tight text-slate-300">
+                                    {icon.name}
+                                </div>
+
+                                {!isUnlocked && (
                                     <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/80 rounded-2xl backdrop-blur-[1px] p-2 text-center z-10 border border-white/5">
                                         <Lock size={16} className="text-slate-500 mb-1" />
                                         <div className="text-[8px] font-bold text-slate-500 leading-tight line-clamp-2">
@@ -111,6 +151,7 @@ const Profile: React.FC = () => {
   const [rivalStats, setRivalStats] = useState<{bestCustomer: RivalData | null, nemeses: RivalData | null}>({bestCustomer: null, nemeses: null});
   const [isSelectorOpen, setIsSelectorOpen] = useState(false);
   const [isIconModalOpen, setIsIconModalOpen] = useState(false);
+  const [isTitleModalOpen, setIsTitleModalOpen] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -160,6 +201,7 @@ const Profile: React.FC = () => {
   const settings = getSettings();
   const isFactionWar = isEventActive() && settings.eventType === EventType.FACTION_WAR;
   const iconDef = getUserIconDef(user.activeIconId);
+  const avatarChar = getUserAvatarChar(user);
   const isRed = user.faction === 'RED';
 
   // Prepare graph data
@@ -212,6 +254,10 @@ const Profile: React.FC = () => {
           />
       )}
 
+      {isTitleModalOpen && (
+          <TitleCollectionModal user={user} onClose={() => setIsTitleModalOpen(false)} />
+      )}
+
       {/* Back Button & Header */}
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-4">
@@ -251,9 +297,9 @@ const Profile: React.FC = () => {
                      </div>
                 ) : (
                     <div className={`w-32 h-32 md:w-40 md:h-40 rounded-full ${user.avatarColor} p-1 shadow-2xl ring-4 ring-slate-800 relative`}>
-                        <div className="w-full h-full rounded-full bg-slate-900/50 backdrop-blur-sm flex items-center justify-center text-7xl shadow-inner relative overflow-hidden text-white">
+                        <div className="w-full h-full rounded-full bg-slate-900/50 backdrop-blur-sm flex items-center justify-center text-7xl shadow-inner relative overflow-hidden text-white font-serif-jp">
                             <span className="drop-shadow-md transform group-hover:scale-110 transition-transform duration-300 select-none">
-                                {iconDef.char}
+                                {avatarChar}
                             </span>
                         </div>
                     </div>
@@ -280,7 +326,7 @@ const Profile: React.FC = () => {
                                 {ACHIEVEMENTS_DATA.find(a => a.id === user.activeTitle)?.name || user.activeTitle}
                             </span>
                         ) : (
-                            <span className="px-3 py-1 bg-slate-800 text-slate-500 rounded-full text-xs font-bold border border-slate-700">
+                            <span className="px-3 py-1 bg-slate-800 text-slate-400 rounded-full text-xs font-bold border border-slate-700">
                                 称号なし
                             </span>
                         )}
@@ -472,22 +518,27 @@ const Profile: React.FC = () => {
             </Card>
 
              <Card title="獲得称号リスト" icon={<Award size={18} />}>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-60 overflow-y-auto pr-1">
-                    {unlockedAchievements.length > 0 ? (
-                        unlockedAchievements.map(ach => (
-                            <div key={ach.id} className="flex items-center gap-2 p-2 bg-indigo-900/20 rounded-lg border border-indigo-500/20">
-                                <Award size={16} className="text-indigo-400 shrink-0" />
-                                <div>
-                                    <div className="text-xs font-bold text-slate-200">{ach.name}</div>
-                                    <div className="text-[10px] text-slate-400">{ach.description}</div>
+                <div className="flex flex-col gap-2">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-60 overflow-y-auto pr-1">
+                        {unlockedAchievements.length > 0 ? (
+                            unlockedAchievements.map(ach => (
+                                <div key={ach.id} className="flex items-center gap-2 p-2 bg-indigo-900/20 rounded-lg border border-indigo-500/20">
+                                    <Award size={16} className="text-indigo-400 shrink-0" />
+                                    <div>
+                                        <div className="text-xs font-bold text-slate-200">{ach.name}</div>
+                                        <div className="text-[10px] text-slate-400">{ach.description}</div>
+                                    </div>
                                 </div>
+                            ))
+                        ) : (
+                            <div className="col-span-2 text-center text-slate-500 py-4 text-sm">
+                                まだ称号を獲得していません。<br/>対局や活動を重ねてゲットしよう！
                             </div>
-                        ))
-                    ) : (
-                        <div className="col-span-2 text-center text-slate-500 py-4 text-sm">
-                            まだ称号を獲得していません。<br/>対局や活動を重ねてゲットしよう！
-                        </div>
-                    )}
+                        )}
+                    </div>
+                    <button onClick={() => setIsTitleModalOpen(true)} className="w-full mt-2 bg-slate-800 text-slate-300 py-2 rounded-lg text-xs font-bold hover:bg-slate-700 transition-colors flex items-center justify-center gap-2">
+                        <List size={14} /> 全称号リストを確認する (コレクション)
+                    </button>
                 </div>
             </Card>
 

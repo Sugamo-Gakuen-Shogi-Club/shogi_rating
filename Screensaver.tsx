@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { getUsers } from './storage';
-import { User } from './types';
-import { Trophy, Star, Calendar, TrendingUp } from 'lucide-react';
+import { getUsers, getSettings, isEventActive } from './storage';
+import { User, EventType } from './types';
+import { Trophy, Star, Calendar, TrendingUp, Flag, Crown } from 'lucide-react';
 
 interface ScreensaverProps {
   onDismiss: () => void;
@@ -9,25 +9,55 @@ interface ScreensaverProps {
 
 export const Screensaver: React.FC<ScreensaverProps> = ({ onDismiss }) => {
   const [users, setUsers] = useState<User[]>([]);
-  const [mode, setMode] = useState<'RATE' | 'POINTS' | 'ATTENDANCE'>('RATE');
+  const [mode, setMode] = useState<'RATE' | 'POINTS' | 'ATTENDANCE' | 'FACTION_WAR'>('RATE');
+  const [factionStats, setFactionStats] = useState({ red: 0, white: 0 });
+
+  const settings = getSettings();
+  const isFactionWar = isEventActive() && settings.eventType === EventType.FACTION_WAR;
 
   useEffect(() => {
     setUsers(getUsers());
+    
+    // Initial Calc for Faction
+    const u = getUsers();
+    let r = 0, w = 0;
+    u.forEach(user => {
+        if(user.faction === 'RED') r += (user.eventPoints || 0);
+        if(user.faction === 'WHITE') w += (user.eventPoints || 0);
+    });
+    setFactionStats({ red: r, white: w });
+
     const interval = setInterval(() => {
       setMode(prev => {
+        if (isFactionWar) {
+             // In Faction War, cycle: RATE -> FACTION -> POINTS -> FACTION -> ATTENDANCE -> FACTION
+             if (prev === 'RATE') return 'FACTION_WAR';
+             if (prev === 'FACTION_WAR') {
+                 // Determine next state based on random or counter? Simple rotation:
+                 // Need context of "previous previous". Simpler:
+                 // Just make FACTION_WAR appear more often.
+                 return Math.random() > 0.5 ? 'POINTS' : 'RATE'; // Fallback logic simpler below
+             }
+             if (prev === 'POINTS') return 'FACTION_WAR';
+             if (prev === 'ATTENDANCE') return 'FACTION_WAR';
+             return 'FACTION_WAR';
+        }
+        
+        // Standard Cycle
         if (prev === 'RATE') return 'POINTS';
         if (prev === 'POINTS') return 'ATTENDANCE';
         return 'RATE';
       });
     }, 8000); // Switch every 8 seconds
     return () => clearInterval(interval);
-  }, []);
+  }, [isFactionWar]);
 
   // Sort Users
   const sortedUsers = [...users].sort((a, b) => {
     if (mode === 'RATE') return b.rate - a.rate;
     if (mode === 'POINTS') return b.monthlyPoints - a.monthlyPoints;
-    return b.activityDays - a.activityDays;
+    if (mode === 'ATTENDANCE') return b.activityDays - a.activityDays;
+    return 0;
   });
 
   const topUsers = sortedUsers.slice(0, 5);
@@ -37,11 +67,76 @@ export const Screensaver: React.FC<ScreensaverProps> = ({ onDismiss }) => {
       case 'RATE': return { title: '最強の棋士は誰だ', subtitle: '現在のレートランキング', icon: <Star size={48} className="text-yellow-400" /> };
       case 'POINTS': return { title: '今月の活動リーダー', subtitle: '月間獲得ポイント', icon: <TrendingUp size={48} className="text-green-400" /> };
       case 'ATTENDANCE': return { title: '活動皆勤賞', subtitle: '活動日数ランキング', icon: <Calendar size={48} className="text-blue-400" /> };
+      case 'FACTION_WAR': return { title: settings.eventName || '紅白対抗戦', subtitle: 'チーム対抗戦 開催中', icon: <Flag size={48} className="text-red-400" /> };
     }
   };
 
   const info = getModeInfo();
 
+  // --- FACTION WAR RENDER ---
+  if (mode === 'FACTION_WAR') {
+      return (
+        <div 
+          className="fixed inset-0 z-50 bg-black flex flex-col items-center justify-center text-white cursor-pointer overflow-hidden font-serif-jp"
+          onClick={onDismiss}
+          onTouchStart={onDismiss}
+        >
+             {/* Dynamic Background */}
+             <div className="absolute inset-0">
+                 {/* Red Spotlight */}
+                 <div className="absolute top-[-50%] left-[-20%] w-[100%] h-[200%] bg-gradient-to-b from-red-600/30 to-transparent rotate-[30deg] animate-[spotlight_4s_infinite_alternate]"></div>
+                 {/* Blue Spotlight */}
+                 <div className="absolute top-[-50%] right-[-20%] w-[100%] h-[200%] bg-gradient-to-b from-blue-600/30 to-transparent rotate-[-30deg] animate-[spotlight_4s_infinite_alternate-reverse]"></div>
+                 
+                 <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-30"></div>
+             </div>
+
+             <div className="relative z-10 w-full max-w-6xl flex items-center justify-center gap-12">
+                 {/* Red Score */}
+                 <div className="text-center transform animate-[slideInLeft_0.5s_ease-out]">
+                      <div className="text-red-500 font-black text-9xl drop-shadow-[0_0_20px_rgba(239,68,68,0.8)] filter">
+                          {factionStats.red}
+                      </div>
+                      <div className="text-4xl font-black text-red-200 uppercase tracking-widest mt-4 border-t-4 border-red-600 pt-2">RED ARMY</div>
+                 </div>
+
+                 {/* VS */}
+                 <div className="relative">
+                     <div className="text-8xl font-black italic text-white drop-shadow-[0_0_30px_rgba(255,255,255,0.8)] animate-pulse">VS</div>
+                 </div>
+
+                 {/* White Score */}
+                 <div className="text-center transform animate-[slideInRight_0.5s_ease-out]">
+                      <div className="text-blue-400 font-black text-9xl drop-shadow-[0_0_20px_rgba(96,165,250,0.8)] filter">
+                          {factionStats.white}
+                      </div>
+                      <div className="text-4xl font-black text-blue-200 uppercase tracking-widest mt-4 border-t-4 border-blue-500 pt-2">WHITE ARMY</div>
+                 </div>
+             </div>
+             
+             <div className="absolute bottom-12 text-slate-400 font-mono animate-pulse">
+                 TAP TO RESUME
+             </div>
+
+             <style>{`
+                @keyframes spotlight {
+                    0% { transform: rotate(20deg) translateX(-10%); opacity: 0.5; }
+                    100% { transform: rotate(40deg) translateX(10%); opacity: 0.8; }
+                }
+                @keyframes slideInLeft {
+                    from { transform: translateX(-100px); opacity: 0; }
+                    to { transform: translateX(0); opacity: 1; }
+                }
+                @keyframes slideInRight {
+                    from { transform: translateX(100px); opacity: 0; }
+                    to { transform: translateX(0); opacity: 1; }
+                }
+             `}</style>
+        </div>
+      );
+  }
+
+  // --- STANDARD RANKING RENDER ---
   return (
     <div 
       className="fixed inset-0 z-50 bg-slate-900 flex flex-col items-center justify-center text-white cursor-pointer overflow-hidden"

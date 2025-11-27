@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
-import { getUsers, saveUsers, getSettings, saveSettings, manualPointAdjustment, resetMonthly, isEventActive, exportData, importData, getMatches, deleteMatch, balanceFactions, toggleGeneral, assignGenerals, resetEventPoints } from './storage';
+import { getUsers, saveUsers, getSettings, saveSettings, manualPointAdjustment, resetMonthly, isEventActive, exportData, importData, getMatches, deleteMatch, balanceFactions, toggleGeneral, assignGenerals, resetEventPoints, getFactionBalanceSimulation } from './storage';
 import { User, SystemSettings, MatchRecord, Season, EventType } from './types';
 import { Card } from './Card';
 import { NumPad } from './NumPad';
@@ -26,6 +25,9 @@ const Admin: React.FC = () => {
   const [wRedGeneral, setWRedGeneral] = useState<string | null>(null);
   const [wWhiteGeneral, setWWhiteGeneral] = useState<string | null>(null);
   const [wSelectingTarget, setWSelectingTarget] = useState<'RED' | 'WHITE' | null>(null);
+  
+  // Balance Simulation Data
+  const [wSimData, setWSimData] = useState<ReturnType<typeof getFactionBalanceSimulation> | null>(null);
 
   // New User Form
   const [newName, setNewName] = useState('');
@@ -123,6 +125,7 @@ const Admin: React.FC = () => {
       setWDuration(7);
       setWRedGeneral(null);
       setWWhiteGeneral(null);
+      setWSimData(null);
       setWizardStep(1);
       setIsEventWizardOpen(true);
   }
@@ -164,7 +167,9 @@ const Admin: React.FC = () => {
       if (wizardStep === 1) {
           if (!wName) { alert('イベント名を入力してください'); return; }
           if (wType === EventType.FACTION_WAR) {
-              setWizardStep(2); // Go to balance
+              // Run simulation on transition to step 2
+              setWSimData(getFactionBalanceSimulation(users));
+              setWizardStep(2); 
           } else {
               finishEventSetup(); // Standard event just starts
           }
@@ -175,12 +180,13 @@ const Admin: React.FC = () => {
       }
   }
 
-  const handleWizardBalance = () => {
-      if (window.confirm('現在のレートと活動日数に基づいてチームを自動編成します。\n本当によろしいですか？')) {
+  const handleWizardBalanceApply = () => {
+      if (window.confirm('この編成を適用しますか？\n(現在のチーム設定は上書きされます)')) {
           const balanced = balanceFactions(users);
           saveUsers(balanced);
-          setUsers(balanced); // Optimistic update
-          refreshData(); // Sync
+          setUsers(balanced); 
+          refreshData(); 
+          setWizardStep(3); // Move to next step
       }
   }
 
@@ -234,14 +240,6 @@ const Admin: React.FC = () => {
           } catch(e) {
               alert('取り消しに失敗しました');
           }
-      }
-  }
-
-  const handleSeasonChange = (season: Season) => {
-      if (window.confirm(`現在のシーズンを「${season}」に変更しますか？`)) {
-          const newSettings: SystemSettings = { ...settings, currentSeason: season };
-          saveSettings(newSettings);
-          refreshData();
       }
   }
 
@@ -337,21 +335,67 @@ const Admin: React.FC = () => {
                       )}
 
                       {wizardStep === 2 && wType === EventType.FACTION_WAR && (
-                          <div className="space-y-6 text-center">
-                              <Shuffle size={64} className="mx-auto text-indigo-500" />
-                              <h4 className="text-2xl font-black text-white">チーム編成の確認</h4>
-                              <p className="text-slate-400">
-                                  現在登録されている部員のレートと活動日数に基づいて、<br/>
-                                  戦力が均等になるようにチームを自動で振り分けますか？
-                              </p>
-                              <div className="bg-amber-900/20 p-4 rounded-xl text-left text-xs text-amber-500 font-bold border border-amber-500/20">
-                                  <AlertCircle size={14} className="inline mr-1"/>
-                                  注意: これを実行すると、現在のチーム割り当てはすべて上書きされます。手動で設定したい場合はスキップしてください。
+                          <div className="space-y-6">
+                              <div className="text-center mb-6">
+                                  <Shuffle size={48} className="mx-auto text-indigo-500 mb-2" />
+                                  <h4 className="text-2xl font-black text-white">チーム編成シミュレーション</h4>
+                                  <p className="text-slate-400 text-sm">
+                                      「活動日数」を最重視して戦力が均等になるように振り分けました。<br/>
+                                      以下のバランスを確認し、適用してください。
+                                  </p>
                               </div>
-                              <button onClick={handleWizardBalance} className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-indigo-700 active:scale-95 transition-all flex items-center justify-center gap-2">
-                                  <Shuffle size={20} /> 戦力均衡オート編成を実行
+
+                              {wSimData && (
+                                  <div className="grid grid-cols-2 gap-4">
+                                      {/* Red Sim */}
+                                      <div className="bg-red-900/20 border border-red-500/30 rounded-2xl p-4">
+                                          <div className="text-red-400 font-black uppercase text-xs mb-2">Red Army Preview</div>
+                                          <div className="space-y-2">
+                                              <div className="flex justify-between text-sm">
+                                                  <span className="text-slate-400">人数</span>
+                                                  <span className="font-bold text-white">{wSimData.redStats.count} 名</span>
+                                              </div>
+                                              <div className="flex justify-between text-sm">
+                                                  <span className="text-slate-400">平均Rate</span>
+                                                  <span className="font-bold text-white">{wSimData.redStats.avgRate}</span>
+                                              </div>
+                                              <div className="flex justify-between text-sm">
+                                                  <span className="text-slate-400">総活動日数</span>
+                                                  <span className="font-bold text-white">{wSimData.redStats.totalDays} 日</span>
+                                              </div>
+                                          </div>
+                                      </div>
+
+                                      {/* White Sim */}
+                                      <div className="bg-slate-800/50 border border-slate-600/30 rounded-2xl p-4">
+                                          <div className="text-slate-400 font-black uppercase text-xs mb-2">White Army Preview</div>
+                                           <div className="space-y-2">
+                                              <div className="flex justify-between text-sm">
+                                                  <span className="text-slate-400">人数</span>
+                                                  <span className="font-bold text-white">{wSimData.whiteStats.count} 名</span>
+                                              </div>
+                                              <div className="flex justify-between text-sm">
+                                                  <span className="text-slate-400">平均Rate</span>
+                                                  <span className="font-bold text-white">{wSimData.whiteStats.avgRate}</span>
+                                              </div>
+                                              <div className="flex justify-between text-sm">
+                                                  <span className="text-slate-400">総活動日数</span>
+                                                  <span className="font-bold text-white">{wSimData.whiteStats.totalDays} 日</span>
+                                              </div>
+                                          </div>
+                                      </div>
+                                  </div>
+                              )}
+                              
+                              <button onClick={handleWizardBalanceApply} className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-indigo-700 active:scale-95 transition-all flex items-center justify-center gap-2">
+                                  <Shuffle size={20} /> この編成を適用して次へ
                               </button>
-                              <div className="text-xs text-slate-500 mt-4">編成が終わっている場合は次へ進んでください</div>
+                              
+                              <div className="text-center">
+                                <button onClick={() => setWizardStep(3)} className="text-xs text-slate-500 underline hover:text-slate-400">
+                                    現在のチーム編成を維持したまま次へ
+                                </button>
+                              </div>
                           </div>
                       )}
 
@@ -411,9 +455,11 @@ const Admin: React.FC = () => {
                       ) : (
                           <>
                              <button onClick={() => setWizardStep(prev => (prev - 1) as any)} className="text-slate-500 font-bold px-4 hover:bg-slate-900 rounded-lg transition-colors">戻る</button>
-                             <button onClick={handleWizardNext} className="bg-slate-200 text-slate-900 px-8 py-3 rounded-xl font-bold shadow-lg hover:bg-white active:scale-95 transition-all flex items-center gap-2">
-                                {wizardStep === 3 ? 'イベント開始確定' : '次へ'} <ChevronRight size={16} />
-                             </button>
+                             {wizardStep === 3 && (
+                                <button onClick={finishEventSetup} className="bg-slate-200 text-slate-900 px-8 py-3 rounded-xl font-bold shadow-lg hover:bg-white active:scale-95 transition-all flex items-center gap-2">
+                                    イベント開始確定 <ChevronRight size={16} />
+                                </button>
+                             )}
                           </>
                       )}
                   </div>

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { User, EventType } from './types';
@@ -106,13 +105,13 @@ export const UserSelector: React.FC<UserSelectorProps> = ({
             <div className="w-full md:w-[45%] lg:w-[40%] bg-slate-800 border-r border-slate-700 flex flex-col order-2 md:order-1">
                  {/* ステータス＆リセット */}
                  <div className="p-3 border-b border-slate-700 bg-slate-800/80 backdrop-blur shrink-0 z-10 flex items-center justify-between">
-                     <span className="font-bold text-slate-400 text-sm">
+                     <span className="font-bold text-slate-300 text-sm">
                          {selectedChar ? `「${selectedChar}」行を選択中` : 'フィルタなし'}
                      </span>
                      {selectedChar && (
                         <button 
                             onClick={() => setSelectedChar(null)} 
-                            className="text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 px-3 py-1.5 rounded-full font-bold flex items-center gap-1 transition-colors"
+                            className="text-xs bg-slate-700 hover:bg-slate-600 text-slate-200 px-3 py-1.5 rounded-full font-bold flex items-center gap-1 transition-colors"
                         >
                             <RefreshCw size={12} /> 解除
                         </button>
@@ -171,7 +170,7 @@ export const UserSelector: React.FC<UserSelectorProps> = ({
                      <span className="font-bold text-slate-400 flex items-center gap-2">
                          {selectedChar ? <><span className="bg-blue-900/30 text-blue-400 px-2 py-0.5 rounded border border-blue-500/30">「{selectedChar}」</span>行</> : '全員'}
                      </span>
-                     <span className="bg-slate-800 text-slate-400 px-3 py-1 rounded-full text-xs font-bold border border-slate-700">
+                     <span className="bg-slate-800 text-slate-300 px-3 py-1 rounded-full text-xs font-bold border border-slate-700">
                          {filteredUsers.length}名
                      </span>
                  </div>
@@ -182,6 +181,7 @@ export const UserSelector: React.FC<UserSelectorProps> = ({
                             const last = u.lastAttendance ? new Date(u.lastAttendance).toISOString().split('T')[0] : null;
                             const isAttendedToday = today === last;
                             const iconDef = getUserIconDef(u.activeIconId);
+                            const avatarChar = getUserAvatarChar(u);
                             
                             // 出席モードの場合のみ、すでに出席済みの人を選択不可にする
                             const isDisabled = mode === 'ATTENDANCE' && isAttendedToday;
@@ -232,8 +232,8 @@ export const UserSelector: React.FC<UserSelectorProps> = ({
                                         <ShogiPiece char={iconDef.char} scale={0.6} />
                                     ) : (
                                         <div className={`w-14 h-14 rounded-full ${u.avatarColor} p-0.5 shadow-md flex items-center justify-center`}>
-                                            <div className="w-full h-full rounded-full bg-slate-900/50 backdrop-blur-[1px] flex items-center justify-center text-3xl font-black text-white drop-shadow-md">
-                                                {iconDef.char}
+                                            <div className="w-full h-full rounded-full bg-slate-900/50 backdrop-blur-[1px] flex items-center justify-center text-3xl font-black text-white drop-shadow-md font-serif-jp">
+                                                {avatarChar}
                                             </div>
                                         </div>
                                     )}
