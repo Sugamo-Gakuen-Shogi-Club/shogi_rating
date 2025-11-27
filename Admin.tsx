@@ -413,7 +413,7 @@ const Admin: React.FC = () => {
                           <div className="space-y-6">
                               <div className="text-center">
                                   <Crown size={48} className="mx-auto text-yellow-500 mb-2" />
-                                  <h4 className="text-2xl font-black text-white">大将任命の儀</h4>
+                                  <h4 className="text-2xl font-black text-white">大将任命</h4>
                                   <p className="text-slate-400 text-sm">各軍のリーダーとなる「大将」を指名してください。<br/>この選択はイベントの運命を左右します。</p>
                               </div>
                               
