@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { User, EventType } from './types';
@@ -187,6 +188,7 @@ export const UserSelector: React.FC<UserSelectorProps> = ({
                             const isDisabled = mode === 'ATTENDANCE' && isAttendedToday;
                             const isGeneral = u.isGeneral;
                             const isRed = u.faction === 'RED';
+                            const hasSystemTitle = !!u.systemTitle;
 
                             return (
                             <button 
@@ -200,7 +202,9 @@ export const UserSelector: React.FC<UserSelectorProps> = ({
                                             ? 'bg-red-950/20 border-red-900/50 hover:border-red-500 hover:shadow-xl hover:shadow-red-900/20 hover:-translate-y-1 cursor-pointer'
                                             : isFactionWar && !isRed
                                                 ? 'bg-slate-800 border-slate-600 hover:border-slate-400 hover:shadow-xl hover:-translate-y-1 cursor-pointer'
-                                                : 'bg-slate-800 border-slate-700 hover:border-blue-500 hover:shadow-xl hover:-translate-y-1 cursor-pointer'
+                                                : hasSystemTitle
+                                                    ? 'bg-gradient-to-b from-slate-800 to-slate-900 border-yellow-500/50 hover:border-yellow-400 hover:shadow-xl hover:shadow-yellow-500/10'
+                                                    : 'bg-slate-800 border-slate-700 hover:border-blue-500 hover:shadow-xl hover:-translate-y-1 cursor-pointer'
                                     }
                                 `}
                             >
@@ -227,6 +231,12 @@ export const UserSelector: React.FC<UserSelectorProps> = ({
                                     </div>
                                 )}
 
+                                {hasSystemTitle && !isGeneral && (
+                                     <div className="absolute -top-3 -right-3 rotate-12 z-20">
+                                        <Crown size={20} className="text-yellow-400 drop-shadow-md fill-yellow-400" />
+                                    </div>
+                                )}
+
                                 <div className="group-hover:scale-110 transition-transform relative mb-1">
                                     {iconDef.category === 'SHOGI' ? (
                                         <ShogiPiece char={iconDef.char} scale={0.6} />
@@ -240,7 +250,7 @@ export const UserSelector: React.FC<UserSelectorProps> = ({
                                 </div>
                                 
                                 <div className="w-full mt-2">
-                                    <div className="font-bold text-slate-200 text-sm leading-tight w-full truncate flex items-center justify-center gap-1">
+                                    <div className={`font-bold text-sm leading-tight w-full truncate flex items-center justify-center gap-1 ${hasSystemTitle ? 'text-yellow-200' : 'text-slate-200'}`}>
                                         {u.name}
                                     </div>
                                 </div>

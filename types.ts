@@ -1,5 +1,4 @@
 
-
 export enum ActivityType {
   MATCH_WIN = 'MATCH_WIN',
   MATCH_LOSS = 'MATCH_LOSS',
@@ -19,7 +18,7 @@ export interface AchievementDef {
 
 export interface IconDef {
   id: string;
-  char: string; // Emoji or Character. If special ID 'DEFAULT_INITIAL', handled dynamically.
+  char: string;
   name: string;
   conditionDescription: string;
   type: 'DEFAULT' | 'RATE' | 'WINS' | 'STREAK' | 'SPECIAL' | 'MATCHES';
@@ -32,7 +31,6 @@ export interface RateHistoryPoint {
   rate: number;
 }
 
-// 5 Seasons definition (Updated)
 export enum Season {
   TERM_1_EARLY = '1学期前半',
   TERM_1_LATE = '1学期後半',
@@ -46,39 +44,52 @@ export enum EventType {
   FACTION_WAR = '紅白戦'
 }
 
+export type SystemTitle = 'MASTER' | 'RISING_STAR' | 'GRINDER' | 'GIANT_KILLER';
+
+export interface TitleDef {
+    id: SystemTitle;
+    name: string;
+    english: string;
+    description: string;
+    color: string;
+}
+
 export interface User {
   id: string;
   name: string;
-  reading?: string; // Hiragana reading for sorting/filtering
+  reading?: string;
   isNewMember: boolean;
   rate: number;
-  faction?: 'RED' | 'WHITE'; // Team assignment
-  isGeneral: boolean; // Faction Leader (Taisho)
+  faction?: 'RED' | 'WHITE';
+  isGeneral: boolean;
   
+  // System Title (The Four Kings)
+  systemTitle: SystemTitle | null;
+
   // Icon System
   activeIconId: string;
   unlockedIcons: string[];
 
   // Point Breakdown
-  totalPoints: number;      // Sum of below
-  pointsMatch: number;      // Points from matches
-  pointsAttendance: number; // Points from attendance
-  pointsSpecial: number;    // Points from admin/contribution
+  totalPoints: number;
+  pointsMatch: number;
+  pointsAttendance: number;
+  pointsSpecial: number;
 
-  monthlyPoints: number; // Resets monthly
-  eventPoints: number;   // Resets per event, used for Faction War specific scoring
+  monthlyPoints: number;
+  eventPoints: number;
 
-  currentStreak: number; // Winning streak
+  currentStreak: number;
   maxStreak: number;
   wins: number;
   losses: number;
   draws: number;
-  lastAttendance: string | null; // ISO Date string
-  activityDays: number; // Number of days attended
+  lastAttendance: string | null;
+  activityDays: number;
   rateHistory: RateHistoryPoint[];
-  achievements: string[]; // Array of Achievement IDs
-  activeTitle: string | null; // Currently selected title
-  avatarColor: string; // Background gradient class
+  achievements: string[];
+  activeTitle: string | null; // Cosmetic title
+  avatarColor: string;
 }
 
 export interface MatchRecord {
@@ -91,19 +102,18 @@ export interface MatchRecord {
   p2RateChange: number;
   p1PointsEarned: number;
   p2PointsEarned: number;
-  isDuel?: boolean; // General vs General
+  isDuel?: boolean;
 }
 
 export interface SystemSettings {
   adminPin: string;
-  // Event config
   eventName: string | null;
   eventType: EventType;
-  eventEndsAt: string | null; // ISO Date string
+  eventEndsAt: string | null;
   eventMultiplier: number;
-  
-  currentSeason: Season; // Current Season Context
+  currentSeason: Season;
   lastMonthlyReset: string;
+  lastTitleUpdate: string | null;
 }
 
 export interface ActivityLog {
@@ -115,32 +125,25 @@ export interface ActivityLog {
   date: string;
 }
 
-// Point breakdown details for UI display
 export interface PointBreakdown {
     base: number;
     streakBonus: number;
     newMemberBonus: number;
-    eventMultiplier: number; // 1 if none
+    eventMultiplier: number;
     total: number;
 }
 
-// Return types for actions
 export interface MatchProcessResult {
   p1RateChange: number;
   p2RateChange: number;
-  
   p1PointsDetail: PointBreakdown;
   p2PointsDetail: PointBreakdown;
-
-  p1PointsEarned: number; // total
-  p2PointsEarned: number; // total
-  
+  p1PointsEarned: number;
+  p2PointsEarned: number;
   newAchievementsP1: AchievementDef[];
   newAchievementsP2: AchievementDef[];
-  
   newIconsP1: IconDef[];
   newIconsP2: IconDef[];
-  
   isDuel: boolean;
 }
 

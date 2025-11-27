@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { getUsers, processMatch, getSettings, getUserAvatarChar } from './storage';
+import { getUsers, processMatch, getSettings, getUserAvatarChar, playSound, vibrate } from './storage';
 import { User, MatchProcessResult, AchievementDef, PointBreakdown, IconDef } from './types';
 import { NumPad } from './NumPad';
 import { Trophy, Minus, TrendingUp, Star, Search, User as UserIcon } from 'lucide-react';
@@ -43,18 +43,36 @@ const MatchEntry: React.FC = () => {
     }
   };
 
+  const handleSelection = (target: 'p1' | 'p2') => {
+      playSound('CLICK');
+      vibrate(10);
+      setModalTarget(target);
+  }
+
+  const handleResultSelect = (res: 'PLAYER1_WIN' | 'PLAYER2_WIN' | 'DRAW' | null) => {
+      playSound('CLICK');
+      vibrate(20);
+      setResult(res);
+  }
+
   const handleSubmit = () => {
+    playSound('CLICK');
+    vibrate(10);
     const settings = getSettings();
     if (pin !== settings.adminPin) {
+      playSound('ERROR');
+      vibrate([50, 50, 50]);
       alert('管理者PINが間違っています');
       setPin('');
       return;
     }
     if (!p1 || !p2 || !result) {
+      playSound('ERROR');
       alert('すべての項目を入力してください');
       return;
     }
     if (p1 === p2) {
+        playSound('ERROR');
         alert('自分自身とは対戦できません');
         return;
     }
@@ -79,13 +97,18 @@ const MatchEntry: React.FC = () => {
       ];
       
       if (earned.length > 0) {
+          setTimeout(() => playSound('FANFARE'), 500);
           setNewAchievements(earned);
+      } else {
+          playSound('SUCCESS');
       }
 
       // Effect
       if (result !== 'DRAW') {
           triggerConfetti();
       }
+
+      vibrate([50, 50, 100]);
 
       // Reset Form
       setP1('');
@@ -94,6 +117,7 @@ const MatchEntry: React.FC = () => {
       setPin('');
     } catch (e: any) {
       console.error(e);
+      playSound('ERROR');
       alert(e.message || '対戦処理中にエラーが発生しました');
     } finally {
       setIsSubmitting(false);
@@ -117,7 +141,7 @@ const MatchEntry: React.FC = () => {
     pointTotal: number,
     pointDetail: PointBreakdown
   }> = ({ name, label, rateChange, pointTotal, pointDetail }) => (
-    <div className="flex-1 relative p-4 bg-slate-800/50 rounded-2xl border border-white/10">
+    <div className="flex-1 relative p-4 bg-slate-800/50 rounded-2xl border border-white/10 animate-pop-in">
         <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-slate-700 text-slate-300 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase border border-slate-600">
             {label}
         </div>
@@ -237,6 +261,7 @@ const MatchEntry: React.FC = () => {
                 if (modalTarget === 'p1') setP1(id);
                 else setP2(id);
                 setModalTarget(null);
+                playSound('CLICK');
             }}
             onClose={() => setModalTarget(null)}
             excludeIds={modalTarget === 'p1' ? (p2 ? [p2] : []) : (p1 ? [p1] : [])}
@@ -261,7 +286,7 @@ const MatchEntry: React.FC = () => {
             
             {/* Player 1 Card */}
             <div 
-                onClick={() => setModalTarget('p1')}
+                onClick={() => handleSelection('p1')}
                 className={`
                     relative p-6 rounded-[2rem] border-4 transition-all duration-300 cursor-pointer group min-h-[280px] flex flex-col justify-center
                     ${result === 'PLAYER1_WIN' ? 'bg-red-950/30 border-red-500 shadow-xl shadow-red-500/20 scale-105 z-20 backdrop-blur-md' : 
@@ -286,7 +311,7 @@ const MatchEntry: React.FC = () => {
 
                     {p1 && result !== 'PLAYER1_WIN' && result !== 'DRAW' && (
                         <button 
-                            onClick={(e) => { e.stopPropagation(); setResult('PLAYER1_WIN'); }}
+                            onClick={(e) => { e.stopPropagation(); handleResultSelect('PLAYER1_WIN'); }}
                             className="mt-6 px-8 py-3 bg-red-600 text-white rounded-full font-black shadow-lg hover:bg-red-500 active:scale-95 transition-all uppercase tracking-wider border border-red-400"
                         >
                             Winner
@@ -305,7 +330,7 @@ const MatchEntry: React.FC = () => {
 
             {/* Player 2 Card */}
             <div 
-                 onClick={() => setModalTarget('p2')}
+                 onClick={() => handleSelection('p2')}
                  className={`
                     relative p-6 rounded-[2rem] border-4 transition-all duration-300 cursor-pointer group min-h-[280px] flex flex-col justify-center
                     ${result === 'PLAYER2_WIN' ? 'bg-blue-950/30 border-blue-500 shadow-xl shadow-blue-500/20 scale-105 z-20 backdrop-blur-md' : 
@@ -330,7 +355,7 @@ const MatchEntry: React.FC = () => {
 
                     {p2 && result !== 'PLAYER2_WIN' && result !== 'DRAW' && (
                         <button 
-                             onClick={(e) => { e.stopPropagation(); setResult('PLAYER2_WIN'); }}
+                             onClick={(e) => { e.stopPropagation(); handleResultSelect('PLAYER2_WIN'); }}
                             className="mt-6 px-8 py-3 bg-blue-600 text-white rounded-full font-black shadow-lg hover:bg-blue-500 active:scale-95 transition-all uppercase tracking-wider border border-blue-400"
                         >
                             Winner
@@ -344,7 +369,7 @@ const MatchEntry: React.FC = () => {
         {/* Draw Button Area */}
         <div className="flex justify-center mt-8">
              <button 
-                onClick={() => setResult(result === 'DRAW' ? null : 'DRAW')}
+                onClick={() => handleResultSelect(result === 'DRAW' ? null : 'DRAW')}
                 className={`px-8 py-3 rounded-full font-bold border-2 transition-all active:scale-95 flex items-center gap-2 ${
                     result === 'DRAW' 
                     ? 'bg-slate-700 text-white border-slate-600 shadow-lg' 
@@ -372,7 +397,7 @@ const MatchEntry: React.FC = () => {
                             className="w-full p-3 rounded-xl border border-slate-600 bg-slate-900 font-mono text-lg text-white text-center tracking-widest cursor-default outline-none"
                             maxLength={4}
                         />
-                        <NumPad value={pin} onChange={setPin} maxLength={4} />
+                        <NumPad value={pin} onChange={(v) => { playSound('CLICK'); setPin(v); }} maxLength={4} />
                      </div>
 
                      <button 

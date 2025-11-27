@@ -1,5 +1,6 @@
+
 import React, { useState } from 'react';
-import { BookOpen, HelpCircle, Shield, TrendingUp, Star, Users, Flag, Crown, CheckCircle, Info, Settings, Clock, Save } from 'lucide-react';
+import { BookOpen, HelpCircle, Shield, TrendingUp, Star, Crown, CheckCircle, Info, Clock, Save, Flag, Settings } from 'lucide-react';
 import { ShogiPiece } from './ShogiPiece';
 import { Card } from './Card';
 

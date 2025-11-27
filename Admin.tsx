@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect } from 'react';
-import { getUsers, saveUsers, getSettings, saveSettings, manualPointAdjustment, resetMonthly, isEventActive, exportData, importData, getMatches, deleteMatch, balanceFactions, toggleGeneral, assignGenerals, resetEventPoints, getFactionBalanceSimulation } from './storage';
+import { getUsers, saveUsers, getSettings, saveSettings, manualPointAdjustment, resetMonthly, isEventActive, exportData, importData, getMatches, deleteMatch, balanceFactions, toggleGeneral, assignGenerals, resetEventPoints, getFactionBalanceSimulation, awardSystemTitles } from './storage';
 import { User, SystemSettings, MatchRecord, Season, EventType } from './types';
 import { Card } from './Card';
 import { NumPad } from './NumPad';
@@ -74,6 +75,7 @@ const Admin: React.FC = () => {
       rate: 1000,
       faction: Math.random() > 0.5 ? 'RED' : 'WHITE',
       isGeneral: false,
+      systemTitle: null,
       totalPoints: 0,
       pointsMatch: 0,
       pointsAttendance: 0,
@@ -116,6 +118,14 @@ const Admin: React.FC = () => {
       saveUsers(updated);
       refreshData();
   };
+
+  const handleUpdateTitles = () => {
+      if (window.confirm('現在のデータに基づいて、四大タイトル（名人・新星・活動家・下克上）を更新しますか？')) {
+          awardSystemTitles();
+          refreshData();
+          alert('タイトルを更新しました！');
+      }
+  }
 
   // --- WIZARD HANDLERS ---
   const openEventWizard = () => {
@@ -573,6 +583,24 @@ const Admin: React.FC = () => {
 
         {/* System & Points */}
         <div className="space-y-8">
+            <Card title="タイトル戦 (The Crown)" icon={<Crown className="text-yellow-500" />}>
+                <div className="space-y-4">
+                     <p className="text-sm text-slate-400">
+                         現在のデータに基づき、「名人」「新星」「活動家」「下克上」の称号を授与します。<br/>
+                         2週間に1回程度、手動で更新してください。
+                     </p>
+                     <button 
+                        onClick={handleUpdateTitles} 
+                        className="w-full bg-gradient-to-r from-amber-600 to-yellow-600 text-white py-3 rounded-xl font-black hover:from-amber-500 hover:to-yellow-500 active:scale-95 transition-all shadow-lg border border-yellow-500/20"
+                    >
+                         タイトル戦 決着（更新）
+                    </button>
+                    <div className="text-xs text-slate-500 text-center">
+                        最終更新: {settings.lastTitleUpdate ? new Date(settings.lastTitleUpdate).toLocaleDateString() : '未実施'}
+                    </div>
+                </div>
+            </Card>
+
             <Card title="ポイント特別付与" icon={<Crown />}>
                 <div className="space-y-4">
                     <select 
