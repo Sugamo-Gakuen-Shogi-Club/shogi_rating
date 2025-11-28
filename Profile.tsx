@@ -9,8 +9,6 @@ import { UserSelector } from './UserSelector';
 import { useNavigate } from 'react-router-dom';
 import { ShogiPiece } from './ShogiPiece';
 
-// ... (Modal Components same as before, simplified for brevity in this delta, but ensuring Heatmap and Visuals are added) ...
-
 // Title Collection Modal
 const TitleCollectionModal: React.FC<{ user: User, onClose: () => void }> = ({ user, onClose }) => {
     return (
@@ -28,20 +26,20 @@ const TitleCollectionModal: React.FC<{ user: User, onClose: () => void }> = ({ u
                     {ACHIEVEMENTS_DATA.map(ach => {
                         const isUnlocked = user.achievements.includes(ach.id);
                         return (
-                            <div key={ach.id} className={`p-3 rounded-xl border flex items-center justify-between ${isUnlocked ? 'bg-indigo-900/20 border-indigo-500/30' : 'bg-slate-800/50 border-slate-700/50 opacity-60'}`}>
+                            <div key={ach.id} className={`p-3 rounded-xl border flex items-center justify-between ${isUnlocked ? 'bg-indigo-900/20 border-indigo-500/30' : 'bg-slate-950 border-slate-800 grayscale'}`}>
                                 <div className="flex items-center gap-3">
-                                    <div className={`p-2 rounded-lg ${isUnlocked ? 'bg-indigo-500 text-white' : 'bg-slate-700 text-slate-500'}`}>
+                                    <div className={`p-2 rounded-lg ${isUnlocked ? 'bg-indigo-500 text-white' : 'bg-slate-800 text-slate-500'}`}>
                                         <Award size={20} />
                                     </div>
                                     <div>
-                                        <div className={`font-bold ${isUnlocked ? 'text-white' : 'text-slate-400'}`}>{ach.name}</div>
-                                        <div className="text-xs text-slate-500">{ach.description}</div>
+                                        <div className={`font-bold ${isUnlocked ? 'text-white' : 'text-slate-500'}`}>{ach.name}</div>
+                                        <div className="text-xs text-slate-600">{ach.description}</div>
                                     </div>
                                 </div>
                                 {isUnlocked ? (
                                     <span className="text-xs font-bold text-green-400 bg-green-900/20 px-2 py-1 rounded">獲得済</span>
                                 ) : (
-                                    <Lock size={16} className="text-slate-600" />
+                                    <Lock size={16} className="text-slate-700" />
                                 )}
                             </div>
                         )
@@ -114,10 +112,10 @@ const IconSelectorModal: React.FC<{
                                         ? 'bg-blue-900/20 border-blue-500 ring-2 ring-blue-500/30' 
                                         : isUnlocked 
                                             ? 'bg-slate-800 border-slate-700 hover:border-blue-500 hover:shadow-lg hover:-translate-y-1' 
-                                            : 'bg-slate-900 border-slate-800 opacity-40 cursor-not-allowed'}
+                                            : 'bg-slate-950 border-slate-900 cursor-not-allowed grayscale brightness-75'} 
                                 `}
                             >
-                                <div className={`flex items-center justify-center mb-2 ${isUnlocked ? '' : 'blur-[2px] opacity-30'}`}>
+                                <div className={`flex items-center justify-center mb-2 ${isUnlocked ? '' : 'opacity-60'}`}>
                                     {icon.category === 'SHOGI' ? (
                                         <ShogiPiece char={icon.char} scale={0.6} shadow={false} />
                                     ) : (
@@ -125,14 +123,14 @@ const IconSelectorModal: React.FC<{
                                     )}
                                 </div>
                                 
-                                <div className="text-[10px] font-bold truncate w-full text-center leading-tight text-slate-300">
+                                <div className={`text-[10px] font-bold truncate w-full text-center leading-tight ${isUnlocked ? 'text-slate-300' : 'text-slate-600'}`}>
                                     {icon.name}
                                 </div>
 
                                 {!isUnlocked && (
-                                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/80 rounded-2xl backdrop-blur-[1px] p-2 text-center z-10 border border-white/5">
-                                        <Lock size={16} className="text-slate-500 mb-1" />
-                                        <div className="text-[8px] font-bold text-slate-500 leading-tight line-clamp-2">
+                                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 rounded-2xl backdrop-blur-[0px] p-2 text-center z-10">
+                                        <Lock size={16} className="text-slate-400 mb-1" />
+                                        <div className="text-[8px] font-bold text-slate-400 leading-tight line-clamp-2 px-1 bg-slate-900/80 rounded">
                                             {icon.conditionDescription}
                                         </div>
                                     </div>

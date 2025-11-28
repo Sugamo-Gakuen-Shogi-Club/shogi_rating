@@ -1,10 +1,9 @@
-
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { getUsers, recordAttendance, getSettings, isEventActive, getLogs, getUserAvatarChar, playSound, vibrate, SYSTEM_TITLES } from './storage';
 import { User, ActivityType, EventType, AchievementDef, IconDef, SystemTitle } from './types';
 import { Card } from './Card';
-import { Trophy, Users, Calendar, ArrowRight, Zap, Crown, Flame, Snowflake, Search, Activity, Swords } from 'lucide-react';
+import { Trophy, Users, Calendar, ArrowRight, Zap, Crown, Flame, Snowflake, Search, Activity, Swords, X } from 'lucide-react';
 import { UserSelector } from './UserSelector';
 import { AchievementPopup } from './AchievementPopup';
 import { ShogiPiece } from './ShogiPiece';
@@ -172,33 +171,45 @@ const Dashboard: React.FC = () => {
         />
       )}
 
+      {/* Faction War Modal - Increased Z-Index to cover sidebar */}
       {isFactionModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-in fade-in">
-              <div className="bg-slate-900 w-full max-w-4xl rounded-3xl shadow-2xl border border-white/10 flex flex-col max-h-[80vh]">
-                  <div className="p-4 border-b border-white/10 flex justify-between items-center bg-slate-800">
+          <div className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-950/90 backdrop-blur-md p-4 animate-in fade-in">
+              <div className="bg-slate-900 w-full max-w-4xl rounded-3xl shadow-2xl border border-white/10 flex flex-col max-h-[80vh] relative">
+                  {/* Close Button specifically placed */}
+                  <button 
+                    onClick={() => setIsFactionModalOpen(false)}
+                    className="absolute -top-12 right-0 md:-right-12 text-white/50 hover:text-white transition-colors"
+                  >
+                      <X size={32} />
+                  </button>
+
+                  <div className="p-4 border-b border-white/10 flex justify-between items-center bg-slate-800 rounded-t-3xl">
                       <h3 className="font-bold text-white flex items-center gap-2"><Users /> チーム編成一覧</h3>
-                      <button onClick={() => setIsFactionModalOpen(false)}><ArrowRight className="rotate-45" /></button>
                   </div>
-                  <div className="flex-1 overflow-hidden flex flex-col md:flex-row">
-                      <div className="flex-1 p-4 bg-red-950/10 overflow-y-auto border-r border-white/5">
-                          <h4 className="text-red-400 font-black uppercase tracking-widest mb-4 sticky top-0 bg-slate-900/90 p-2 backdrop-blur z-10">Red Army</h4>
+                  <div className="flex-1 overflow-hidden flex flex-col md:flex-row rounded-b-3xl bg-slate-900">
+                      <div className="flex-1 p-4 bg-gradient-to-br from-red-950/30 to-slate-900 overflow-y-auto border-r border-white/5">
+                          <h4 className="text-red-400 font-black uppercase tracking-widest mb-4 sticky top-0 bg-slate-900/90 p-2 backdrop-blur z-10 border-b border-red-900/30 flex justify-between">
+                              Red Army <span className="text-xs opacity-50">{users.filter(u => u.faction === 'RED').length}名</span>
+                          </h4>
                           <div className="grid grid-cols-2 gap-2">
                               {users.filter(u => u.faction === 'RED').map(u => (
                                   <div key={u.id} className="flex items-center gap-2 p-2 bg-slate-800/50 rounded-lg border border-red-900/30">
-                                      {u.isGeneral && <Crown size={12} className="text-yellow-400" />}
-                                      <span className="text-sm font-bold text-slate-300">{u.name}</span>
+                                      {u.isGeneral && <Crown size={14} className="text-yellow-400 fill-yellow-400 shrink-0" />}
+                                      <span className="text-sm font-bold text-slate-300 truncate">{u.name}</span>
                                       <span className="ml-auto text-xs font-mono text-slate-500">{Math.round(u.rate)}</span>
                                   </div>
                               ))}
                           </div>
                       </div>
-                      <div className="flex-1 p-4 bg-blue-950/10 overflow-y-auto">
-                          <h4 className="text-blue-400 font-black uppercase tracking-widest mb-4 sticky top-0 bg-slate-900/90 p-2 backdrop-blur z-10">White Army</h4>
+                      <div className="flex-1 p-4 bg-gradient-to-bl from-blue-950/30 to-slate-900 overflow-y-auto">
+                          <h4 className="text-blue-400 font-black uppercase tracking-widest mb-4 sticky top-0 bg-slate-900/90 p-2 backdrop-blur z-10 border-b border-blue-900/30 flex justify-between">
+                              White Army <span className="text-xs opacity-50">{users.filter(u => u.faction === 'WHITE').length}名</span>
+                          </h4>
                           <div className="grid grid-cols-2 gap-2">
                               {users.filter(u => u.faction === 'WHITE').map(u => (
                                   <div key={u.id} className="flex items-center gap-2 p-2 bg-slate-800/50 rounded-lg border border-blue-900/30">
-                                      {u.isGeneral && <Crown size={12} className="text-yellow-400" />}
-                                      <span className="text-sm font-bold text-slate-300">{u.name}</span>
+                                      {u.isGeneral && <Crown size={14} className="text-yellow-400 fill-yellow-400 shrink-0" />}
+                                      <span className="text-sm font-bold text-slate-300 truncate">{u.name}</span>
                                       <span className="ml-auto text-xs font-mono text-slate-500">{Math.round(u.rate)}</span>
                                   </div>
                               ))}
@@ -216,13 +227,22 @@ const Dashboard: React.FC = () => {
         <div className="absolute inset-0 bg-slate-900">
              {isFactionWar ? (
                  <>
-                    {/* Fire & Ice Effects */}
-                    <div className="absolute top-0 left-0 w-3/4 h-full bg-gradient-to-r from-red-900/40 via-red-800/10 to-transparent mix-blend-screen animate-pulse"></div>
-                    <div className="absolute top-0 right-0 w-3/4 h-full bg-gradient-to-l from-blue-900/40 via-blue-800/10 to-transparent mix-blend-screen animate-pulse" style={{ animationDelay: '1s' }}></div>
-                    <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20"></div>
+                    {/* Enhanced Faction War Effects */}
+                    <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/seigaiha.png')] opacity-10 mix-blend-overlay"></div>
+                    
+                    {/* Animated gradients */}
+                    <div className="absolute top-0 left-0 w-3/4 h-full bg-gradient-to-r from-red-900/60 via-red-800/20 to-transparent mix-blend-screen animate-pulse"></div>
+                    <div className="absolute top-0 right-0 w-3/4 h-full bg-gradient-to-l from-blue-900/60 via-blue-800/20 to-transparent mix-blend-screen animate-pulse" style={{ animationDelay: '1s' }}></div>
+                    
+                    {/* Particles (CSS Simulated) */}
+                    <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                        <div className="absolute top-[-50%] left-[-20%] w-[100%] h-[200%] bg-gradient-to-b from-red-500/10 to-transparent rotate-[30deg] blur-3xl animate-[shimmer_8s_infinite]"></div>
+                        <div className="absolute top-[-50%] right-[-20%] w-[100%] h-[200%] bg-gradient-to-b from-blue-500/10 to-transparent rotate-[-30deg] blur-3xl animate-[shimmer_8s_infinite_reverse]"></div>
+                    </div>
                  </>
              ) : (
                  <div className="absolute inset-0 bg-gradient-to-br from-slate-800 to-slate-950">
+                     <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5"></div>
                      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-500/10 rounded-full blur-[100px] -translate-y-1/2 translate-x-1/2"></div>
                  </div>
              )}
@@ -237,9 +257,11 @@ const Dashboard: React.FC = () => {
             {/* Event Subtitle */}
             <div className="mb-8">
                  {isFactionWar ? (
-                     <div className="inline-flex items-center gap-2 px-4 py-1 rounded-full bg-gradient-to-r from-red-500/20 to-blue-500/20 border border-white/10 backdrop-blur-md">
-                         <Swords size={16} className="text-white" />
-                         <span className="text-white font-bold tracking-widest uppercase text-sm">{settings.eventName || 'FACTION WAR'}</span>
+                     <div className="inline-flex items-center gap-2 px-6 py-2 rounded-full bg-slate-900/80 border border-white/20 backdrop-blur-md shadow-[0_0_15px_rgba(255,255,255,0.1)]">
+                         <Swords size={18} className="text-yellow-400" />
+                         <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-400 via-yellow-200 to-blue-400 font-black tracking-widest uppercase text-base">
+                             {settings.eventName || 'FACTION WAR'}
+                         </span>
                      </div>
                  ) : (
                      <span className="text-slate-400 font-bold tracking-[0.2em] text-sm uppercase">Shogi Club Management System</span>
@@ -252,41 +274,41 @@ const Dashboard: React.FC = () => {
                     {/* Scores */}
                     <div className="flex justify-between items-end mb-2 px-2">
                         <div className="flex flex-col items-start">
-                             <div className="text-4xl font-black text-red-500 drop-shadow-[0_0_10px_rgba(239,68,68,0.6)] font-mono">{factionStats.redScore}</div>
+                             <div className="text-5xl font-black text-red-500 drop-shadow-[0_0_15px_rgba(239,68,68,0.8)] font-mono">{factionStats.redScore}</div>
                              <div className="text-[10px] font-black uppercase tracking-widest text-red-300 flex items-center gap-1"><Flame size={12}/> Red Army</div>
                         </div>
                         
-                        <div className="mb-2">
-                             <div className="bg-slate-900/80 px-3 py-1 rounded-full text-[10px] font-bold text-slate-400 border border-white/10 flex items-center gap-2 group-hover:bg-slate-800 transition-colors">
-                                 <Users size={12}/> チーム編成を確認
+                        <div className="mb-4 animate-bounce">
+                             <div className="bg-slate-900/80 px-4 py-1.5 rounded-full text-[10px] font-bold text-white border border-yellow-500/50 flex items-center gap-2 group-hover:bg-slate-800 transition-colors shadow-[0_0_10px_rgba(250,204,21,0.3)]">
+                                 <Users size={12} className="text-yellow-400"/> チーム編成を確認
                              </div>
                         </div>
 
                         <div className="flex flex-col items-end">
-                             <div className="text-4xl font-black text-blue-400 drop-shadow-[0_0_10px_rgba(96,165,250,0.6)] font-mono">{factionStats.whiteScore}</div>
+                             <div className="text-5xl font-black text-blue-400 drop-shadow-[0_0_15px_rgba(96,165,250,0.8)] font-mono">{factionStats.whiteScore}</div>
                              <div className="text-[10px] font-black uppercase tracking-widest text-blue-300 flex items-center gap-1">White Army <Snowflake size={12}/></div>
                         </div>
                     </div>
 
                     {/* Bar */}
-                    <div className="h-4 bg-slate-900 rounded-full overflow-hidden relative border border-white/10 shadow-inner">
+                    <div className="h-6 bg-slate-900/50 rounded-full overflow-hidden relative border border-white/20 shadow-inner backdrop-blur-sm">
                         {/* Red Segment */}
                         <div 
-                            className="absolute top-0 left-0 h-full bg-gradient-to-r from-red-900 to-red-600 transition-all duration-1000 ease-out"
+                            className="absolute top-0 left-0 h-full bg-gradient-to-r from-red-900 via-red-600 to-red-500 transition-all duration-1000 ease-out box-shadow-[0_0_20px_rgba(239,68,68,0.5)]"
                             style={{ width: `${factionStats.redPercent}%` }}
                         >
                             <div className="absolute inset-0 bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.4),transparent)] w-[50%] animate-[shimmer_2s_infinite]"></div>
                         </div>
                         {/* White Segment */}
                         <div 
-                            className="absolute top-0 right-0 h-full bg-gradient-to-l from-blue-900 to-blue-500 transition-all duration-1000 ease-out"
+                            className="absolute top-0 right-0 h-full bg-gradient-to-l from-blue-900 via-blue-600 to-blue-500 transition-all duration-1000 ease-out box-shadow-[0_0_20px_rgba(59,130,246,0.5)]"
                             style={{ width: `${100 - factionStats.redPercent}%` }}
                         >
                              <div className="absolute inset-0 bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.4),transparent)] w-[50%] animate-[shimmer_2s_infinite]"></div>
                         </div>
                         
                         {/* Center Marker */}
-                        <div className="absolute top-0 left-1/2 w-0.5 h-full bg-white/50 z-10"></div>
+                        <div className="absolute top-0 left-1/2 w-1 h-full bg-white z-10 shadow-[0_0_10px_white]"></div>
                     </div>
                 </div>
             )}
@@ -309,7 +331,7 @@ const Dashboard: React.FC = () => {
                  </div>
                  <div className="bg-slate-950/40 backdrop-blur-md border border-white/5 rounded-2xl p-4 flex flex-col items-center">
                      <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-1">Season</span>
-                     <div className="text-xl font-black text-white mt-1">{settings.currentSeason}</div>
+                     <div className="text-lg font-black text-white mt-1 whitespace-nowrap">{settings.currentSeason}</div>
                  </div>
                   <div className="bg-slate-950/40 backdrop-blur-md border border-white/5 rounded-2xl p-4 flex flex-col items-center">
                      <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-1">Status</span>

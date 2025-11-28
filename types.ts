@@ -32,11 +32,14 @@ export interface RateHistoryPoint {
 }
 
 export enum Season {
-  TERM_1_EARLY = '1学期前半',
-  TERM_1_LATE = '1学期後半',
-  TERM_2_EARLY = '2学期前半',
-  TERM_2_LATE = '2学期後半',
-  TERM_3 = '3学期'
+  TERM_1_EARLY = '１学期前半',
+  TERM_1_LATE = '１学期後半',
+  SUMMER_CAMP = '夏季合宿',
+  TERM_2_EARLY = '２学期前半',
+  TERM_2_LATE = '２学期後半',
+  WINTER_CAMP = '冬季合宿',
+  TERM_3 = '３学期',
+  SPRING_CAMP = '春季合宿'
 }
 
 export enum EventType {
@@ -130,6 +133,7 @@ export interface PointBreakdown {
     streakBonus: number;
     newMemberBonus: number;
     eventMultiplier: number;
+    spamPenalty: number; // 1.0 = normal, 0.5 = penalty
     total: number;
 }
 
@@ -145,6 +149,7 @@ export interface MatchProcessResult {
   newIconsP1: IconDef[];
   newIconsP2: IconDef[];
   isDuel: boolean;
+  result: 'PLAYER1_WIN' | 'PLAYER2_WIN' | 'DRAW';
 }
 
 export interface AttendanceResult {

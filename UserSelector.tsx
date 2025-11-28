@@ -82,7 +82,7 @@ export const UserSelector: React.FC<UserSelectorProps> = ({
   const today = new Date().toISOString().split('T')[0];
 
   const content = (
-    <div className="fixed inset-0 z-[50] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-2 md:p-4 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-2 md:p-4 animate-in fade-in duration-200">
       <div className="bg-slate-900 w-full max-w-5xl rounded-3xl shadow-2xl overflow-hidden flex flex-col h-[90vh] max-h-[800px] border border-white/10 relative z-[51]">
         {/* ヘッダー */}
         <div className={`p-4 text-white flex items-center justify-between shrink-0 shadow-lg ${
@@ -197,7 +197,7 @@ export const UserSelector: React.FC<UserSelectorProps> = ({
                                 disabled={isDisabled}
                                 className={`relative flex flex-col items-center p-4 rounded-2xl border transition-all text-center group overflow-hidden
                                     ${isDisabled 
-                                        ? 'bg-slate-900 border-slate-800 opacity-40 cursor-default' 
+                                        ? 'bg-slate-950 border-slate-800 grayscale brightness-75 cursor-default' // High readability for disabled state
                                         : isFactionWar && isRed 
                                             ? 'bg-red-950/20 border-red-900/50 hover:border-red-500 hover:shadow-xl hover:shadow-red-900/20 hover:-translate-y-1 cursor-pointer'
                                             : isFactionWar && !isRed
@@ -216,7 +216,7 @@ export const UserSelector: React.FC<UserSelectorProps> = ({
                                 )}
 
                                 {mode === 'ATTENDANCE' && isAttendedToday && (
-                                    <div className="absolute top-0 right-0 bg-green-600 text-white px-3 py-1 rounded-bl-xl text-[10px] font-bold shadow-sm z-10">
+                                    <div className="absolute top-0 right-0 bg-green-700/90 text-white px-3 py-1 rounded-bl-xl text-[10px] font-bold shadow-sm z-10 border-l border-b border-slate-900">
                                         出席済
                                     </div>
                                 )}
@@ -250,7 +250,7 @@ export const UserSelector: React.FC<UserSelectorProps> = ({
                                 </div>
                                 
                                 <div className="w-full mt-2">
-                                    <div className={`font-bold text-sm leading-tight w-full truncate flex items-center justify-center gap-1 ${hasSystemTitle ? 'text-yellow-200' : 'text-slate-200'}`}>
+                                    <div className={`font-bold text-sm leading-tight w-full truncate flex items-center justify-center gap-1 ${isDisabled ? 'text-slate-500' : hasSystemTitle ? 'text-yellow-200' : 'text-slate-200'}`}>
                                         {u.name}
                                     </div>
                                 </div>
@@ -260,8 +260,8 @@ export const UserSelector: React.FC<UserSelectorProps> = ({
                                     {mode === 'MATCH_SELECT' ? (
                                         <div className="text-xs font-mono text-blue-400 font-bold bg-blue-900/30 rounded py-0.5 border border-blue-500/20">Rate: {Math.round(u.rate)}</div>
                                     ) : (
-                                        <div className="text-[10px] text-slate-500">
-                                             {isDisabled ? '完了' : '選択'}
+                                        <div className={`text-[10px] ${isDisabled ? 'text-slate-600 font-bold' : 'text-slate-500'}`}>
+                                             {isDisabled ? '記録完了' : '選択'}
                                         </div>
                                     )}
                                 </div>

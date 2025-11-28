@@ -4,7 +4,7 @@ import { getUsers, saveUsers, getSettings, saveSettings, manualPointAdjustment, 
 import { User, SystemSettings, MatchRecord, Season, EventType } from './types';
 import { Card } from './Card';
 import { NumPad } from './NumPad';
-import { Settings, Trash2, Plus, ToggleLeft, ToggleRight, Calendar, Download, Copy, ClipboardCheck, History, CheckCircle, AlertCircle, Shuffle, Users, Crown, ChevronRight, X, UserCheck } from 'lucide-react';
+import { Settings, Trash2, Plus, ToggleLeft, ToggleRight, Calendar, Download, Copy, ClipboardCheck, History, CheckCircle, AlertCircle, Shuffle, Users, Crown, ChevronRight, X, UserCheck, Snowflake, Sun, Leaf } from 'lucide-react';
 import { UserSelector } from './UserSelector';
 
 const Admin: React.FC = () => {
@@ -64,6 +64,15 @@ const Admin: React.FC = () => {
     setSettings(s);
     setActiveEvent(isEventActive());
     setRecentMatches(getMatches().slice(0, 20)); // Get last 20
+  };
+
+  const handleSeasonChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+      const newSeason = e.target.value as Season;
+      if (window.confirm(`シーズンを「${newSeason}」に変更しますか？`)) {
+          const newSettings = { ...settings, currentSeason: newSeason };
+          saveSettings(newSettings);
+          refreshData();
+      }
   };
 
   const handleAddUser = () => {
@@ -300,7 +309,7 @@ const Admin: React.FC = () => {
       
       {/* --- EVENT SETUP WIZARD MODAL --- */}
       {isEventWizardOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-950/90 backdrop-blur-sm p-4 animate-in fade-in">
               <div className="bg-slate-900 w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] border border-white/10">
                   {/* Header */}
                   <div className="bg-slate-950 text-white p-6 shrink-0 flex justify-between items-center border-b border-white/10">
@@ -413,7 +422,7 @@ const Admin: React.FC = () => {
                           <div className="space-y-6">
                               <div className="text-center">
                                   <Crown size={48} className="mx-auto text-yellow-500 mb-2" />
-                                  <h4 className="text-2xl font-black text-white">大将任命</h4>
+                                  <h4 className="text-2xl font-black text-white">大将任命の儀</h4>
                                   <p className="text-slate-400 text-sm">各軍のリーダーとなる「大将」を指名してください。<br/>この選択はイベントの運命を左右します。</p>
                               </div>
                               
@@ -540,8 +549,18 @@ const Admin: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         
         {/* User Management */}
-        <Card title="部員管理" icon={<Users />}>
+        <Card title="部員管理 & 新入部員設定" icon={<Users />}>
           <div className="space-y-6">
+            <div className="bg-slate-900/50 p-4 rounded-xl border border-white/5">
+                <div className="text-sm text-slate-400 mb-2 font-bold flex items-center gap-2">
+                    <UserCheck size={16}/> 新入部員モードについて
+                </div>
+                <p className="text-xs text-slate-500 mb-2">
+                    新入部員フラグがONの部員との対局にはボーナスポイントが付与されます。<br/>
+                    リスト内のボタンでON/OFFを切り替えられます。
+                </p>
+            </div>
+
             <div className="flex gap-2">
                <input 
                  type="text" 
@@ -566,15 +585,24 @@ const Admin: React.FC = () => {
                                <div className="font-bold text-sm text-slate-200">{u.name}</div>
                                <div className="text-xs text-slate-400 flex gap-2">
                                    <span>Rate: {Math.round(u.rate)}</span>
-                                   <button onClick={() => toggleNewMember(u.id)} className={`hover:underline ${u.isNewMember ? 'text-green-400 font-bold' : 'text-slate-500'}`}>
-                                       {u.isNewMember ? '新入部員' : '一般部員'}
-                                   </button>
                                </div>
                            </div>
                        </div>
-                       <button onClick={() => handleDeleteUser(u.id)} className="text-slate-500 hover:text-red-500 transition-colors p-2">
-                           <Trash2 size={18} />
-                       </button>
+                       <div className="flex items-center gap-2">
+                           <button 
+                                onClick={() => toggleNewMember(u.id)} 
+                                className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
+                                    u.isNewMember 
+                                    ? 'bg-green-900/30 text-green-400 border-green-600' 
+                                    : 'bg-slate-900 text-slate-500 border-slate-700 hover:border-slate-500'
+                                }`}
+                           >
+                               {u.isNewMember ? '🔰 新入部員' : '一般部員'}
+                           </button>
+                           <button onClick={() => handleDeleteUser(u.id)} className="text-slate-500 hover:text-red-500 transition-colors p-2">
+                               <Trash2 size={18} />
+                           </button>
+                       </div>
                    </div>
                ))}
             </div>
@@ -583,6 +611,28 @@ const Admin: React.FC = () => {
 
         {/* System & Points */}
         <div className="space-y-8">
+            <Card title="シーズン管理" icon={<Calendar className="text-blue-400"/>}>
+                <div className="space-y-4">
+                     <p className="text-sm text-slate-400">
+                         現在の学期・シーズンを設定します。ダッシュボードに表示されます。
+                     </p>
+                     <div className="relative">
+                         <select 
+                             className="w-full p-4 border border-slate-600 rounded-xl font-bold bg-slate-900 text-white appearance-none cursor-pointer hover:border-blue-500 transition-colors"
+                             value={settings.currentSeason}
+                             onChange={handleSeasonChange}
+                         >
+                             {Object.values(Season).map(s => (
+                                 <option key={s} value={s}>{s}</option>
+                             ))}
+                         </select>
+                         <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                             <Settings size={18} />
+                         </div>
+                     </div>
+                </div>
+            </Card>
+
             <Card title="タイトル戦 (The Crown)" icon={<Crown className="text-yellow-500" />}>
                 <div className="space-y-4">
                      <p className="text-sm text-slate-400">

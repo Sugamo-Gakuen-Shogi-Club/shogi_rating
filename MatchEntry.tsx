@@ -1,9 +1,10 @@
 
+
 import React, { useState, useEffect } from 'react';
-import { getUsers, processMatch, getSettings, getUserAvatarChar, playSound, vibrate } from './storage';
-import { User, MatchProcessResult, AchievementDef, PointBreakdown, IconDef } from './types';
+import { getUsers, processMatch, getSettings, getUserAvatarChar, playSound, vibrate, isEventActive } from './storage';
+import { User, MatchProcessResult, AchievementDef, PointBreakdown, IconDef, EventType } from './types';
 import { NumPad } from './NumPad';
-import { Trophy, Minus, TrendingUp, Star, Search, User as UserIcon } from 'lucide-react';
+import { Trophy, Minus, TrendingUp, Star, Search, User as UserIcon, Crown, Flame, Snowflake, Swords } from 'lucide-react';
 import { AchievementPopup } from './AchievementPopup';
 import { UserSelector } from './UserSelector';
 
@@ -22,7 +23,7 @@ const MatchEntry: React.FC = () => {
   const [result, setResult] = useState<'PLAYER1_WIN' | 'PLAYER2_WIN' | 'DRAW' | null>(null);
   const [pin, setPin] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [successData, setSuccessData] = useState<{p1Name: string, p2Name: string, record: MatchProcessResult} | null>(null);
+  const [successData, setSuccessData] = useState<{p1Name: string, p2Name: string, record: MatchProcessResult, p1Faction?: string, p2Faction?: string} | null>(null);
   const [newAchievements, setNewAchievements] = useState<AchievementItem[]>([]);
   
   // Modal State
@@ -32,13 +33,15 @@ const MatchEntry: React.FC = () => {
     setUsers(getUsers());
   }, []);
 
-  const triggerConfetti = () => {
+  const triggerConfetti = (colors?: string[]) => {
     if (typeof confetti === 'function') {
         confetti({
-            particleCount: 150,
-            spread: 70,
+            particleCount: 200,
+            spread: 100,
             origin: { y: 0.6 },
-            colors: ['#EF4444', '#3B82F6', '#FBBF24', '#10B981']
+            colors: colors || ['#EF4444', '#3B82F6', '#FBBF24', '#10B981'],
+            gravity: 0.8,
+            scalar: 1.2,
         });
     }
   };
@@ -81,13 +84,17 @@ const MatchEntry: React.FC = () => {
     try {
       const record = processMatch(p1, p2, result);
       
-      const p1Name = users.find(u => u.id === p1)?.name || '';
-      const p2Name = users.find(u => u.id === p2)?.name || '';
+      const p1User = users.find(u => u.id === p1);
+      const p2User = users.find(u => u.id === p2);
+      const p1Name = p1User?.name || '';
+      const p2Name = p2User?.name || '';
 
       setSuccessData({
         p1Name,
         p2Name,
-        record
+        record,
+        p1Faction: p1User?.faction,
+        p2Faction: p2User?.faction
       });
 
       // Collect new achievements with names
@@ -100,12 +107,23 @@ const MatchEntry: React.FC = () => {
           setTimeout(() => playSound('FANFARE'), 500);
           setNewAchievements(earned);
       } else {
-          playSound('SUCCESS');
+          // Play different sound based on win/draw
+          if (result === 'DRAW') playSound('SUCCESS');
+          else playSound('WIN'); // Using Taiko for win
       }
 
       // Effect
       if (result !== 'DRAW') {
-          triggerConfetti();
+          // Determine winner faction for confetti
+          const winnerFaction = result === 'PLAYER1_WIN' ? p1User?.faction : p2User?.faction;
+          let confettiColors = undefined;
+          
+          if (isEventActive() && settings.eventType === EventType.FACTION_WAR) {
+              if (winnerFaction === 'RED') confettiColors = ['#ef4444', '#b91c1c', '#f87171', '#ffffff'];
+              else if (winnerFaction === 'WHITE') confettiColors = ['#3b82f6', '#1d4ed8', '#60a5fa', '#ffffff'];
+          }
+          
+          triggerConfetti(confettiColors);
       }
 
       vibrate([50, 50, 100]);
@@ -124,12 +142,12 @@ const MatchEntry: React.FC = () => {
     }
   };
 
-  const BreakdownItem: React.FC<{ label: string, value: number }> = ({ label, value }) => {
-    if (value <= 0) return null;
+  const BreakdownItem: React.FC<{ label: string, value: number, isPenalty?: boolean }> = ({ label, value, isPenalty }) => {
+    if (value === 0) return null;
     return (
-      <div className="flex justify-between text-xs text-slate-400">
+      <div className={`flex justify-between text-xs ${isPenalty ? 'text-red-400' : 'text-white/70'}`}>
         <span>{label}</span>
-        <span className="font-bold text-slate-300">+{value}</span>
+        <span className="font-bold">{value > 0 ? '+' : ''}{value}</span>
       </div>
     );
   };
@@ -139,36 +157,81 @@ const MatchEntry: React.FC = () => {
     label: string, 
     rateChange: number, 
     pointTotal: number,
-    pointDetail: PointBreakdown
-  }> = ({ name, label, rateChange, pointTotal, pointDetail }) => (
-    <div className="flex-1 relative p-4 bg-slate-800/50 rounded-2xl border border-white/10 animate-pop-in">
-        <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-slate-700 text-slate-300 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase border border-slate-600">
-            {label}
-        </div>
-        <div className="font-black text-xl text-white mb-4 text-center">{name}</div>
+    pointDetail: PointBreakdown,
+    isWinner: boolean,
+    isDraw: boolean,
+    faction?: string
+  }> = ({ name, label, rateChange, pointTotal, pointDetail, isWinner, isDraw, faction }) => {
+    const isFactionWar = isEventActive() && getSettings().eventType === EventType.FACTION_WAR;
+    
+    // Determine card styles based on winner/loser/draw and faction
+    let bgStyle = 'bg-slate-800/80 border-slate-700';
+    
+    if (isWinner) {
+        if (isFactionWar && faction === 'RED') {
+            bgStyle = 'bg-gradient-to-br from-red-900/90 to-red-800/90 border-red-500 shadow-[0_0_30px_rgba(239,68,68,0.5)] scale-105 z-10';
+        } else if (isFactionWar && faction === 'WHITE') {
+            bgStyle = 'bg-gradient-to-br from-blue-900/90 to-blue-800/90 border-blue-500 shadow-[0_0_30px_rgba(59,130,246,0.5)] scale-105 z-10';
+        } else {
+            bgStyle = 'bg-gradient-to-br from-yellow-600/20 to-amber-900/40 border-yellow-500 shadow-[0_0_20px_rgba(234,179,8,0.2)] scale-105 z-10';
+        }
+    } else if (isDraw) {
+        bgStyle = 'bg-slate-800 border-slate-600 opacity-90';
+    } else {
+        bgStyle = 'bg-slate-900/50 border-slate-800 opacity-60 grayscale scale-95';
+    }
+
+    return (
+    <div className={`flex-1 relative p-6 rounded-3xl border transition-all duration-500 ${bgStyle} animate-pop-in flex flex-col justify-between`}>
         
-        <div className="flex flex-col gap-4">
+        {isWinner && (
+            <div className="absolute -top-6 left-1/2 -translate-x-1/2">
+                <Crown size={40} className="text-yellow-400 fill-yellow-400 animate-bounce drop-shadow-lg" />
+            </div>
+        )}
+
+        <div>
+            <div className="flex justify-between items-center mb-2">
+                <div className="bg-black/30 text-white/80 text-[10px] font-bold px-3 py-1 rounded-full uppercase border border-white/10">
+                    {label}
+                </div>
+                {isFactionWar && faction && (
+                    <div className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider ${faction === 'RED' ? 'bg-red-600 text-white' : 'bg-blue-600 text-white'}`}>
+                        {faction}
+                    </div>
+                )}
+            </div>
+            
+            <div className="font-black text-2xl text-white mb-6 text-center drop-shadow-md truncate font-serif-jp">
+                {name}
+            </div>
+        </div>
+        
+        <div className="space-y-4">
             {/* Rate Section */}
-            <div className="bg-slate-900/50 p-3 rounded-xl border border-blue-500/20 shadow-sm">
+            <div className="bg-black/20 p-4 rounded-2xl border border-white/5 backdrop-blur-sm">
                 <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-bold text-blue-400 uppercase flex items-center gap-1">
-                        <TrendingUp size={12}/> レート (実力)
+                    <span className="text-xs font-bold text-blue-200 uppercase flex items-center gap-1 opacity-80">
+                        <TrendingUp size={12}/> RATE CHANGE
                     </span>
                 </div>
                 <div className="text-center">
-                    <span className="text-3xl font-black text-blue-500">+{rateChange}</span>
+                    <span className="text-4xl font-black text-white drop-shadow-sm">+{rateChange}</span>
                 </div>
+                {pointDetail.spamPenalty < 1 && (
+                     <div className="text-[10px] text-center text-red-400 font-bold mt-1">連戦補正あり (x{pointDetail.spamPenalty})</div>
+                )}
             </div>
 
             {/* Points Section */}
-            <div className="bg-slate-900/50 p-3 rounded-xl border border-amber-500/20 shadow-sm">
+            <div className="bg-black/20 p-4 rounded-2xl border border-white/5 backdrop-blur-sm">
                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-bold text-amber-500 uppercase flex items-center gap-1">
-                        <Star size={12}/> ポイント (活動)
+                    <span className="text-xs font-bold text-amber-200 uppercase flex items-center gap-1 opacity-80">
+                        <Star size={12}/> POINTS
                     </span>
                 </div>
                 <div className="text-center mb-2">
-                    <span className="text-3xl font-black text-amber-500">+{pointTotal}</span>
+                    <span className="text-4xl font-black text-amber-400 drop-shadow-sm">+{pointTotal}</span>
                 </div>
                 
                 {/* Breakdown */}
@@ -177,57 +240,125 @@ const MatchEntry: React.FC = () => {
                     <BreakdownItem label="連勝ボーナス" value={pointDetail.streakBonus} />
                     <BreakdownItem label="新入部員交流" value={pointDetail.newMemberBonus} />
                     {pointDetail.eventMultiplier > 1 && (
-                        <div className="text-[10px] text-center text-indigo-400 font-bold">イベント倍率 x{pointDetail.eventMultiplier} 適用済</div>
+                        <div className="text-[10px] text-center text-yellow-300 font-bold animate-pulse mt-1">EVENT BONUS x{pointDetail.eventMultiplier} APPLIED!</div>
                     )}
                 </div>
             </div>
         </div>
     </div>
-  );
+  )};
 
+  // --------------------------------------------------------------------------------
+  // SUCCESS VIEW - FLASHY RESULT SCREEN (SONG PROGRAM STYLE)
+  // --------------------------------------------------------------------------------
   if (successData) {
+    const isFactionWar = isEventActive() && getSettings().eventType === EventType.FACTION_WAR;
+    
+    // Logic to determine winner for display
+    const p1Won = successData.record.result === 'PLAYER1_WIN';
+    const p2Won = successData.record.result === 'PLAYER2_WIN';
+    const isDraw = successData.record.result === 'DRAW';
+    
+    let themeGradient = "from-slate-900 via-slate-800 to-slate-900";
+    
+    if (isFactionWar && !isDraw) {
+        const winningFaction = p1Won ? successData.p1Faction : successData.p2Faction;
+        if (winningFaction === 'RED') themeGradient = "from-red-950 via-red-900 to-black";
+        if (winningFaction === 'WHITE') themeGradient = "from-blue-950 via-blue-900 to-black";
+    }
+
     return (
-      <div className="flex flex-col items-center justify-center py-12 animate-in fade-in zoom-in duration-300 relative">
-        <AchievementPopup items={newAchievements} onClose={() => setNewAchievements([])} />
+      <div className={`fixed inset-0 z-[100] flex flex-col items-center justify-center bg-gradient-to-br ${themeGradient} text-white animate-in fade-in duration-500 overflow-y-auto py-8`}>
         
+        {/* Dynamic Background Spotlights & Pattern */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-gradient-to-b from-blue-900/20 to-transparent"></div>
+             {/* Japanese Pattern Overlay */}
+             <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/seigaiha.png')] opacity-10"></div>
+             
+             {/* Rotating Light Beams */}
+             <div className="absolute top-[-50%] left-[-20%] w-[100%] h-[200%] bg-white/5 rotate-[30deg] animate-[spin_20s_linear_infinite] opacity-30 blur-3xl"></div>
+             <div className="absolute top-[-50%] right-[-20%] w-[100%] h-[200%] bg-white/5 rotate-[-30deg] animate-[spin_25s_linear_infinite_reverse] opacity-30 blur-3xl"></div>
+
+             {/* Winner Spotlight (Center) */}
+             {!isDraw && (
+                 <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full blur-[100px] animate-pulse opacity-40 ${
+                     isFactionWar && (p1Won ? successData.p1Faction : successData.p2Faction) === 'RED' ? 'bg-red-500' : 
+                     isFactionWar && (p1Won ? successData.p1Faction : successData.p2Faction) === 'WHITE' ? 'bg-blue-500' : 'bg-yellow-500'
+                 }`}></div>
+             )}
         </div>
 
-        <Trophy size={80} className="text-yellow-400 mb-6 animate-float drop-shadow-xl" />
-        <h2 className="text-4xl font-black text-white mb-2 tracking-tight">MATCH RECORDED!</h2>
-        <p className="text-slate-400 mb-8 font-medium">対戦結果を記録しました</p>
+        <AchievementPopup items={newAchievements} onClose={() => setNewAchievements([])} />
+        
+        <div className="relative z-10 w-full max-w-6xl px-4 flex flex-col items-center">
+            
+            {/* Header / Winner Announcement (Song Program Style) */}
+            <div className="mb-12 text-center animate-in zoom-in slide-in-from-bottom-4 duration-700">
+                {isDraw ? (
+                     <h2 className="text-6xl md:text-8xl font-black text-slate-300 tracking-tighter drop-shadow-[0_0_20px_rgba(255,255,255,0.5)] uppercase italic font-serif-jp">
+                         引き分け
+                     </h2>
+                ) : (
+                    <>
+                        <div className="flex items-center justify-center gap-4 mb-4">
+                             <Trophy size={56} className="text-yellow-400 fill-yellow-400 animate-bounce drop-shadow-lg" />
+                             {isFactionWar && (p1Won ? successData.p1Faction : successData.p2Faction) === 'RED' && <Flame size={56} className="text-red-500 fill-red-500 animate-pulse"/>}
+                             {isFactionWar && (p1Won ? successData.p1Faction : successData.p2Faction) === 'WHITE' && <Snowflake size={56} className="text-blue-500 fill-blue-500 animate-pulse"/>}
+                        </div>
+                        
+                        {/* Huge Typography */}
+                        <h2 className="text-7xl md:text-9xl font-black text-transparent bg-clip-text bg-gradient-to-b from-yellow-100 via-yellow-300 to-amber-600 tracking-tighter drop-shadow-[0_4px_0_rgba(0,0,0,0.5)] uppercase italic transform -skew-x-12 leading-none pb-4">
+                            WINNER!
+                        </h2>
+                        
+                        {/* Faction Victory Banner */}
+                        {isFactionWar && (
+                            <div className={`text-3xl md:text-4xl font-black tracking-[0.3em] uppercase mt-4 animate-pulse px-8 py-2 border-y-4 bg-black/30 backdrop-blur-md transform skew-x-[-12deg] inline-block ${
+                                (p1Won ? successData.p1Faction : successData.p2Faction) === 'RED' ? 'text-red-500 border-red-500' : 'text-blue-400 border-blue-500'
+                            }`}>
+                                {(p1Won ? successData.p1Faction : successData.p2Faction) === 'RED' ? '紅組 勝利' : '白組 勝利'}
+                            </div>
+                        )}
+                    </>
+                )}
+            </div>
 
-        <div className="bg-slate-900/80 p-8 rounded-3xl shadow-2xl border border-white/10 w-full max-w-3xl transform transition-all hover:scale-[1.01] backdrop-blur-xl">
-          <div className="flex flex-col md:flex-row items-stretch justify-between gap-8">
-             
-             <PlayerResultCard 
-                name={successData.p1Name} 
-                label="Player 1" 
-                rateChange={successData.record.p1RateChange}
-                pointTotal={successData.record.p1PointsEarned}
-                pointDetail={successData.record.p1PointsDetail}
-             />
+            {/* Cards Container */}
+            <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-8 items-center justify-center relative">
+                 {/* VS Badge in Center */}
+                 <div className="hidden md:flex absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 w-24 h-24 bg-slate-900 rounded-full items-center justify-center border-4 border-slate-700 shadow-2xl">
+                     <span className="font-black text-3xl italic text-slate-500 font-serif-jp">VS</span>
+                 </div>
 
-             <div className="flex items-center justify-center">
-                <div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center font-black text-slate-500 text-lg border-4 border-slate-700 shadow-sm">VS</div>
-             </div>
+                 <PlayerResultCard 
+                    name={successData.p1Name} 
+                    label="Player 1" 
+                    rateChange={successData.record.p1RateChange}
+                    pointTotal={successData.record.p1PointsEarned}
+                    pointDetail={successData.record.p1PointsDetail}
+                    isWinner={p1Won}
+                    isDraw={isDraw}
+                    faction={successData.p1Faction}
+                 />
 
-             <PlayerResultCard 
-                name={successData.p2Name} 
-                label="Player 2" 
-                rateChange={successData.record.p2RateChange}
-                pointTotal={successData.record.p2PointsEarned}
-                pointDetail={successData.record.p2PointsDetail}
-             />
-          </div>
+                 <PlayerResultCard 
+                    name={successData.p2Name} 
+                    label="Player 2" 
+                    rateChange={successData.record.p2RateChange}
+                    pointTotal={successData.record.p2PointsEarned}
+                    pointDetail={successData.record.p2PointsDetail}
+                    isWinner={p2Won}
+                    isDraw={isDraw}
+                    faction={successData.p2Faction}
+                 />
+            </div>
           
-          <button 
-            onClick={() => setSuccessData(null)}
-            className="w-full mt-8 bg-white text-slate-900 py-4 rounded-xl font-bold hover:bg-slate-200 active:scale-95 transition-transform shadow-lg"
-          >
-            次の対戦へ
-          </button>
+            <button 
+                onClick={() => setSuccessData(null)}
+                className="mt-16 bg-white text-slate-900 px-16 py-5 rounded-full font-black text-2xl hover:bg-slate-200 active:scale-95 transition-transform shadow-[0_0_30px_rgba(255,255,255,0.3)] animate-pulse uppercase tracking-widest"
+            >
+                次の対戦へ
+            </button>
         </div>
       </div>
     );
@@ -242,7 +373,7 @@ const MatchEntry: React.FC = () => {
       return (
         <div className="flex flex-col items-center animate-pop-in">
           <div className={`w-24 h-24 md:w-32 md:h-32 rounded-full ${u.avatarColor} p-1 shadow-lg border-4 border-slate-700 mb-3`}>
-              <div className="w-full h-full rounded-full bg-slate-900/50 backdrop-blur-[1px] flex items-center justify-center text-4xl md:text-5xl text-white">
+              <div className="w-full h-full rounded-full bg-slate-900/50 backdrop-blur-[1px] flex items-center justify-center text-4xl md:text-5xl text-white font-serif-jp">
                   {avatarChar}
               </div>
           </div>
@@ -280,7 +411,7 @@ const MatchEntry: React.FC = () => {
       {/* VS Screen Layout */}
       <div className="relative">
         {/* Background VS Text */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[200px] font-black text-white/5 select-none pointer-events-none">VS</div>
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[200px] font-black text-white/5 select-none pointer-events-none italic font-serif-jp">VS</div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-12 relative z-10">
             
@@ -323,7 +454,7 @@ const MatchEntry: React.FC = () => {
 
             {/* Center VS Badge */}
             <div className="md:absolute md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 z-30 flex justify-center my-4 md:my-0">
-                <div className="bg-slate-900 text-white w-16 h-16 rounded-full flex items-center justify-center font-black text-2xl border-4 border-slate-700 shadow-xl italic">
+                <div className="bg-slate-900 text-white w-16 h-16 rounded-full flex items-center justify-center font-black text-2xl border-4 border-slate-700 shadow-xl italic font-serif-jp">
                     VS
                 </div>
             </div>

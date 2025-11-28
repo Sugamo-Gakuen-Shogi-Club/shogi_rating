@@ -1,136 +1,179 @@
 
 import React, { useState } from 'react';
-import { BookOpen, HelpCircle, Shield, TrendingUp, Star, Crown, CheckCircle, Info, Clock, Save, Flag, Settings } from 'lucide-react';
+import { BookOpen, HelpCircle, Shield, TrendingUp, Star, Crown, CheckCircle, Info, Clock, Save, Flag, Settings, Volume2, Activity, Zap, AlertTriangle, List, Database, Code, Terminal, Server } from 'lucide-react';
 import { ShogiPiece } from './ShogiPiece';
 import { Card } from './Card';
+import { SYSTEM_TITLES } from './storage';
 
 const ManualTab = () => (
     <div className="space-y-8 animate-in slide-in-from-right duration-300 text-slate-200">
+        
+        {/* ARCHITECTURE */}
         <section>
-            <h3 className="text-2xl font-black text-white mb-4 flex items-center gap-2 font-serif-jp">
-                <Shield className="text-blue-500" /> レート (Rating) システム
+            <h3 className="text-2xl font-black text-white mb-4 flex items-center gap-2 font-serif-jp border-b border-white/10 pb-2">
+                <Server className="text-indigo-400" /> システムアーキテクチャ (Technical Overview)
             </h3>
-            <Card>
-                <p className="text-slate-200 leading-relaxed mb-4 font-medium">
-                    本アプリでは、チェスや将棋で広く使われている<strong>イロレーティング (Elo Rating)</strong>を採用しています。<br/>
-                    これは「対戦相手の強さ」に応じて、勝敗時の変動幅が変わる公平なシステムです。
-                </p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="bg-blue-950/40 p-5 rounded-xl border border-blue-500/30 shadow-lg">
-                        <h4 className="font-bold text-blue-300 mb-2 text-lg">格上に勝った場合 (Giant Killing)</h4>
-                        <p className="text-sm text-slate-300 leading-relaxed">
-                            自分より強い相手に勝つと、通常より<strong>多くのレート</strong>を獲得できます。<br/>
-                            相手との差が100以上ある場合、獲得量は1.5倍になります。
-                        </p>
-                    </div>
-                    <div className="bg-slate-900/50 p-5 rounded-xl border border-slate-700 shadow-lg">
-                        <h4 className="font-bold text-slate-200 mb-2 text-lg">格下に負けた場合</h4>
-                        <p className="text-sm text-slate-400 leading-relaxed">
-                            自分より弱い相手に負けると、通常より<strong>大きくレートが減少</strong>します。<br/>
-                            ただし、本アプリではモチベーション維持のため、減少幅はマイルドに調整されています。
-                        </p>
-                    </div>
+            <div className="bg-slate-950/50 p-6 rounded-xl border border-indigo-500/20 space-y-4 font-mono text-sm">
+                <div>
+                    <h4 className="text-indigo-300 font-bold mb-1">[Frontend / Stack]</h4>
+                    <p className="text-slate-400">React 19, TypeScript, Vite, TailwindCSS, Recharts, Lucide-React</p>
                 </div>
-            </Card>
-        </section>
-
-        <section>
-            <h3 className="text-2xl font-black text-white mb-4 flex items-center gap-2 font-serif-jp">
-                <Star className="text-amber-500" /> ポイント (Points) システム
-            </h3>
-            <Card>
-                <p className="text-slate-200 leading-relaxed mb-4 font-medium">
-                    強さを示す「レート」とは別に、活動量を示す「ポイント」があります。<br/>
-                    ポイントは毎月リセットされ、月間MVPを決める指標となります。
-                </p>
-                <ul className="space-y-3">
-                    <li className="flex items-center justify-between p-4 bg-amber-900/20 rounded-xl border border-amber-500/20">
-                        <span className="font-bold text-amber-300 flex items-center gap-3"><CheckCircle size={20}/> 対局勝利</span>
-                        <span className="font-black text-amber-400 text-xl">+10 pt</span>
-                    </li>
-                    <li className="flex items-center justify-between p-4 bg-slate-800/50 rounded-xl border border-slate-700">
-                        <span className="font-bold text-slate-300 flex items-center gap-3"><CheckCircle size={20}/> 対局敗北</span>
-                        <span className="font-black text-slate-400 text-xl">+5 pt</span>
-                    </li>
-                    <li className="flex items-center justify-between p-4 bg-slate-800/50 rounded-xl border border-slate-700">
-                        <span className="font-bold text-slate-300 flex items-center gap-3"><CheckCircle size={20}/> 出席 (1日1回)</span>
-                        <span className="font-black text-slate-400 text-xl">+5 pt</span>
-                    </li>
-                </ul>
-                <div className="mt-4 text-xs text-slate-400 text-right font-mono">※イベント期間中は倍率がかかることがあります</div>
-            </Card>
-        </section>
-
-        <section>
-            <h3 className="text-2xl font-black text-white mb-4 flex items-center gap-2 font-serif-jp">
-                <Flag className="text-red-500" /> 紅白戦 (Faction War)
-            </h3>
-            <div className="bg-gradient-to-br from-red-950 to-slate-900 p-8 rounded-3xl shadow-2xl text-white border border-red-900/40 relative overflow-hidden">
-                <div className="relative z-10">
-                    <p className="text-slate-200 leading-relaxed mb-6 font-medium">
-                        不定期で開催されるチーム対抗イベントです。部員は自動的に<strong>紅組(Red)</strong>と<strong>白組(White)</strong>に分けられます。<br/>
-                        各軍にはトッププレイヤーから「大将」が選出されます。
+                <div>
+                    <h4 className="text-indigo-300 font-bold mb-1">[Data Persistence]</h4>
+                    <p className="text-slate-400">
+                        LocalStorage (ブラウザ依存)。バックエンドサーバー非依存のスタンドアロン設計。<br/>
+                        以下のキーを使用:
                     </p>
-                    <div className="flex flex-col md:flex-row gap-6">
-                        <div className="flex-1 bg-white/5 p-5 rounded-2xl border border-white/10 backdrop-blur-sm">
-                            <div className="flex items-center gap-2 mb-2 font-bold text-red-400 text-lg">
-                                <Crown size={20} /> 大将 (General)
-                            </div>
-                            <p className="text-sm text-slate-300 leading-relaxed">
-                                大将同士の対局は<strong>「一騎討ち (Duel)」</strong>と呼ばれ、勝利すると特別な称号とボーナスポイントが手に入ります。
-                            </p>
-                        </div>
-                        <div className="flex-1 bg-white/5 p-5 rounded-2xl border border-white/10 backdrop-blur-sm">
-                            <div className="flex items-center gap-2 mb-2 font-bold text-blue-400 text-lg">
-                                <TrendingUp size={20} /> 勝利条件
-                            </div>
-                            <p className="text-sm text-slate-300 leading-relaxed">
-                                イベント期間中に、敵チームのメンバーに勝利することでチームスコアが加算されます。<br/>
-                                最終的にスコアの高いチームが勝利となります。
-                            </p>
-                        </div>
-                    </div>
+                    <ul className="list-disc list-inside mt-1 ml-2 text-slate-500">
+                        <li><code>club_rivals_users_v2</code>: ユーザーデータ (User[])</li>
+                        <li><code>club_rivals_matches</code>: 対戦履歴 (MatchRecord[])</li>
+                        <li><code>club_rivals_settings</code>: システム設定 (SystemSettings)</li>
+                        <li><code>club_rivals_logs</code>: アクティビティログ (ActivityLog[])</li>
+                    </ul>
                 </div>
             </div>
         </section>
 
+        {/* ALGORITHM: RATE */}
         <section>
-            <h3 className="text-2xl font-black text-white mb-4 flex items-center gap-2 font-serif-jp">
-                <Info className="text-slate-400" /> システム仕様詳細
+            <h3 className="text-2xl font-black text-white mb-4 flex items-center gap-2 font-serif-jp border-b border-white/10 pb-2">
+                <Shield className="text-blue-500" /> レート計算アルゴリズム (Elo Rating Logic)
             </h3>
             <Card>
-                <div className="space-y-4 divide-y divide-white/5">
-                    <div className="pt-4 first:pt-0">
-                         <h4 className="font-bold text-slate-200 flex items-center gap-2 mb-2"><Clock size={16}/> クールダウン (不正防止)</h4>
-                         <p className="text-sm text-slate-400">
-                             同じ相手との対戦は、前回の対局終了から<strong>「1分間」</strong>経過するまで記録できません。<br/>
-                             これは連打による不正なポイント稼ぎや誤入力を防ぐための仕様です。
-                         </p>
+                <div className="space-y-4 text-sm">
+                    <p className="text-slate-200 font-bold">基本ロジック: Elo Rating System (K=32)</p>
+                    <div className="bg-slate-900 p-4 rounded-lg font-mono text-xs text-slate-400 border border-slate-700">
+                        Exp = 1 / (1 + 10^((Rate_Opponent - Rate_Player) / 400))<br/>
+                        Change = K * (ActualScore - Exp)
                     </div>
-                    <div className="pt-4">
-                         <h4 className="font-bold text-slate-200 flex items-center gap-2 mb-2"><TrendingUp size={16}/> 順位決定ロジック</h4>
-                         <p className="text-sm text-slate-400">
-                             ランキングでスコアが同点の場合、内部的に同一順位（例: 1位, 1位, 3位）として処理されます。<br/>
-                             スクリーンセーバー等では微細な小数点の差で表示順が変わる場合があります。
-                         </p>
+                    
+                    <h4 className="font-bold text-blue-300 mt-4">[独自仕様 / 補正]</h4>
+                    <ul className="list-disc list-inside space-y-2 text-slate-300">
+                        <li><strong>デフレ防止 (Inflationary):</strong> 敗北時の減少幅を抑制し、勝利時の増加幅を維持。</li>
+                        <li><strong>最低保証変動:</strong> 勝利(+10), 引分(+5), 敗北(+2) の固定値を加算ベースとする。</li>
+                        <li><strong>ジャイアントキリング (Giant Killing):</strong> レート差100以上の格上に勝利した場合、変動値に <code className="bg-slate-800 px-1 rounded">x1.5</code> の係数を適用。</li>
+                        <li><strong>連戦ペナルティ (Spam Protection):</strong> 同一日・同ペアによる対戦が3回目(index>=2)以降の場合、変動値およびポイントに <code className="bg-red-900/30 text-red-400 px-1 rounded">x0.5</code> の係数を適用。</li>
+                    </ul>
+                </div>
+            </Card>
+        </section>
+
+        {/* ALGORITHM: POINTS */}
+        <section>
+            <h3 className="text-2xl font-black text-white mb-4 flex items-center gap-2 font-serif-jp border-b border-white/10 pb-2">
+                <Star className="text-amber-500" /> ポイント計算仕様 (Point Logic)
+            </h3>
+            <Card>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm text-left font-mono">
+                        <thead className="bg-slate-800 text-slate-400">
+                            <tr>
+                                <th className="p-2">Action</th>
+                                <th className="p-2">Base Points</th>
+                                <th className="p-2">Multipliers / Bonus</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-700 bg-slate-900/50">
+                            <tr>
+                                <td className="p-2">WIN</td>
+                                <td className="p-2 text-amber-500">10 pt</td>
+                                <td className="p-2">EventMultiplier, StreakBonus(3連+10, 5連+30), NewMember(+5)</td>
+                            </tr>
+                            <tr>
+                                <td className="p-2">DRAW</td>
+                                <td className="p-2 text-slate-400">7 pt</td>
+                                <td className="p-2">EventMultiplier, NewMember(+5)</td>
+                            </tr>
+                            <tr>
+                                <td className="p-2">LOSS</td>
+                                <td className="p-2 text-slate-500">5 pt</td>
+                                <td className="p-2">EventMultiplier, NewMember(+5)</td>
+                            </tr>
+                            <tr>
+                                <td className="p-2">ATTENDANCE</td>
+                                <td className="p-2 text-green-500">5 pt</td>
+                                <td className="p-2">1日1回制限 (Daily check)</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p className="mt-4 text-xs text-slate-500">
+                    ※ <code>MatchRecord</code> オブジェクト内に <code>PointBreakdown</code> として計算内訳が保存されます。
+                </p>
+            </Card>
+        </section>
+
+        {/* ADMIN & BACKUP */}
+        <section>
+            <h3 className="text-2xl font-black text-white mb-4 flex items-center gap-2 font-serif-jp border-b border-white/10 pb-2">
+                <Database className="text-red-400" /> データ管理・バックアップ仕様
+            </h3>
+            <Card>
+                <div className="space-y-4">
+                    <div>
+                        <h4 className="font-bold text-white mb-1 flex items-center gap-2"><Settings size={16}/> 管理機能 (Admin.tsx)</h4>
+                        <p className="text-sm text-slate-400">
+                            管理画面へのアクセスにはPINコード（デフォルト: <code>1123</code>）が必要です。<br/>
+                            <code>storage.ts</code> 内の <code>DEFAULT_SETTINGS</code> 定数で定義されています。
+                        </p>
                     </div>
-                    <div className="pt-4">
-                         <h4 className="font-bold text-slate-200 flex items-center gap-2 mb-2"><Save size={16}/> データバックアップ</h4>
-                         <p className="text-sm text-slate-400">
-                             データはブラウザ内に保存されます。タブレットを変更する場合や初期化する場合は、<br/>
-                             管理画面の「バックアップ」からテキストデータをコピーし、新しい端末で「復元」してください。
-                         </p>
-                    </div>
-                    <div className="pt-4">
-                         <h4 className="font-bold text-slate-200 flex items-center gap-2 mb-2"><Settings size={16}/> スクリーンセーバー</h4>
-                         <p className="text-sm text-slate-400">
-                             操作がない状態で<strong>「45秒」</strong>経過すると、自動的にランキング表示モード（スクリーンセーバー）に切り替わります。<br/>
-                             画面をタップすると解除されます。
-                         </p>
+                    
+                    <div className="bg-slate-950/50 p-4 rounded-xl border border-white/10">
+                        <h4 className="font-bold text-white mb-2 flex items-center gap-2"><Save size={16}/> JSONバックアップ構造</h4>
+                        <pre className="text-[10px] text-slate-400 overflow-x-auto bg-black p-2 rounded border border-slate-800">
+{`{
+  "users": User[],          // 全ユーザーデータ
+  "matches": MatchRecord[], // 全対戦履歴
+  "settings": SystemSettings, // 現在の設定（シーズン、イベント等）
+  "logs": ActivityLog[],    // 直近の活動ログ
+  "timestamp": string       // エクスポート日時
+}`}
+                        </pre>
+                        <p className="text-xs text-slate-500 mt-2">
+                            ※ データ復元時は、このJSON構造を解析し、検証に成功した場合のみLocalStorageを上書きします。
+                        </p>
                     </div>
                 </div>
             </Card>
         </section>
+
+        {/* FACTION WAR ALGORITHM */}
+        <section>
+            <h3 className="text-2xl font-black text-white mb-4 flex items-center gap-2 font-serif-jp border-b border-white/10 pb-2">
+                <Flag className="text-red-500" /> 紅白戦チーム分けロジック
+            </h3>
+            <Card>
+                <p className="text-sm text-slate-300 mb-2">
+                    <code>getFactionBalanceSimulation()</code> 関数により、以下の指標を用いて戦力が均等になるよう貪欲法で振り分けます。
+                </p>
+                <div className="bg-slate-900 p-4 rounded-lg font-mono text-xs text-slate-400 border border-slate-700 mb-4">
+                    PowerScore = (Rate * 0.3) + (ActivityDays * 300)
+                </div>
+                <p className="text-xs text-slate-400">
+                    単純なレート順ではなく、<strong>「活動日数（ActivityDays）」</strong>に高い重み付けを行うことで、
+                    幽霊部員ばかりのチームができないようにし、アクティブ率の均衡化を図っています。
+                </p>
+            </Card>
+        </section>
+        
+        {/* AUDIO ENGINE */}
+        <section>
+            <h3 className="text-2xl font-black text-white mb-4 flex items-center gap-2 font-serif-jp border-b border-white/10 pb-2">
+                <Volume2 className="text-green-400" /> オーディオエンジン (Web Audio API)
+            </h3>
+            <Card>
+                <p className="text-sm text-slate-300 mb-2">
+                    外部アセット（mp3/wav）を使用せず、<code>AudioContext</code> を用いてブラウザ上で波形をリアルタイム合成しています。
+                </p>
+                <ul className="list-disc list-inside text-xs text-slate-400 space-y-1 font-mono">
+                    <li><strong>CLICK (将棋音):</strong> High-pass filtered Noise Burst + Triangle wave resonance.</li>
+                    <li><strong>SUCCESS (鼓):</strong> Pitch-bending Sine wave (High to Low).</li>
+                    <li><strong>WIN (和太鼓):</strong> Low-pass filtered Square waves with decay.</li>
+                    <li><strong>FANFARE (雅楽・笙):</strong> Sawtooth oscillators stacking Pentatonic scale (E5, A5, B5, E6, F#6).</li>
+                </ul>
+            </Card>
+        </section>
+
     </div>
 );
 
@@ -211,6 +254,23 @@ const TutorialTab = () => (
                  <p className="text-xs text-amber-500 mt-2 font-bold text-center w-full">目指せ、「王将」アイコン！</p>
              </Card>
         </section>
+
+        <section>
+             <h4 className="text-xl font-bold text-white mb-4 border-l-4 border-purple-500 pl-4 py-1">4. データを分析しよう</h4>
+             <Card>
+                 <p className="text-slate-200 text-sm mb-4 leading-relaxed">
+                     プロフィール画面では、自分の活動履歴を詳しく見ることができます。
+                 </p>
+                 <div className="grid grid-cols-2 gap-4 text-xs font-bold text-slate-400">
+                     <div className="bg-slate-800 p-3 rounded-lg flex items-center gap-2">
+                         <Activity size={16} className="text-green-500" /> 活動ヒートマップ (草)
+                     </div>
+                     <div className="bg-slate-800 p-3 rounded-lg flex items-center gap-2">
+                         <Zap size={16} className="text-yellow-500" /> 星取表 (○●)
+                     </div>
+                 </div>
+             </Card>
+        </section>
     </div>
 );
 
@@ -221,7 +281,7 @@ export const Guide: React.FC = () => {
         <div className="max-w-4xl mx-auto pb-24">
             <div className="mb-10 text-center">
                 <h2 className="text-5xl font-black text-white tracking-tighter mb-4 font-serif-jp drop-shadow-lg">ガイドブック</h2>
-                <p className="text-slate-400 font-medium">アプリの使い方とルールをマスターしよう</p>
+                <p className="text-slate-400 font-medium">システム仕様 (Manual) & 使い方 (Tutorial)</p>
             </div>
 
             <div className="flex justify-center mb-10">
@@ -230,13 +290,13 @@ export const Guide: React.FC = () => {
                         onClick={() => setTab('MANUAL')}
                         className={`px-8 py-3 rounded-xl font-bold text-sm transition-all flex items-center gap-2 ${tab === 'MANUAL' ? 'bg-slate-600 text-white shadow-md ring-1 ring-slate-500' : 'text-slate-400 hover:bg-slate-700 hover:text-white'}`}
                     >
-                        <BookOpen size={18} /> 説明書 (Manual)
+                        <Terminal size={18} /> システム仕様書 (Technical)
                     </button>
                     <button 
                         onClick={() => setTab('TUTORIAL')}
                         className={`px-8 py-3 rounded-xl font-bold text-sm transition-all flex items-center gap-2 ${tab === 'TUTORIAL' ? 'bg-blue-600 text-white shadow-md ring-1 ring-blue-500' : 'text-slate-400 hover:bg-slate-700 hover:text-white'}`}
                     >
-                        <HelpCircle size={18} /> チュートリアル
+                        <HelpCircle size={18} /> チュートリアル (User)
                     </button>
                 </div>
             </div>

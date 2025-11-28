@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { getUsers, getSettings, isEventActive } from './storage';
 import { User, EventType } from './types';
@@ -34,7 +35,6 @@ export const Screensaver: React.FC<ScreensaverProps> = ({ onDismiss }) => {
              if (prev === 'RATE') return 'FACTION_WAR';
              if (prev === 'FACTION_WAR') {
                  // Determine next state based on random or counter? Simple rotation:
-                 // Need context of "previous previous". Simpler:
                  // Just make FACTION_WAR appear more often.
                  return Math.random() > 0.5 ? 'POINTS' : 'RATE'; // Fallback logic simpler below
              }
@@ -89,6 +89,14 @@ export const Screensaver: React.FC<ScreensaverProps> = ({ onDismiss }) => {
                  <div className="absolute top-[-50%] right-[-20%] w-[100%] h-[200%] bg-gradient-to-b from-blue-600/30 to-transparent rotate-[-30deg] animate-[spotlight_4s_infinite_alternate-reverse]"></div>
                  
                  <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-30"></div>
+             </div>
+             
+             {/* Main Title Badge */}
+             <div className="relative z-20 mb-12 px-12 py-6 border-y-4 border-white/20 bg-slate-900/60 backdrop-blur-md transform skew-x-[-10deg] flex flex-col items-center">
+                 <h2 className="text-5xl md:text-7xl font-black text-white tracking-[0.2em] animate-pulse skew-x-[10deg] drop-shadow-[0_0_15px_rgba(255,255,255,0.8)]">
+                     紅白戦開催中
+                 </h2>
+                 <div className="text-xl text-yellow-400 font-bold tracking-widest mt-2 skew-x-[10deg] animate-pulse">FACTION WAR IN PROGRESS</div>
              </div>
 
              <div className="relative z-10 w-full max-w-6xl flex items-center justify-center gap-12">

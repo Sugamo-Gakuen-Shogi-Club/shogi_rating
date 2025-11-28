@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { HashRouter, Routes, Route, useLocation, Link } from 'react-router-dom';
 import { Home, Trophy, User as UserIcon, Settings, PlusCircle, BookOpen } from 'lucide-react';
@@ -87,8 +88,8 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         })}
       </div>
 
-      {/* Main Content */}
-      <main className="flex-1 flex flex-col relative z-0 overflow-hidden pt-[70px] md:pt-0">
+      {/* Main Content - Removed z-0 to allow fixed children to stack properly above sidebar */}
+      <main className="flex-1 flex flex-col relative overflow-hidden pt-[70px] md:pt-0">
         <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-10 scrollbar-hide">
           <div className="max-w-6xl mx-auto h-full pb-24 md:pb-0">
             {children}

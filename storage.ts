@@ -1,4 +1,5 @@
 
+
 import { User, MatchRecord, SystemSettings, ActivityLog, ActivityType, AchievementDef, MatchProcessResult, AttendanceResult, BackupData, PointBreakdown, EventType, Season, IconDef, RivalData, SystemTitle, TitleDef } from './types';
 
 const USERS_KEY = 'club_rivals_users_v2';
@@ -181,73 +182,166 @@ const INITIAL_MEMBERS = [
   { name: "龍口　直史", isNew: false }
 ];
 
-// --- SOUND & HAPTICS ---
+// --- SOUND & HAPTICS (Japanese Style / 和風) ---
 export const playSound = (type: 'CLICK' | 'SUCCESS' | 'ERROR' | 'WIN' | 'FANFARE') => {
     if (typeof window === 'undefined') return;
     try {
         const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
         if (!AudioContext) return;
         const ctx = new AudioContext();
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-
-        const now = ctx.currentTime;
         
+        const masterGain = ctx.createGain();
+        masterGain.gain.value = 0.5; 
+        masterGain.connect(ctx.destination);
+        const now = ctx.currentTime;
+
+        // Helper to create noise buffer for percussion
+        const createNoiseBuffer = () => {
+            const bufferSize = ctx.sampleRate * 1; 
+            const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+            const output = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                output[i] = Math.random() * 2 - 1;
+            }
+            return buffer;
+        };
+
         switch (type) {
-            case 'CLICK':
-                // Short Wood Click
+            case 'CLICK': {
+                // 将棋の駒音 (PACHI): Sharp wood click
+                // Filtered noise burst + Body resonance
+                
+                // 1. The Snap (Noise)
+                const noise = ctx.createBufferSource();
+                noise.buffer = createNoiseBuffer();
+                const noiseFilter = ctx.createBiquadFilter();
+                noiseFilter.type = 'highpass';
+                noiseFilter.frequency.value = 1200;
+                const noiseGain = ctx.createGain();
+                
+                noise.connect(noiseFilter);
+                noiseFilter.connect(noiseGain);
+                noiseGain.connect(masterGain);
+                
+                // Very short burst
+                noiseGain.gain.setValueAtTime(0.8, now);
+                noiseGain.gain.exponentialRampToValueAtTime(0.01, now + 0.04);
+                noise.start(now);
+                noise.stop(now + 0.05);
+
+                // 2. The Wood Body (Resonance)
+                const osc = ctx.createOscillator();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(350, now);
+                osc.frequency.exponentialRampToValueAtTime(300, now + 0.05); // slight drop
+                const oscGain = ctx.createGain();
+                oscGain.gain.setValueAtTime(0.4, now);
+                oscGain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+                
+                osc.connect(oscGain);
+                oscGain.connect(masterGain);
+                osc.start(now);
+                osc.stop(now + 0.1);
+                break;
+            }
+            case 'SUCCESS': {
+                // 鼓 (TSUZUMI): "Pon!"
+                // Pitch bending sine wave + hollow resonance
+                const osc = ctx.createOscillator();
+                osc.type = 'sine';
+                
+                // Pitch drop: High to Low (simulating tension release)
+                // Classic "Yo-oooo" drum effect
+                osc.frequency.setValueAtTime(200, now);
+                osc.frequency.exponentialRampToValueAtTime(100, now + 0.2);
+                
+                const gain = ctx.createGain();
+                gain.gain.setValueAtTime(0, now);
+                gain.gain.linearRampToValueAtTime(0.8, now + 0.01);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+                
+                osc.connect(gain);
+                gain.connect(masterGain);
+                osc.start(now);
+                osc.stop(now + 0.35);
+                break;
+            }
+            case 'WIN': {
+                // 和太鼓連打 (Taiko Drum Roll) + 拍子木 (Hyoshigi)
+                // Simulated by multiple low freq hits
+                const hit = (time: number, freq: number, decay: number, vol: number) => {
+                    const osc = ctx.createOscillator();
+                    osc.type = 'square'; // Richer harmonics for drum
+                    const filter = ctx.createBiquadFilter();
+                    filter.type = 'lowpass';
+                    filter.frequency.value = 180;
+                    
+                    osc.frequency.setValueAtTime(freq, time);
+                    const g = ctx.createGain();
+                    g.gain.setValueAtTime(vol, time);
+                    g.gain.exponentialRampToValueAtTime(0.001, time + decay);
+                    
+                    osc.connect(filter);
+                    filter.connect(g);
+                    g.connect(masterGain);
+                    osc.start(time);
+                    osc.stop(time + decay);
+                };
+
+                // Doko-Doko-Don!
+                hit(now, 80, 0.1, 0.5); 
+                hit(now + 0.1, 80, 0.1, 0.6); 
+                hit(now + 0.25, 60, 0.4, 0.8); // DOON!
+                break;
+            }
+            case 'FANFARE': {
+                // 雅楽の笙 (SHO): Mystical Chord
+                // E5, A5, B5, E6, F#6 (Pentatonic cluster)
+                // Slow attack, long sustain, saw/square mix
+                const freqs = [523.25, 659.25, 783.99, 1046.50, 1174.66]; // C5, E5, G5, C6, D6 (Pentatonic)
+                freqs.forEach((f, i) => {
+                    const osc = ctx.createOscillator();
+                    osc.type = 'sawtooth'; // Sho has rich harmonics
+                    
+                    const filter = ctx.createBiquadFilter();
+                    filter.type = 'lowpass';
+                    filter.frequency.value = 1500;
+
+                    const g = ctx.createGain();
+                    g.gain.setValueAtTime(0, now);
+                    g.gain.linearRampToValueAtTime(0.08, now + 0.5 + (i * 0.05)); // Slow bloom
+                    g.gain.linearRampToValueAtTime(0, now + 3.0);
+                    
+                    osc.connect(filter);
+                    filter.connect(g);
+                    g.connect(masterGain);
+                    osc.start(now);
+                    osc.stop(now + 3.5);
+                });
+                break;
+            }
+            case 'ERROR': {
+                // 木魚 / 拍子木 (Hyoshigi/Mokugyo)
+                // Hard wooden strike, higher pitch than click
+                const osc = ctx.createOscillator();
                 osc.type = 'square';
                 osc.frequency.setValueAtTime(800, now);
-                osc.frequency.exponentialRampToValueAtTime(100, now + 0.05);
-                gain.gain.setValueAtTime(0.3, now);
-                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
+                
+                const filter = ctx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.value = 1200;
+                
+                const g = ctx.createGain();
+                g.gain.setValueAtTime(0.4, now);
+                g.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                
+                osc.connect(filter);
+                filter.connect(g);
+                g.connect(masterGain);
                 osc.start(now);
-                osc.stop(now + 0.05);
+                osc.stop(now + 0.15);
                 break;
-            case 'SUCCESS':
-                // Chime
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(600, now);
-                osc.frequency.linearRampToValueAtTime(1200, now + 0.1);
-                gain.gain.setValueAtTime(0.1, now);
-                gain.gain.linearRampToValueAtTime(0, now + 0.4);
-                osc.start(now);
-                osc.stop(now + 0.4);
-                break;
-            case 'WIN':
-                // Victory Chord
-                osc.type = 'triangle';
-                osc.frequency.setValueAtTime(523.25, now); // C
-                osc.frequency.setValueAtTime(659.25, now + 0.1); // E
-                osc.frequency.setValueAtTime(783.99, now + 0.2); // G
-                gain.gain.setValueAtTime(0.2, now);
-                gain.gain.linearRampToValueAtTime(0, now + 0.6);
-                osc.start(now);
-                osc.stop(now + 0.6);
-                break;
-            case 'FANFARE':
-                 // Simpler fanfare
-                osc.type = 'sawtooth';
-                osc.frequency.setValueAtTime(400, now);
-                osc.frequency.setValueAtTime(500, now + 0.1);
-                osc.frequency.setValueAtTime(600, now + 0.2);
-                osc.frequency.setValueAtTime(800, now + 0.4);
-                gain.gain.setValueAtTime(0.3, now);
-                gain.gain.exponentialRampToValueAtTime(0.01, now + 1.5);
-                osc.start(now);
-                osc.stop(now + 1.5);
-                break;
-            case 'ERROR':
-                osc.type = 'sawtooth';
-                osc.frequency.setValueAtTime(150, now);
-                osc.frequency.linearRampToValueAtTime(100, now + 0.3);
-                gain.gain.setValueAtTime(0.3, now);
-                gain.gain.linearRampToValueAtTime(0, now + 0.3);
-                osc.start(now);
-                osc.stop(now + 0.3);
-                break;
+            }
         }
     } catch (e) {
         console.error('Audio play failed', e);
@@ -478,12 +572,6 @@ export const awardSystemTitles = () => {
         
         // Check P1 Win
         if (m.result === 'PLAYER1_WIN') {
-            // Need historical rate? Approximation: use current rate or reconstructing is complex.
-            // Simplified: Use current rates for GK calc or assume stored rate change reflects difficulty.
-            // Better: Use recorded match data if we stored rates. We didn't store snapshot rates in MatchRecord.
-            // Fallback: Check if rate change was >= 25 (High K-factor win implies giant killing roughly)
-            // Or better: Re-use the existing logic that Giant Killing gives 1.5x K-factor.
-            // If p1RateChange > 20 (approx normal max 16 * 1.5 = 24+), it's likely a GK.
             if (m.p1RateChange >= 24) {
                 giantKillerCounts[m.player1Id] = (giantKillerCounts[m.player1Id] || 0) + 1;
             }
@@ -605,24 +693,49 @@ export const getRivalryStats = (userId: string): { bestCustomer: RivalData | nul
 }
 
 const K_FACTOR = 32;
-export const calculateEloChange = (playerRate: number, opponentRate: number, actualScore: number): number => {
+export const calculateEloChange = (playerRate: number, opponentRate: number, actualScore: number, penaltyMultiplier: number = 1.0): number => {
   const expectedScore = 1 / (1 + 10 ** ((opponentRate - playerRate) / 400));
-  if (actualScore === 1) {
-      let change = K_FACTOR * (actualScore - expectedScore);
+  let change = 0;
+  if (actualScore === 1) { // Win
+      change = K_FACTOR * (actualScore - expectedScore);
       if (opponentRate - playerRate >= 100) change = change * 1.5; 
-      return Math.max(10, Math.round(change));
-  } else if (actualScore === 0.5) { return 5; } else { return 2; }
+      change = Math.max(10, Math.round(change));
+  } else if (actualScore === 0.5) { // Draw
+      change = 5; 
+  } else { // Loss
+      change = 2; 
+  }
+  
+  // Apply anti-spam penalty
+  return Math.max(1, Math.round(change * penaltyMultiplier));
 };
 
-const calculateMatchPoints = (resultType: 'WIN' | 'LOSS' | 'DRAW', currentStreak: number, isNewMemberInvolved: boolean, multiplier: number): PointBreakdown => {
+const calculateMatchPoints = (resultType: 'WIN' | 'LOSS' | 'DRAW', currentStreak: number, isNewMemberInvolved: boolean, eventMultiplier: number, penaltyMultiplier: number = 1.0): PointBreakdown => {
     let base = 0;
     if (resultType === 'WIN') base = 10; else if (resultType === 'LOSS') base = 5; else base = 7;
-    const effectiveBase = base * multiplier;
+    
+    // Apply penalty to base points
+    const effectiveBase = Math.round(base * eventMultiplier * penaltyMultiplier);
+    
     let streakBonus = 0;
     if (resultType === 'WIN') { const nextStreak = currentStreak + 1; if (nextStreak === 3) streakBonus = 10; if (nextStreak === 5) streakBonus = 30; }
+    
+    // Apply penalty to bonus? Usually bonuses might stay, but let's penalize everything to discourage farming.
+    streakBonus = Math.round(streakBonus * penaltyMultiplier);
+    
     let newMemberBonus = 0;
     if (isNewMemberInvolved) newMemberBonus = 5;
-    return { base: effectiveBase, streakBonus, newMemberBonus, eventMultiplier: multiplier, total: effectiveBase + streakBonus + newMemberBonus };
+    // New member bonus usually shouldn't be penalized as much, but consistency is key.
+    newMemberBonus = Math.round(newMemberBonus * penaltyMultiplier);
+
+    return { 
+        base: effectiveBase, 
+        streakBonus, 
+        newMemberBonus, 
+        eventMultiplier, 
+        spamPenalty: penaltyMultiplier,
+        total: effectiveBase + streakBonus + newMemberBonus 
+    };
 };
 
 const validateMatchCooldown = (p1Id: string, p2Id: string) => {
@@ -642,6 +755,17 @@ const validateMatchCooldown = (p1Id: string, p2Id: string) => {
     }
 }
 
+const getDailyMatchCount = (p1Id: string, p2Id: string): number => {
+    const matches = getMatches();
+    const today = new Date().toISOString().split('T')[0];
+    const samePairMatches = matches.filter(m => {
+        const matchDate = m.date.split('T')[0];
+        const isSamePair = (m.player1Id === p1Id && m.player2Id === p2Id) || (m.player1Id === p2Id && m.player2Id === p1Id);
+        return matchDate === today && isSamePair;
+    });
+    return samePairMatches.length;
+}
+
 export const processMatch = (p1Id: string, p2Id: string, result: 'PLAYER1_WIN' | 'PLAYER2_WIN' | 'DRAW'): MatchProcessResult => {
   validateMatchCooldown(p1Id, p2Id);
   const users = getUsers();
@@ -650,24 +774,37 @@ export const processMatch = (p1Id: string, p2Id: string, result: 'PLAYER1_WIN' |
   const p2 = users.find(u => u.id === p2Id);
   if (!p1 || !p2) throw new Error("User not found");
   const isDuel = p1.isGeneral && p2.isGeneral && p1.faction !== p2.faction;
+  
+  // Anti-Spam / Farming Logic
+  const dailyMatches = getDailyMatchCount(p1Id, p2Id);
+  // If count is 0 or 1 (1st or 2nd match), multiplier is 1.0. 
+  // If count is >= 2 (3rd match onwards), multiplier is 0.5.
+  const penaltyMultiplier = dailyMatches >= 2 ? 0.5 : 1.0;
+
   let p1Score = 0.5;
   if (result === 'PLAYER1_WIN') p1Score = 1;
   if (result === 'PLAYER2_WIN') p1Score = 0;
   const p2Score = 1 - p1Score;
-  const p1RateDelta = calculateEloChange(p1.rate, p2.rate, p1Score);
-  const p2RateDelta = calculateEloChange(p2.rate, p1.rate, p2Score);
+  
+  const p1RateDelta = calculateEloChange(p1.rate, p2.rate, p1Score, penaltyMultiplier);
+  const p2RateDelta = calculateEloChange(p2.rate, p1.rate, p2Score, penaltyMultiplier);
+  
   const activeEvent = isEventActive();
   const multiplier = activeEvent ? settings.eventMultiplier : 1;
   const isNewMemberInvolved = p1.isNewMember || p2.isNewMember;
   const isInterFactionMatch = activeEvent && settings.eventType === EventType.FACTION_WAR && p1.faction !== p2.faction;
+  
   let p1ResType: 'WIN' | 'LOSS' | 'DRAW' = 'DRAW';
   if (result === 'PLAYER1_WIN') p1ResType = 'WIN';
   if (result === 'PLAYER2_WIN') p1ResType = 'LOSS';
+  
   let p2ResType: 'WIN' | 'LOSS' | 'DRAW' = 'DRAW';
   if (result === 'PLAYER2_WIN') p2ResType = 'WIN';
   if (result === 'PLAYER1_WIN') p2ResType = 'LOSS';
-  const p1PointsDetail = calculateMatchPoints(p1ResType, p1.currentStreak, isNewMemberInvolved, multiplier);
-  const p2PointsDetail = calculateMatchPoints(p2ResType, p2.currentStreak, isNewMemberInvolved, multiplier);
+  
+  const p1PointsDetail = calculateMatchPoints(p1ResType, p1.currentStreak, isNewMemberInvolved, multiplier, penaltyMultiplier);
+  const p2PointsDetail = calculateMatchPoints(p2ResType, p2.currentStreak, isNewMemberInvolved, multiplier, penaltyMultiplier);
+  
   const date = getTimestamp();
   const updateUserStats = (u: User, won: boolean, draw: boolean, rateChange: number, pointsDetail: PointBreakdown, duelWin: boolean, isInterFaction: boolean) => {
     u.rate += rateChange; 
@@ -679,13 +816,17 @@ export const processMatch = (p1Id: string, p2Id: string, result: 'PLAYER1_WIN' |
     if (draw) { u.draws += 1; u.currentStreak = 0; } else if (won) { u.wins += 1; u.currentStreak += 1; if (u.currentStreak > u.maxStreak) u.maxStreak = u.currentStreak; } else { u.losses += 1; u.currentStreak = 0; }
     return checkAchievementsAndIcons(u, { isDuelWin: duelWin });
   };
+  
   const resultsP1 = updateUserStats(p1, result === 'PLAYER1_WIN', result === 'DRAW', p1RateDelta, p1PointsDetail, isDuel && result === 'PLAYER1_WIN', isInterFactionMatch);
   const resultsP2 = updateUserStats(p2, result === 'PLAYER2_WIN', result === 'DRAW', p2RateDelta, p2PointsDetail, isDuel && result === 'PLAYER2_WIN', isInterFactionMatch);
+  
   saveUsers(users);
   const matchRecord: MatchRecord = { id: generateId(), date, player1Id: p1Id, player2Id: p2Id, result, p1RateChange: p1RateDelta, p2RateChange: p2RateDelta, p1PointsEarned: p1PointsDetail.total, p2PointsEarned: p2PointsDetail.total, isDuel };
   addMatch(matchRecord);
+  
   addLog({ id: generateId(), userId: p1Id, type: result === 'PLAYER1_WIN' ? ActivityType.MATCH_WIN : result === 'DRAW' ? ActivityType.MATCH_DRAW : ActivityType.MATCH_LOSS, points: p1PointsDetail.total, description: isDuel ? `Duel vs ${p2.name}` : `Match vs ${p2.name}`, date });
   addLog({ id: generateId(), userId: p2Id, type: result === 'PLAYER2_WIN' ? ActivityType.MATCH_WIN : result === 'DRAW' ? ActivityType.MATCH_DRAW : ActivityType.MATCH_LOSS, points: p2PointsDetail.total, description: isDuel ? `Duel vs ${p1.name}` : `Match vs ${p1.name}`, date });
+  
   return { p1RateChange: p1RateDelta, p2RateChange: p2RateDelta, p1PointsEarned: p1PointsDetail.total, p2PointsEarned: p2PointsDetail.total, p1PointsDetail, p2PointsDetail, newAchievementsP1: resultsP1.newAchievements, newAchievementsP2: resultsP2.newAchievements, newIconsP1: resultsP1.newIcons, newIconsP2: resultsP2.newIcons, isDuel };
 };
 
