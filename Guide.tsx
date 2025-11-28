@@ -1,9 +1,7 @@
-
 import React, { useState } from 'react';
-import { BookOpen, HelpCircle, Shield, TrendingUp, Star, Crown, CheckCircle, Info, Clock, Save, Flag, Settings, Volume2, Activity, Zap, AlertTriangle, List, Database, Code, Terminal, Server } from 'lucide-react';
+import { HelpCircle, Shield, Star, CheckCircle, Save, Flag, Settings, Volume2, Activity, Zap, Database, Terminal, Server } from 'lucide-react';
 import { ShogiPiece } from './ShogiPiece';
 import { Card } from './Card';
-import { SYSTEM_TITLES } from './storage';
 
 const ManualTab = () => (
     <div className="space-y-8 animate-in slide-in-from-right duration-300 text-slate-200">
@@ -24,12 +22,12 @@ const ManualTab = () => (
                         LocalStorage (ブラウザ依存)。バックエンドサーバー非依存のスタンドアロン設計。<br/>
                         以下のキーを使用:
                     </p>
-                    <ul className="list-disc list-inside mt-1 ml-2 text-slate-500">
-                        <li><code>club_rivals_users_v2</code>: ユーザーデータ (User[])</li>
-                        <li><code>club_rivals_matches</code>: 対戦履歴 (MatchRecord[])</li>
-                        <li><code>club_rivals_settings</code>: システム設定 (SystemSettings)</li>
-                        <li><code>club_rivals_logs</code>: アクティビティログ (ActivityLog[])</li>
-                    </ul>
+                    <div className="flex flex-col gap-1 mt-1 ml-2 text-slate-500">
+                        <div>• <code>club_rivals_users_v2</code>: ユーザーデータ (User[])</div>
+                        <div>• <code>club_rivals_matches</code>: 対戦履歴 (MatchRecord[])</div>
+                        <div>• <code>club_rivals_settings</code>: システム設定 (SystemSettings)</div>
+                        <div>• <code>club_rivals_logs</code>: アクティビティログ (ActivityLog[])</div>
+                    </div>
                 </div>
             </div>
         </section>
@@ -48,12 +46,28 @@ const ManualTab = () => (
                     </div>
                     
                     <h4 className="font-bold text-blue-300 mt-4">[独自仕様 / 補正]</h4>
-                    <ul className="list-disc list-inside space-y-2 text-slate-300">
-                        <li><strong>デフレ防止 (Inflationary):</strong> 敗北時の減少幅を抑制し、勝利時の増加幅を維持。</li>
-                        <li><strong>最低保証変動:</strong> 勝利(+10), 引分(+5), 敗北(+2) の固定値を加算ベースとする。</li>
-                        <li><strong>ジャイアントキリング (Giant Killing):</strong> レート差100以上の格上に勝利した場合、変動値に <code className="bg-slate-800 px-1 rounded">x1.5</code> の係数を適用。</li>
-                        <li><strong>連戦ペナルティ (Spam Protection):</strong> 同一日・同ペアによる対戦が3回目(index>=2)以降の場合、変動値およびポイントに <code className="bg-red-900/30 text-red-400 px-1 rounded">x0.5</code> の係数を適用。</li>
-                    </ul>
+                    <div className="space-y-3 text-slate-300">
+                        <div className="flex gap-2">
+                            <span className="text-blue-500 font-bold">•</span>
+                            <span><strong>デフレ防止 (Inflationary):</strong> 敗北時の減少幅を抑制し、勝利時の増加幅を維持。</span>
+                        </div>
+                        <div className="flex gap-2">
+                            <span className="text-blue-500 font-bold">•</span>
+                            <span><strong>最低保証変動:</strong> 勝利(+10), 引分(+5), 敗北(+2) の固定値を加算ベースとする。</span>
+                        </div>
+                        <div className="flex gap-2">
+                            <span className="text-blue-500 font-bold">•</span>
+                            <span><strong>ジャイアントキリング (Giant Killing):</strong> レート差100以上の格上に勝利した場合、変動値に <code className="bg-slate-800 px-1 rounded">x1.5</code> の係数を適用。</span>
+                        </div>
+                        <div className="flex gap-2">
+                            <span className="text-blue-500 font-bold">•</span>
+                            <span>
+                                <strong>連戦ペナルティ (Spam Protection):</strong>
+                                同一日・同ペアによる対戦が3回目(index &gt;= 2)以降の場合、
+                                変動値およびポイントに <code className="bg-red-900/30 text-red-400 px-1 rounded">x0.5</code> の係数を適用。
+                            </span>
+                        </div>
+                    </div>
                 </div>
             </Card>
         </section>
@@ -165,12 +179,12 @@ const ManualTab = () => (
                 <p className="text-sm text-slate-300 mb-2">
                     外部アセット（mp3/wav）を使用せず、<code>AudioContext</code> を用いてブラウザ上で波形をリアルタイム合成しています。
                 </p>
-                <ul className="list-disc list-inside text-xs text-slate-400 space-y-1 font-mono">
-                    <li><strong>CLICK (将棋音):</strong> High-pass filtered Noise Burst + Triangle wave resonance.</li>
-                    <li><strong>SUCCESS (鼓):</strong> Pitch-bending Sine wave (High to Low).</li>
-                    <li><strong>WIN (和太鼓):</strong> Low-pass filtered Square waves with decay.</li>
-                    <li><strong>FANFARE (雅楽・笙):</strong> Sawtooth oscillators stacking Pentatonic scale (E5, A5, B5, E6, F#6).</li>
-                </ul>
+                <div className="space-y-1 text-xs text-slate-400 font-mono">
+                    <div>• <strong>CLICK (将棋音):</strong> High-pass filtered Noise Burst + Triangle wave resonance.</div>
+                    <div>• <strong>SUCCESS (鼓):</strong> Pitch-bending Sine wave (High to Low).</div>
+                    <div>• <strong>WIN (和太鼓):</strong> Low-pass filtered Square waves with decay.</div>
+                    <div>• <strong>FANFARE (雅楽・笙):</strong> Sawtooth oscillators stacking Pentatonic scale (E5, A5, B5, E6, F#6).</div>
+                </div>
             </Card>
         </section>
 
