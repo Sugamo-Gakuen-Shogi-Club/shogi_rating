@@ -827,7 +827,20 @@ export const processMatch = (p1Id: string, p2Id: string, result: 'PLAYER1_WIN' |
   addLog({ id: generateId(), userId: p1Id, type: result === 'PLAYER1_WIN' ? ActivityType.MATCH_WIN : result === 'DRAW' ? ActivityType.MATCH_DRAW : ActivityType.MATCH_LOSS, points: p1PointsDetail.total, description: isDuel ? `Duel vs ${p2.name}` : `Match vs ${p2.name}`, date });
   addLog({ id: generateId(), userId: p2Id, type: result === 'PLAYER2_WIN' ? ActivityType.MATCH_WIN : result === 'DRAW' ? ActivityType.MATCH_DRAW : ActivityType.MATCH_LOSS, points: p2PointsDetail.total, description: isDuel ? `Duel vs ${p1.name}` : `Match vs ${p1.name}`, date });
   
-  return { p1RateChange: p1RateDelta, p2RateChange: p2RateDelta, p1PointsEarned: p1PointsDetail.total, p2PointsEarned: p2PointsDetail.total, p1PointsDetail, p2PointsDetail, newAchievementsP1: resultsP1.newAchievements, newAchievementsP2: resultsP2.newAchievements, newIconsP1: resultsP1.newIcons, newIconsP2: resultsP2.newIcons, isDuel };
+  return { 
+      p1RateChange: p1RateDelta, 
+      p2RateChange: p2RateDelta, 
+      p1PointsEarned: p1PointsDetail.total, 
+      p2PointsEarned: p2PointsDetail.total, 
+      p1PointsDetail, 
+      p2PointsDetail, 
+      newAchievementsP1: resultsP1.newAchievements, 
+      newAchievementsP2: resultsP2.newAchievements, 
+      newIconsP1: resultsP1.newIcons, 
+      newIconsP2: resultsP2.newIcons, 
+      isDuel,
+      result 
+  };
 };
 
 export const deleteMatch = (matchId: string) => {
@@ -886,6 +899,23 @@ export const manualPointAdjustment = (userId: string, points: number, reason: st
     checkAchievementsAndIcons(user);
     saveUsers(users);
     addLog({ id: generateId(), userId: user.id, type: ActivityType.CONTRIBUTION, points: points, description: reason, date: new Date().toISOString() });
+};
+
+export const manualRateAdjustment = (userId: string, rateDelta: number, reason: string) => {
+    const users = getUsers();
+    const user = users.find(u => u.id === userId);
+    if (!user) return;
+    user.rate += rateDelta;
+    user.rateHistory.push({ date: new Date().toISOString(), rate: user.rate });
+    saveUsers(users);
+    addLog({ 
+        id: generateId(), 
+        userId: user.id, 
+        type: ActivityType.CONTRIBUTION, 
+        points: 0, 
+        description: `Rate adjustment: ${reason} (${rateDelta > 0 ? '+' : ''}${rateDelta})`, 
+        date: new Date().toISOString() 
+    });
 };
 
 export const resetMonthly = () => {

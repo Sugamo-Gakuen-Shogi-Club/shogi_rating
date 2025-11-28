@@ -1,10 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
-import { getUsers, saveUsers, getSettings, saveSettings, manualPointAdjustment, resetMonthly, isEventActive, exportData, importData, getMatches, deleteMatch, balanceFactions, toggleGeneral, assignGenerals, resetEventPoints, getFactionBalanceSimulation, awardSystemTitles } from './storage';
+import { getUsers, saveUsers, getSettings, saveSettings, manualPointAdjustment, manualRateAdjustment, resetMonthly, isEventActive, exportData, importData, getMatches, deleteMatch, balanceFactions, toggleGeneral, assignGenerals, resetEventPoints, getFactionBalanceSimulation, awardSystemTitles } from './storage';
 import { User, SystemSettings, MatchRecord, Season, EventType } from './types';
 import { Card } from './Card';
 import { NumPad } from './NumPad';
-import { Settings, Trash2, Plus, ToggleLeft, ToggleRight, Calendar, Download, Copy, ClipboardCheck, History, CheckCircle, AlertCircle, Shuffle, Users, Crown, ChevronRight, X, UserCheck, Snowflake, Sun, Leaf } from 'lucide-react';
+import { Settings, Trash2, Plus, ToggleLeft, ToggleRight, Calendar, Download, Copy, ClipboardCheck, History, CheckCircle, AlertCircle, Shuffle, Users, Crown, ChevronRight, X, UserCheck, Snowflake, Sun, Leaf, TrendingUp, Star, RefreshCw } from 'lucide-react';
 import { UserSelector } from './UserSelector';
 
 const Admin: React.FC = () => {
@@ -33,12 +33,13 @@ const Admin: React.FC = () => {
   // New User Form
   const [newName, setNewName] = useState('');
   
-  // Point Adjustment
+  // Point/Rate Adjustment
+  const [adjMode, setAdjMode] = useState<'POINT' | 'RATE'>('POINT');
   const [adjUser, setAdjUser] = useState('');
-  const [adjPoints, setAdjPoints] = useState(10);
-  const [adjReason, setAdjReason] = useState('部室掃除');
-  const [isPointProcessing, setIsPointProcessing] = useState(false);
-  const [pointSuccessMsg, setPointSuccessMsg] = useState<string | null>(null);
+  const [adjValue, setAdjValue] = useState(10);
+  const [adjReason, setAdjReason] = useState(adjMode === 'POINT' ? '部室掃除' : 'レート補正');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   // Backup Text State
   const [backupText, setBackupText] = useState('');
@@ -47,6 +48,11 @@ const Admin: React.FC = () => {
   useEffect(() => {
       refreshData();
   }, []);
+
+  // Update default reason when mode changes
+  useEffect(() => {
+      setAdjReason(adjMode === 'POINT' ? '部室掃除' : 'レート補正');
+  }, [adjMode]);
 
   const handleLogin = () => {
     if (pin === settings.adminPin) {
@@ -68,10 +74,12 @@ const Admin: React.FC = () => {
 
   const handleSeasonChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
       const newSeason = e.target.value as Season;
-      if (window.confirm(`シーズンを「${newSeason}」に変更しますか？`)) {
+      
+      if (window.confirm(`シーズンを「${newSeason}」に変更し、アプリをリロードしますか？\n（リロードしないとダッシュボード等の表示が更新されません）`)) {
           const newSettings = { ...settings, currentSeason: newSeason };
           saveSettings(newSettings);
-          refreshData();
+          setSettings(newSettings);
+          window.location.reload();
       }
   };
 
@@ -227,18 +235,24 @@ const Admin: React.FC = () => {
       }
   };
 
-  const handleGivePoints = () => {
+  const handleAdjustmentApply = () => {
     if (!adjUser) return;
     
-    setIsPointProcessing(true);
-    manualPointAdjustment(adjUser, adjPoints, adjReason);
-    setPointSuccessMsg(`${adjPoints}ポイントを付与しました (完了)`);
+    setIsProcessing(true);
+    
+    if (adjMode === 'POINT') {
+        manualPointAdjustment(adjUser, adjValue, adjReason);
+        setSuccessMsg(`${adjValue}ポイントを付与しました`);
+    } else {
+        manualRateAdjustment(adjUser, adjValue, adjReason);
+        setSuccessMsg(`レートを${adjValue}変動させました`);
+    }
     
     refreshData();
 
     setTimeout(() => {
-        setIsPointProcessing(false);
-        setPointSuccessMsg(null);
+        setIsProcessing(false);
+        setSuccessMsg(null);
     }, 3000);
   };
 
@@ -501,7 +515,7 @@ const Admin: React.FC = () => {
                <Settings size={32} className="text-white" />
                <h2 className="text-3xl font-black text-white">管理パネル</h2>
            </div>
-           <p className="text-slate-400 font-bold">イベント開催、ユーザー管理、ポイント調整</p>
+           <p className="text-slate-400 font-bold">イベント開催、ユーザー管理、報酬付与</p>
         </div>
         
         <div className="flex gap-2">
@@ -614,7 +628,7 @@ const Admin: React.FC = () => {
             <Card title="シーズン管理" icon={<Calendar className="text-blue-400"/>}>
                 <div className="space-y-4">
                      <p className="text-sm text-slate-400">
-                         現在の学期・シーズンを設定します。ダッシュボードに表示されます。
+                         現在の学期・シーズンを設定します。<span className="text-red-400 font-bold">※変更後にアプリがリロードされます。</span>
                      </p>
                      <div className="relative">
                          <select 
@@ -627,9 +641,63 @@ const Admin: React.FC = () => {
                              ))}
                          </select>
                          <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
-                             <Settings size={18} />
+                             <RefreshCw size={18} />
                          </div>
                      </div>
+                </div>
+            </Card>
+
+            <Card title="報酬・評価管理 (手動付与)" icon={<Crown />}>
+                <div className="space-y-4">
+                    {/* Tab Switcher */}
+                    <div className="flex gap-1 bg-slate-900 p-1 rounded-xl border border-slate-700">
+                        <button 
+                            onClick={() => setAdjMode('POINT')}
+                            className={`flex-1 py-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${adjMode === 'POINT' ? 'bg-amber-600 text-white shadow-lg' : 'text-slate-500 hover:bg-slate-800'}`}
+                        >
+                            <Star size={14} /> ポイント付与
+                        </button>
+                        <button 
+                            onClick={() => setAdjMode('RATE')}
+                            className={`flex-1 py-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${adjMode === 'RATE' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-500 hover:bg-slate-800'}`}
+                        >
+                            <TrendingUp size={14} /> レート手動調整
+                        </button>
+                    </div>
+
+                    <div className="bg-slate-800/50 p-3 rounded-lg text-xs text-slate-400">
+                        {adjMode === 'POINT' ? 
+                            '部室掃除や貢献活動に対してポイントを付与します。マイナス値を入力すると没収も可能です。' : 
+                            '【注意】特別な事情がある場合のみ使用してください。レートのインフレを防ぐため、むやみな付与は推奨されません。'
+                        }
+                    </div>
+
+                    <select 
+                        className="w-full p-3 border border-slate-700 rounded-xl font-bold bg-slate-900 text-white focus:border-blue-500"
+                        value={adjUser}
+                        onChange={e => setAdjUser(e.target.value)}
+                    >
+                        <option value="">対象者を選択...</option>
+                        {users.map(u => <option key={u.id} value={u.id}>{u.name} (Rate: {Math.round(u.rate)})</option>)}
+                    </select>
+                    
+                    <div className="flex gap-2">
+                        <input type="number" value={adjValue} onChange={e => setAdjValue(Number(e.target.value))} className="w-24 p-3 border border-slate-700 rounded-xl font-bold text-center bg-slate-900 text-white focus:border-blue-500" placeholder="値" />
+                        <input type="text" value={adjReason} onChange={e => setAdjReason(e.target.value)} className="flex-1 p-3 border border-slate-700 rounded-xl font-bold bg-slate-900 text-white focus:border-blue-500" placeholder="理由 (例: 掃除)" />
+                    </div>
+
+                    <button 
+                        onClick={handleAdjustmentApply} 
+                        disabled={!adjUser || isProcessing || !adjValue}
+                        className={`w-full text-slate-900 py-4 rounded-xl font-bold hover:brightness-110 active:scale-95 disabled:opacity-50 disabled:pointer-events-none transition-all relative overflow-hidden shadow-lg ${adjMode === 'POINT' ? 'bg-amber-400' : 'bg-blue-400'}`}
+                    >
+                         {isProcessing ? '処理中...' : adjMode === 'POINT' ? 'ポイントを反映' : 'レートを反映'}
+                         {successMsg && (
+                             <div className="absolute inset-0 bg-green-500 text-white flex items-center justify-center animate-in fade-in">
+                                 <CheckCircle size={20} className="mr-2"/> {successMsg}
+                             </div>
+                         )}
+                    </button>
                 </div>
             </Card>
 
@@ -648,37 +716,6 @@ const Admin: React.FC = () => {
                     <div className="text-xs text-slate-500 text-center">
                         最終更新: {settings.lastTitleUpdate ? new Date(settings.lastTitleUpdate).toLocaleDateString() : '未実施'}
                     </div>
-                </div>
-            </Card>
-
-            <Card title="ポイント特別付与" icon={<Crown />}>
-                <div className="space-y-4">
-                    <select 
-                        className="w-full p-3 border border-slate-700 rounded-xl font-bold bg-slate-900 text-white"
-                        value={adjUser}
-                        onChange={e => setAdjUser(e.target.value)}
-                    >
-                        <option value="">対象者を選択...</option>
-                        {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-                    </select>
-                    
-                    <div className="flex gap-2">
-                        <input type="number" value={adjPoints} onChange={e => setAdjPoints(Number(e.target.value))} className="w-24 p-3 border border-slate-700 rounded-xl font-bold text-center bg-slate-900 text-white" />
-                        <input type="text" value={adjReason} onChange={e => setAdjReason(e.target.value)} className="flex-1 p-3 border border-slate-700 rounded-xl font-bold bg-slate-900 text-white" placeholder="理由 (例: 掃除)" />
-                    </div>
-
-                    <button 
-                        onClick={handleGivePoints} 
-                        disabled={!adjUser || isPointProcessing}
-                        className="w-full bg-slate-200 text-slate-900 py-3 rounded-xl font-bold hover:bg-white active:scale-95 disabled:opacity-50 transition-all relative overflow-hidden"
-                    >
-                         {isPointProcessing ? '処理中...' : 'ポイント付与'}
-                         {pointSuccessMsg && (
-                             <div className="absolute inset-0 bg-green-500 text-white flex items-center justify-center animate-in fade-in">
-                                 <CheckCircle size={20} className="mr-2"/> {pointSuccessMsg}
-                             </div>
-                         )}
-                    </button>
                 </div>
             </Card>
 
