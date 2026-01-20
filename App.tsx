@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { HashRouter, Routes, Route, useLocation, Link } from 'react-router-dom';
-import { Home, Trophy, User as UserIcon, Settings, PlusCircle, BookOpen } from 'lucide-react';
-import { seedData } from './storage';
+import { Home, Trophy, User as UserIcon, Settings, PlusCircle, BookOpen, Cloud } from 'lucide-react';
+import { seedData, loadFromCloud } from './storage';
 
 // Pages
 import Dashboard from './Dashboard';
@@ -62,7 +62,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         <div className="p-6 text-[10px] text-slate-500 text-center border-t border-white/5">
           <div className="font-bold text-slate-400">巣鴨学園 将棋部</div>
           <div className="mt-1">出席＆対局促進アプリ</div>
-          <div className="mt-2 opacity-50">©秀村 紘嗣</div>
+          <div className="mt-2 opacity-50">🄫秀村 紘嗣</div>
         </div>
       </aside>
 
@@ -88,7 +88,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         })}
       </div>
 
-      {/* Main Content - Removed z-0 to allow fixed children to stack properly above sidebar */}
+      {/* Main Content */}
       <main className="flex-1 flex flex-col relative overflow-hidden pt-[70px] md:pt-0">
         <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-10 scrollbar-hide">
           <div className="max-w-6xl mx-auto h-full pb-24 md:pb-0">
@@ -102,21 +102,25 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
 const App: React.FC = () => {
   const [isIdle, setIsIdle] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(true);
   const timerRef = useRef<number | null>(null);
-  const IDLE_TIMEOUT = 45000; // 45 seconds
+  const IDLE_TIMEOUT = 45000;
 
   const resetTimer = () => {
     setIsIdle(false);
-    if (timerRef.current) {
-      window.clearTimeout(timerRef.current);
-    }
-    timerRef.current = window.setTimeout(() => {
-      setIsIdle(true);
-    }, IDLE_TIMEOUT);
+    if (timerRef.current) window.clearTimeout(timerRef.current);
+    timerRef.current = window.setTimeout(() => setIsIdle(true), IDLE_TIMEOUT);
   };
 
   useEffect(() => {
-    seedData();
+    const initData = async () => {
+      // サーバーからのロードを試みる
+      await loadFromCloud();
+      seedData();
+      setIsSyncing(false);
+    };
+
+    initData();
     resetTimer();
 
     const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
@@ -128,6 +132,18 @@ const App: React.FC = () => {
       events.forEach(event => window.removeEventListener(event, handleActivity));
     };
   }, []);
+
+  if (isSyncing) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center space-y-4">
+        <div className="relative">
+          <Cloud size={64} className="text-blue-500 animate-pulse" />
+          <div className="absolute inset-0 border-4 border-white/5 rounded-full animate-ping opacity-20"></div>
+        </div>
+        <div className="text-white font-black text-xl italic tracking-widest animate-pulse">SYNCING DATA...</div>
+      </div>
+    );
+  }
 
   return (
     <HashRouter>
