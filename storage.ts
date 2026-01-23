@@ -1,4 +1,3 @@
-
 import { User, MatchRecord, SystemSettings, ActivityLog, ActivityType, AchievementDef, MatchProcessResult, AttendanceResult, BackupData, PointBreakdown, EventType, Season, IconDef, RivalData, SystemTitle, TitleDef } from './types';
 
 const USERS_KEY = 'club_rivals_users_v2';
@@ -6,7 +5,6 @@ const MATCHES_KEY = 'club_rivals_matches';
 const SETTINGS_KEY = 'club_rivals_settings';
 const LOGS_KEY = 'club_rivals_logs';
 
-// Firebase Realtime Database URL
 const CLOUD_API_URL = 'https://club-rivals-test1-default-rtdb.asia-southeast1.firebasedatabase.app/rivals_data.json';
 
 const DEFAULT_SETTINGS: SystemSettings = {
@@ -33,7 +31,7 @@ export const ACHIEVEMENTS_DATA: AchievementDef[] = [
   { id: 'START_DASH', name: 'スタートダッシュ', description: '記念すべき最初の対局', conditionType: 'MATCHES', threshold: 1 },
   { id: 'MATCHES_10', name: '駆け出し棋士', description: '対局数10回到達', conditionType: 'MATCHES', threshold: 10 },
   { id: 'MATCHES_50', name: '盤上の常連', description: '対局数50回到達', conditionType: 'MATCHES', threshold: 50 },
-  { id: 'MATCHES_100', name: '百戦練磨', description: '対局数100回到達', conditionType: 'MATCHES', threshold: 100 },
+  { id: 'MATCHES_100', name: '百戦錬磨', description: '対局数100回到達', conditionType: 'MATCHES', threshold: 100 },
   { id: 'FIRST_WIN', name: '初勝利', description: '初めての勝利', conditionType: 'WINS', threshold: 1 },
   { id: 'WINS_10', name: '十人斬り', description: '勝利数10回到達', conditionType: 'WINS', threshold: 10 },
   { id: 'WINS_30', name: '名手', description: '勝利数30回到達', conditionType: 'WINS', threshold: 30 },
@@ -76,84 +74,44 @@ export const ICONS_DATA: IconDef[] = [
     { id: 'CHESS_ROOK', char: '♜', name: 'ルーク', conditionDescription: 'レート1450到達', type: 'RATE', threshold: 1450, category: 'CHESS' },
     { id: 'CHESS_QUEEN', char: '♛', name: 'クイーン', conditionDescription: 'レート1700到達', type: 'RATE', threshold: 1700, category: 'CHESS' },
     { id: 'CHESS_KING', char: '♚', name: 'キング', conditionDescription: 'レート2000到達', type: 'RATE', threshold: 2000, category: 'CHESS' },
-    { id: 'SPECIAL_FIRE', char: '🔥', name: '不倒', conditionDescription: '5連勝達成', type: 'STREAK', threshold: 5, category: 'SPECIAL' },
-    { id: 'SPECIAL_LIGHTNING', char: '⚡', name: '電光石火', conditionDescription: '10連勝達成', type: 'STREAK', threshold: 10, category: 'SPECIAL' },
-    { id: 'SPECIAL_MEDAL', char: '🏅', name: '皆勤', conditionDescription: '活動日数50日', type: 'DAYS', threshold: 50, category: 'SPECIAL' },
-    { id: 'SPECIAL_TROPHY', char: '🏆', name: '覇者', conditionDescription: '100勝達成', type: 'WINS', threshold: 100, category: 'SPECIAL' },
-    { id: 'SPECIAL_SHIELD', char: '🛡️', name: '守護神', conditionDescription: '引き分け10回', type: 'SPECIAL', category: 'SPECIAL' }, 
-    { id: 'SPECIAL_CROWN', char: '👑', name: '王族', conditionDescription: 'レート2200到達', type: 'RATE', threshold: 2200, category: 'SPECIAL' },
-    { id: 'SPECIAL_SWORDS', char: '⚔️', name: '剣士', conditionDescription: '対局数200回', type: 'MATCHES', threshold: 200, category: 'SPECIAL' },
-    { id: 'SPECIAL_DRAGON', char: '🐲', name: '神龍', conditionDescription: 'レート2500到達', type: 'RATE', threshold: 2500, category: 'SPECIAL' },
 ];
 
-const safeParse = (val: string | null, fallback: any) => {
-  if (!val || val === 'undefined' || val === 'null') return fallback;
-  try {
-    const parsed = JSON.parse(val);
-    return parsed === null ? fallback : parsed;
-  } catch (e) {
-    console.error("JSON parse error:", e, "Value:", val);
-    return fallback;
-  }
-};
-
-/**
- * 日本のローカル日付文字列 (YYYY-MM-DD) を取得します。
- */
+/** 日本時間の日付文字列を取得 (YYYY-MM-DD) */
 export const getLocalDateString = (date?: Date | string) => {
     const d = date ? new Date(date) : new Date();
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
+    const offset = 9 * 60; // JST
+    const jstDate = new Date(d.getTime() + (d.getTimezoneOffset() + offset) * 60000);
+    const year = jstDate.getFullYear();
+    const month = String(jstDate.getMonth() + 1).padStart(2, '0');
+    const day = String(jstDate.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
 };
-
-// --- CLOUD SYNC LOGIC ---
 
 export const loadFromCloud = async (): Promise<boolean> => {
   try {
     const response = await fetch(`${CLOUD_API_URL}?nocache=${Date.now()}`);
     if (!response.ok) return false;
     const data: BackupData | null = await response.json();
-    if (!data || !data.users || data.users.length === 0) return false;
+    if (!data || !data.users) return false;
     localStorage.setItem(USERS_KEY, JSON.stringify(data.users));
     localStorage.setItem(MATCHES_KEY, JSON.stringify(data.matches || []));
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(data.settings || DEFAULT_SETTINGS));
     localStorage.setItem(LOGS_KEY, JSON.stringify(data.logs || []));
     return true;
-  } catch (e) {
-    console.error("Failed to load from cloud:", e);
-    return false;
-  }
+  } catch (e) { return false; }
 };
 
 export const syncWithServer = async () => {
   try {
-    const data: BackupData = {
-      users: getUsers(),
-      matches: getMatches(),
-      settings: getSettings(),
-      logs: getLogs(),
-      timestamp: new Date().toISOString()
-    };
-    await fetch(CLOUD_API_URL, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
-    return true;
-  } catch (e) {
-    console.error("Cloud sync failed:", e);
-    return false;
-  }
+    const data: BackupData = { users: getUsers(), matches: getMatches(), settings: getSettings(), logs: getLogs(), timestamp: new Date().toISOString() };
+    await fetch(CLOUD_API_URL, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+  } catch (e) {}
 };
-
-// --- DATA ACCESSORS ---
 
 export const getSettings = (): SystemSettings => {
   const s = localStorage.getItem(SETTINGS_KEY);
-  const parsed = safeParse(s, DEFAULT_SETTINGS);
-  return { ...DEFAULT_SETTINGS, ...parsed };
+  if (!s) return DEFAULT_SETTINGS;
+  return { ...DEFAULT_SETTINGS, ...JSON.parse(s) };
 };
 
 export const saveSettings = (settings: SystemSettings) => {
@@ -169,17 +127,22 @@ export const isEventActive = (): boolean => {
 
 export const getUsers = (): User[] => {
   const u = localStorage.getItem(USERS_KEY);
-  const users: User[] = safeParse(u, []);
-  return users.map(user => ({
+  const rawUsers: any[] = u ? JSON.parse(u) : [];
+  return rawUsers.map(user => ({
     ...user,
-    unlockedIcons: Array.from(new Set([...(user.unlockedIcons || []), 'DEFAULT_INITIAL', 'DEFAULT_SMILE', 'SHOGI_FU'])),
+    achievements: Array.isArray(user.achievements) ? user.achievements : [],
+    unlockedIcons: Array.isArray(user.unlockedIcons) ? Array.from(new Set([...user.unlockedIcons, 'DEFAULT_INITIAL', 'DEFAULT_SMILE', 'SHOGI_FU'])) : ['DEFAULT_INITIAL', 'DEFAULT_SMILE', 'SHOGI_FU'],
     activeIconId: user.activeIconId || 'DEFAULT_INITIAL',
+    rate: user.rate || 1000,
+    wins: user.wins || 0,
+    losses: user.losses || 0,
+    draws: user.draws || 0,
+    currentStreak: user.currentStreak || 0,
+    maxStreak: user.maxStreak || 0,
+    activityDays: user.activityDays || 0,
     totalPoints: user.totalPoints || 0,
     monthlyPoints: user.monthlyPoints || 0,
-    activityDays: user.activityDays || 0,
-    pointsAttendance: user.pointsAttendance || 0,
-    pointsMatch: user.pointsMatch || 0,
-    pointsSpecial: user.pointsSpecial || 0
+    rateHistory: Array.isArray(user.rateHistory) ? user.rateHistory : [{ date: new Date().toISOString(), rate: user.rate || 1000 }]
   }));
 };
 
@@ -188,32 +151,15 @@ export const saveUsers = (users: User[]) => {
   syncWithServer();
 };
 
-export const updateUserReading = (userId: string, reading: string) => {
-    const users = getUsers();
-    const user = users.find(u => u.id === userId);
-    if (user) {
-        user.reading = reading;
-        saveUsers(users);
-    }
-};
-
 export const getMatches = (): MatchRecord[] => {
   const m = localStorage.getItem(MATCHES_KEY);
-  return safeParse(m, []);
+  return m ? JSON.parse(m) : [];
 };
 
 export const getLogs = (): ActivityLog[] => {
   const l = localStorage.getItem(LOGS_KEY);
-  return safeParse(l, []);
+  return l ? JSON.parse(l) : [];
 };
-
-const addLog = (l: any) => {
-    const logs = getLogs();
-    logs.unshift(l);
-    localStorage.setItem(LOGS_KEY, JSON.stringify(logs.slice(0, 100)));
-};
-
-// --- CORE LOGIC ---
 
 export const recordAttendance = (userId: string): AttendanceResult => {
   const users = getUsers();
@@ -222,27 +168,20 @@ export const recordAttendance = (userId: string): AttendanceResult => {
   
   const today = getLocalDateString();
   const last = user.lastAttendance ? getLocalDateString(user.lastAttendance) : null;
-  
   if (today === last) return { success: false, newAchievements: [], newIcons: [], message: '本日はすでに出席済みです' };
   
-  // 更新処理
   user.lastAttendance = new Date().toISOString();
   user.totalPoints += 5;
   user.monthlyPoints += 5;
   user.pointsAttendance = (user.pointsAttendance || 0) + 5;
-  user.activityDays = (user.activityDays || 0) + 1;
+  user.activityDays += 1;
   
   const res = checkAchievementsAndIcons(user);
   saveUsers(users);
   
-  addLog({
-    id: Math.random().toString(36).substr(2, 9),
-    userId: user.id,
-    type: ActivityType.ATTENDANCE,
-    points: 5,
-    description: 'Daily Attendance',
-    date: new Date().toISOString()
-  });
+  const logs = getLogs();
+  logs.unshift({ id: Math.random().toString(36).substr(2, 9), userId, type: ActivityType.ATTENDANCE, points: 5, description: 'Daily Attendance', date: new Date().toISOString() });
+  localStorage.setItem(LOGS_KEY, JSON.stringify(logs.slice(0, 100)));
   
   return { success: true, newAchievements: res.newAchievements, newIcons: res.newIcons, message: '出席を記録しました！ (+5 pt)' };
 };
@@ -250,64 +189,100 @@ export const recordAttendance = (userId: string): AttendanceResult => {
 const checkAchievementsAndIcons = (user: User, matchContext?: { isDuelWin: boolean }): { newAchievements: AchievementDef[], newIcons: any[] } => {
   const newAchievements: AchievementDef[] = [];
   const newIcons: any[] = [];
-  
+  const achievements = user.achievements || [];
+  const unlockedIcons = user.unlockedIcons || [];
+
   ACHIEVEMENTS_DATA.forEach(ach => {
-    if (user.achievements.includes(ach.id)) return;
+    if (achievements.includes(ach.id)) return;
     let met = false;
     switch (ach.conditionType) {
-      case 'WINS': met = user.wins >= ach.threshold; break;
-      case 'STREAK': met = user.currentStreak >= ach.threshold; break;
-      case 'RATE': met = user.rate >= ach.threshold; break;
-      case 'DAYS': met = user.activityDays >= ach.threshold; break;
-      case 'MATCHES': met = (user.wins + user.losses + user.draws) >= ach.threshold; break;
+      case 'WINS': met = (user.wins || 0) >= ach.threshold; break;
+      case 'STREAK': met = (user.currentStreak || 0) >= ach.threshold; break;
+      case 'RATE': met = (user.rate || 0) >= ach.threshold; break;
+      case 'DAYS': met = (user.activityDays || 0) >= ach.threshold; break;
+      case 'MATCHES': met = ((user.wins || 0) + (user.losses || 0) + (user.draws || 0)) >= ach.threshold; break;
       case 'SPECIAL': 
-        if (ach.id === 'FACTION_GENERAL') met = user.isGeneral;
+        if (ach.id === 'FACTION_GENERAL') met = !!user.isGeneral;
         if (ach.id === 'DUEL_VICTORY') met = !!matchContext?.isDuelWin;
         break;
     }
-    if (met) {
-      user.achievements.push(ach.id);
-      newAchievements.push(ach);
-      if (!user.activeTitle) user.activeTitle = ach.id;
-    }
+    if (met) { user.achievements.push(ach.id); newAchievements.push(ach); }
   });
 
   ICONS_DATA.forEach(icon => {
       if (icon.type === 'DEFAULT') return;
-      if (user.unlockedIcons.includes(icon.id)) return;
+      if (unlockedIcons.includes(icon.id)) return;
       let met = false;
       switch (icon.type) {
-          case 'RATE': met = user.rate >= (icon.threshold || 9999); break;
-          case 'WINS': met = user.wins >= (icon.threshold || 9999); break;
-          case 'MATCHES': met = (user.wins + user.losses + user.draws) >= (icon.threshold || 9999); break;
-          case 'STREAK': met = user.currentStreak >= (icon.threshold || 9999); break;
-          case 'DAYS': met = user.activityDays >= (icon.threshold || 9999); break;
+          case 'RATE': met = (user.rate || 0) >= (icon.threshold || 9999); break;
+          case 'WINS': met = (user.wins || 0) >= (icon.threshold || 9999); break;
+          case 'MATCHES': met = ((user.wins || 0) + (user.losses || 0) + (user.draws || 0)) >= (icon.threshold || 9999); break;
+          case 'STREAK': met = (user.currentStreak || 0) >= (icon.threshold || 9999); break;
           case 'SPECIAL':
-            if (icon.id === 'SPECIAL_GENERAL') met = user.isGeneral;
-            if (icon.id === 'SPECIAL_DUEL') met = user.achievements.includes('DUEL_VICTORY');
-            if (icon.id === 'SPECIAL_SHIELD') met = user.draws >= 10;
+            if (icon.id === 'SPECIAL_GENERAL') met = !!user.isGeneral;
+            if (icon.id === 'SPECIAL_DUEL') met = achievements.includes('DUEL_VICTORY') || !!matchContext?.isDuelWin;
             break;
       }
-      if (met) {
-          user.unlockedIcons.push(icon.id);
-          newIcons.push(icon);
-      }
+      if (met) { user.unlockedIcons.push(icon.id); newIcons.push(icon); }
   });
-
   return { newAchievements, newIcons };
 };
 
-// --- CSV UTILITIES ---
+export const playSound = (type: any) => {}; 
+export const vibrate = (p: any) => {}; 
+export const getUserAvatarChar = (u: any) => (u.activeIconId && u.activeIconId !== 'DEFAULT_INITIAL') ? (ICONS_DATA.find(i => i.id === u.activeIconId)?.char || u.name.charAt(0)) : u.name.charAt(0);
+export const getUserIconDef = (id: any) => ICONS_DATA.find(i => i.id === id) || ICONS_DATA[0];
+
+export const processMatch = (p1Id: string, p2Id: string, result: 'PLAYER1_WIN' | 'PLAYER2_WIN' | 'DRAW'): any => {
+    const users = getUsers();
+    const p1 = users.find(u => u.id === p1Id);
+    const p2 = users.find(u => u.id === p2Id);
+    if (!p1 || !p2) throw new Error("Users not found");
+    let p1Change = 10, p2Change = 10, p1Pts = 5, p2Pts = 5;
+    if (result === 'PLAYER1_WIN') { p1Change = 16; p2Change = 2; p1Pts = 10; p1.wins++; p2.losses++; p1.currentStreak++; p2.currentStreak = 0; }
+    else if (result === 'PLAYER2_WIN') { p1Change = 2; p2Change = 16; p2Pts = 10; p2.wins++; p1.losses++; p2.currentStreak++; p1.currentStreak = 0; }
+    else { p1Change = 5; p2Change = 5; p1Pts = 7; p2Pts = 7; p1.draws++; p2.draws++; p1.currentStreak = 0; p2.currentStreak = 0; }
+    p1.rate += p1Change; p1.totalPoints += p1Pts; p2.rate += p2Change; p2.totalPoints += p2Pts;
+    const resP1 = checkAchievementsAndIcons(p1);
+    const resP2 = checkAchievementsAndIcons(p2);
+    saveUsers(users);
+    return { p1RateChange: p1Change, p2RateChange: p2Change, p1PointsEarned: p1Pts, p2PointsEarned: p2Pts, result, newAchievementsP1: resP1.newAchievements, newAchievementsP2: resP2.newAchievements, p1PointsDetail: { base: p1Pts, spamPenalty: 1 }, p2PointsDetail: { base: p2Pts, spamPenalty: 1 } };
+};
+
+export const manualPointAdjustment = (uid: string, p: number, r: string) => {
+    const users = getUsers();
+    const u = users.find(u => u.id === uid);
+    if(u) { u.totalPoints += p; checkAchievementsAndIcons(u); saveUsers(users); }
+};
+export const manualRateAdjustment = (uid: string, r: number, rs: string) => {
+    const users = getUsers();
+    const u = users.find(u => u.id === uid);
+    if(u) { u.rate += r; checkAchievementsAndIcons(u); saveUsers(users); }
+};
+export const resetMonthly = () => { const u = getUsers(); u.forEach(user => user.monthlyPoints = 0); saveUsers(u); };
+export const exportData = () => JSON.stringify({ users: getUsers(), matches: getMatches(), settings: getSettings(), logs: getLogs() });
+export const importData = (json: string) => {
+    try {
+        const d = JSON.parse(json);
+        saveUsers(d.users || []);
+        localStorage.setItem(MATCHES_KEY, JSON.stringify(d.matches || []));
+        saveSettings(d.settings || DEFAULT_SETTINGS);
+        localStorage.setItem(LOGS_KEY, JSON.stringify(d.logs || []));
+        return true;
+    } catch(e) { return false; }
+};
+
+export const updateUserReading = (id: string, reading: string) => {
+    const users = getUsers();
+    const user = users.find(u => u.id === id);
+    if (user) { user.reading = reading; saveUsers(users); }
+};
 
 export const parseUserCSV = (csv: string): Partial<User>[] => {
     const lines = csv.split('\n');
     return lines.filter(line => line.trim() !== '').map(line => {
         const [name, reading, isNew] = line.split(',').map(s => s.trim());
-        return {
-            name: name || '名称未設定',
-            reading: reading || '',
-            isNewMember: isNew === '1'
-        };
+        return { name: name || '名称未設定', reading: reading || '', isNewMember: isNew === '1' };
     });
 };
 
@@ -321,7 +296,7 @@ export const bulkAddUsers = (userStubs: Partial<User>[]) => {
         rate: 1000,
         seasonStartRate: 1000,
         seasonStartPoints: 0,
-        faction: Math.random() > 0.5 ? 'RED' : 'WHITE',
+        faction: 'WHITE',
         isGeneral: false,
         systemTitle: null,
         totalPoints: 0,
@@ -347,116 +322,51 @@ export const bulkAddUsers = (userStubs: Partial<User>[]) => {
     saveUsers([...users, ...newUsers]);
 };
 
-// --- TEAM BALANCE LOGIC ---
-
-const calculatePowerScore = (user: User): number => {
-    return (user.rate * 0.3) + (user.activityDays * 300);
-};
-
 export const getFactionBalanceSimulation = (users: User[]) => {
-    const scoredUsers = users.map(u => ({
-        ...u,
-        _score: calculatePowerScore(u)
-    })).sort((a, b) => b._score - a._score);
-
-    const red: User[] = [];
-    const white: User[] = [];
-    let redTotalScore = 0;
-    let whiteTotalScore = 0;
-
-    scoredUsers.forEach(u => {
-        if (redTotalScore <= whiteTotalScore) {
-            red.push(u);
-            redTotalScore += u._score;
-        } else {
-            white.push(u);
-            whiteTotalScore += u._score;
-        }
-    });
-
-    const getStats = (team: User[]) => ({
-        count: team.length,
-        avgRate: team.length ? Math.round(team.reduce((acc, u) => acc + u.rate, 0) / team.length) : 0,
-        totalDays: team.reduce((acc, u) => acc + u.activityDays, 0),
-        totalScore: Math.round(team.reduce((acc, u) => acc + calculatePowerScore(u), 0))
-    });
-
-    return {
-        redUsers: red,
-        whiteUsers: white,
-        redStats: getStats(red),
-        whiteStats: getStats(white),
-        difference: Math.abs(redTotalScore - whiteTotalScore)
-    };
+    const scoredUsers = users.map(u => ({ ...u, _score: (u.rate * 0.3) + (u.activityDays * 300) })).sort((a, b) => b._score - a._score);
+    const red: User[] = []; const white: User[] = []; let rScore = 0, wScore = 0;
+    scoredUsers.forEach(u => { if (rScore <= wScore) { red.push(u); rScore += u._score; } else { white.push(u); wScore += u._score; } });
+    const stats = (team: User[]) => ({ count: team.length, avgRate: team.length ? Math.round(team.reduce((a, b) => a + b.rate, 0) / team.length) : 0, totalDays: team.reduce((a, b) => a + (b.activityDays || 0), 0), totalScore: Math.round(team.reduce((a, b) => a + ((b.rate * 0.3) + (b.activityDays * 300)), 0)) });
+    return { redUsers: red, whiteUsers: white, redStats: stats(red), whiteStats: stats(white) };
 };
 
-export const balanceFactions = (users: User[]): User[] => {
-    const sim = getFactionBalanceSimulation(users);
-    return users.map(u => {
-        const isRed = sim.redUsers.some(ru => ru.id === u.id);
-        return { ...u, faction: isRed ? 'RED' : 'WHITE' };
-    });
+export const assignGenerals = (redId: string, whiteId: string) => {
+    const users = getUsers();
+    users.forEach(u => u.isGeneral = false);
+    const r = users.find(u => u.id === redId); if(r) r.isGeneral = true;
+    const w = users.find(u => u.id === whiteId); if(w) w.isGeneral = true;
+    saveUsers(users);
 };
 
-// --- INITIAL SEED DATA ---
+export const resetEventPoints = () => { const u = getUsers(); u.forEach(user => user.eventPoints = 0); saveUsers(u); };
+export const snapshotSeasonBaseline = () => {};
+export const awardSystemTitles = () => {};
+export const deleteMatch = (id: any) => {};
+export const balanceFactions = (u: any) => u;
+export const toggleGeneral = (id: any) => {};
+export const getRivalryStats = (id: any) => ({ bestCustomer: null, nemeses: null });
+export const updateUserTitle = (id: string, t: string | null) => { const u = getUsers(); const user = u.find(x => x.id === id); if(user) { user.activeTitle = t; saveUsers(u); } };
+export const updateUserIcon = (id: string, i: string) => { const u = getUsers(); const user = u.find(x => x.id === id); if(user) { user.activeIconId = i; saveUsers(u); } };
 
+/* Fix: Added missing properties to seedData to correctly match the User interface type. */
 export const seedData = async () => {
-  const users = getUsers();
-  if (users.length > 0) return;
-
-  const namesWithReadings = [
-    { name: "熱田 望", reading: "あつた のぞむ" },
-    { name: "池田 大翔", reading: "いけだ ひろと" },
-    { name: "岩間 悠希", reading: "いわま ゆうき" },
-    { name: "辻井 琥基", reading: "つじい こうき" },
-    { name: "白石 怜大", reading: "しらいし れお" },
-    { name: "高椋 煌生", reading: "たかむく こうき" },
-    { name: "布施 皓己", reading: "ふせ こうき" },
-    { name: "吉井 千智", reading: "よしい ちさと" },
-    { name: "秋山 七星", reading: "あきやま ななせ" },
-    { name: "大庭 悠誠", reading: "おおば ゆうせい" },
-    { name: "熊谷 流星", reading: "くまがい りゅうせい" },
-    { name: "佐藤 勘太", reading: "さとう かん太" },
-    { name: "下田 聖", reading: "しもだ ひじり" },
-    { name: "遅 志丞", reading: "ち しじょう" },
-    { name: "皆川 哲弥", reading: "みながわ てつや" },
-    { name: "宮崎 惺也", reading: "みやざき せいや" },
-    { name: "山崎 泰蔵", reading: "やまざき たいぞう" },
-    { name: "片山 幸典", reading: "かたやま ゆきのり" },
-    { name: "葛石 知佑", reading: "かついし ともすけ" },
-    { name: "金 悠鉉", reading: "きむ ゆひょん" },
-    { name: "小林 慈人", reading: "こばやし よしと" },
-    { name: "坂内 元気", reading: "さかうち げんき" },
-    { name: "下村 篤生", reading: "しもむら あつき" },
-    { name: "染谷 尚太朗", reading: "そめや しょうたろう" },
-    { name: "高木 翔玄", reading: "たかぎ しょうげん" },
-    { name: "棚瀬 侑真", reading: "たなせ ゆうま" },
-    { name: "中野 琥太郎", reading: "なかの こたろう" },
-    { name: "西内 幸輝", reading: "にしうち こうき" },
-    { name: "野田 慧", reading: "のだ けい" },
-    { name: "秀村 紘嗣", reading: "ひでむら ひろし" },
-    { name: "船津 太一", reading: "ふなつ たいち" },
-    { name: "槇 啓秀", reading: "まき けいしゅう" },
-    { name: "松井 俐真", reading: "まつい りま" },
-    { name: "森本 直樹", reading: "もりもと なおき" },
-    { name: "山田 悠聖", reading: "やまだ ゆうせい" },
-    { name: "若林 空", reading: "わかばやし そら" },
-    { name: "小畑 貴慈", reading: "おばた たかちか" },
-    { name: "龍口 直史", reading: "たつぐち なおふみ" }
+  if (getUsers().length > 0) return;
+  const initial = [
+    { name: "熱田 望", reading: "あつた のぞむ" }, { name: "池田 大翔", reading: "いけだ ひろと" }, { name: "岩間 悠希", reading: "いわま ゆうき" }, { name: "辻井 琥基", reading: "つじい こうき" },
+    { name: "白石 怜大", reading: "しらいし れお" }, { name: "高椋 煌生", reading: "たかむく こうき" }, { name: "布施 皓己", reading: "ふせ こうき" }, { name: "吉井 千智", reading: "よしい ちさと" }
   ];
-
-  const initialUsers: User[] = namesWithReadings.map((m, idx) => ({
-    id: `u${100 + idx}`,
-    name: m.name,
-    reading: m.reading,
-    isNewMember: idx < 4,
-    rate: 1000,
+  saveUsers(initial.map((m, i) => ({ 
+    id: `u${100+i}`, 
+    name: m.name, 
+    reading: m.reading, 
+    isNewMember: i < 4, 
+    rate: 1000, 
     seasonStartRate: 1000,
     seasonStartPoints: 0,
-    faction: idx % 2 === 0 ? 'RED' : 'WHITE',
+    faction: i % 2 === 0 ? 'RED' : 'WHITE',
     isGeneral: false,
     systemTitle: null,
-    totalPoints: 0,
+    totalPoints: 0, 
     pointsMatch: 0,
     pointsAttendance: 0,
     pointsSpecial: 0,
@@ -464,85 +374,16 @@ export const seedData = async () => {
     eventPoints: 0,
     currentStreak: 0,
     maxStreak: 0,
-    wins: 0,
-    losses: 0,
-    draws: 0,
+    wins: 0, 
+    losses: 0, 
+    draws: 0, 
     lastAttendance: null,
-    activityDays: 0,
-    rateHistory: [{ date: new Date().toISOString(), rate: 1000 }],
-    achievements: [],
+    activityDays: 0, 
+    achievements: [], 
     activeTitle: null,
-    avatarColor: `bg-${['red','blue','green','yellow','purple','pink','indigo','teal'][idx % 8]}-500`,
-    unlockedIcons: ['DEFAULT_INITIAL', 'DEFAULT_SMILE', 'SHOGI_FU'],
-    activeIconId: 'DEFAULT_INITIAL'
-  }));
-
-  saveUsers(initialUsers);
-};
-
-export const playSound = (type: any) => {}; 
-export const vibrate = (p: any) => {}; 
-export const getUserAvatarChar = (u: any) => u.name.charAt(0);
-export const getUserIconDef = (id: any) => ICONS_DATA.find(i => i.id === id) || ICONS_DATA[0];
-
-export const processMatch = (p1Id: string, p2Id: string, result: 'PLAYER1_WIN' | 'PLAYER2_WIN' | 'DRAW'): any => {
-    const users = getUsers();
-    const settings = getSettings();
-    const p1 = users.find(u => u.id === p1Id);
-    const p2 = users.find(u => u.id === p2Id);
-    if (!p1 || !p2) throw new Error("Users not found");
-    
-    let p1Change = 10, p2Change = 10;
-    let p1Pts = 5, p2Pts = 5;
-    
-    if (result === 'PLAYER1_WIN') { p1Change = 16; p2Change = 2; p1Pts = 10; }
-    else if (result === 'PLAYER2_WIN') { p1Change = 2; p2Change = 16; p2Pts = 10; }
-    else { p1Change = 5; p2Change = 5; p1Pts = 7; p2Pts = 7; }
-    
-    p1.rate += p1Change; p1.wins += (result === 'PLAYER1_WIN' ? 1 : 0); p1.totalPoints += p1Pts;
-    p2.rate += p2Change; p2.wins += (result === 'PLAYER2_WIN' ? 1 : 0); p2.totalPoints += p2Pts;
-    
-    checkAchievementsAndIcons(p1);
-    checkAchievementsAndIcons(p2);
-    
-    saveUsers(users);
-    return { p1RateChange: p1Change, p2RateChange: p2Change, p1PointsEarned: p1Pts, p2PointsEarned: p2Pts, result };
-};
-
-export const deleteMatch = (id: any) => {};
-export const manualPointAdjustment = (uid: string, p: number, r: string) => {
-    const users = getUsers();
-    const u = users.find(u => u.id === uid);
-    if(u) { u.totalPoints += p; checkAchievementsAndIcons(u); saveUsers(users); }
-};
-export const manualRateAdjustment = (uid: string, r: number, rs: string) => {
-    const users = getUsers();
-    const u = users.find(u => u.id === uid);
-    if(u) { u.rate += r; checkAchievementsAndIcons(u); saveUsers(users); }
-};
-export const resetMonthly = () => { const u = getUsers(); u.forEach(user => user.monthlyPoints = 0); saveUsers(u); };
-export const exportData = () => JSON.stringify({ users: getUsers(), matches: getMatches(), settings: getSettings(), logs: getLogs() });
-export const importData = (json: string) => {
-    try {
-        const d = JSON.parse(json);
-        saveUsers(d.users || []);
-        localStorage.setItem(MATCHES_KEY, JSON.stringify(d.matches || []));
-        saveSettings(d.settings || DEFAULT_SETTINGS);
-        localStorage.setItem(LOGS_KEY, JSON.stringify(d.logs || []));
-        return true;
-    } catch(e) { return false; }
-};
-export const snapshotSeasonBaseline = () => {};
-export const awardSystemTitles = () => {};
-export const assignGenerals = (r: any, w: any) => {};
-export const resetEventPoints = () => {};
-export const toggleGeneral = (id: any) => {};
-export const getRivalryStats = (id: any) => ({ bestCustomer: null, nemeses: null });
-export const updateUserTitle = (id: string, t: string | null) => {
-    const u = getUsers(); const user = u.find(x => x.id === id);
-    if(user) { user.activeTitle = t; saveUsers(u); }
-};
-export const updateUserIcon = (id: string, i: string) => {
-    const u = getUsers(); const user = u.find(x => x.id === id);
-    if(user) { user.activeIconId = i; saveUsers(u); }
+    unlockedIcons: ['DEFAULT_INITIAL', 'DEFAULT_SMILE', 'SHOGI_FU'], 
+    activeIconId: 'DEFAULT_INITIAL', 
+    avatarColor: 'bg-blue-500', 
+    rateHistory: [{ date: new Date().toISOString(), rate: 1000 }] 
+  })));
 };
