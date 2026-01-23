@@ -277,10 +277,6 @@ const checkAchievementsAndIcons = (user: User, matchContext?: { isDuelWin: boole
 
 // --- CSV UTILITIES ---
 
-/**
- * 部員リストのCSVをパースします。
- * 形式: 名前,読み,新入フラグ(0or1)
- */
 export const parseUserCSV = (csv: string): Partial<User>[] => {
     const lines = csv.split('\n');
     return lines.filter(line => line.trim() !== '').map(line => {
@@ -293,9 +289,6 @@ export const parseUserCSV = (csv: string): Partial<User>[] => {
     });
 };
 
-/**
- * 複数の部員を一括で追加します
- */
 export const bulkAddUsers = (userStubs: Partial<User>[]) => {
     const users = getUsers();
     const newUsers: User[] = userStubs.map(stub => ({
@@ -330,6 +323,59 @@ export const bulkAddUsers = (userStubs: Partial<User>[]) => {
         unlockedIcons: ['DEFAULT_INITIAL', 'DEFAULT_SMILE', 'SHOGI_FU']
     }));
     saveUsers([...users, ...newUsers]);
+};
+
+// --- TEAM BALANCE LOGIC ---
+
+const calculatePowerScore = (user: User): number => {
+    // レート(30%) + 出席(70%) の重み付けで「アクティブな実力」を算出
+    return (user.rate * 0.3) + (user.activityDays * 300);
+};
+
+export const getFactionBalanceSimulation = (users: User[]) => {
+    const scoredUsers = users.map(u => ({
+        ...u,
+        _score: calculatePowerScore(u)
+    })).sort((a, b) => b._score - a._score);
+
+    const red: User[] = [];
+    const white: User[] = [];
+    let redTotalScore = 0;
+    let whiteTotalScore = 0;
+
+    // 欲張り法（Greedy）による分配
+    scoredUsers.forEach(u => {
+        if (redTotalScore <= whiteTotalScore) {
+            red.push(u);
+            redTotalScore += u._score;
+        } else {
+            white.push(u);
+            whiteTotalScore += u._score;
+        }
+    });
+
+    const getStats = (team: User[]) => ({
+        count: team.length,
+        avgRate: team.length ? Math.round(team.reduce((acc, u) => acc + u.rate, 0) / team.length) : 0,
+        totalDays: team.reduce((acc, u) => acc + u.activityDays, 0),
+        totalScore: Math.round(team.reduce((acc, u) => acc + calculatePowerScore(u), 0))
+    });
+
+    return {
+        redUsers: red,
+        whiteUsers: white,
+        redStats: getStats(red),
+        whiteStats: getStats(white),
+        difference: Math.abs(redTotalScore - whiteTotalScore)
+    };
+};
+
+export const balanceFactions = (users: User[]): User[] => {
+    const sim = getFactionBalanceSimulation(users);
+    return users.map(u => {
+        const isRed = sim.redUsers.some(ru => ru.id === u.id);
+        return { ...u, faction: isRed ? 'RED' : 'WHITE' };
+    });
 };
 
 // --- INITIAL SEED DATA ---
@@ -469,10 +515,8 @@ export const importData = (json: string) => {
 };
 export const snapshotSeasonBaseline = () => {};
 export const awardSystemTitles = () => {};
-export const balanceFactions = (u: any) => u;
 export const assignGenerals = (r: any, w: any) => {};
 export const resetEventPoints = () => {};
-export const getFactionBalanceSimulation = (u: any) => ({ redStats: { count: 0, avgRate: 0 }, whiteStats: { count: 0, avgRate: 0 } });
 export const toggleGeneral = (id: any) => {};
 export const getRivalryStats = (id: any) => ({ bestCustomer: null, nemeses: null });
 export const updateUserTitle = (id: string, t: string | null) => {

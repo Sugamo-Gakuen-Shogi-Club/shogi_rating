@@ -4,7 +4,7 @@ import { getUsers, saveUsers, getSettings, saveSettings, manualPointAdjustment, 
 import { User, SystemSettings, MatchRecord, Season, EventType } from './types';
 import { Card } from './Card';
 import { NumPad } from './NumPad';
-import { Settings, Trash2, Plus, Calendar, Download, History, CheckCircle, Shuffle, Users, Crown, ChevronRight, X, RefreshCw, Languages, FileUp, Upload } from 'lucide-react';
+import { Settings, Trash2, Plus, Calendar, Download, History, CheckCircle, Shuffle, Users, Crown, ChevronRight, X, RefreshCw, Languages, FileUp, Upload, Swords, Zap, Activity } from 'lucide-react';
 import { UserSelector } from './UserSelector';
 
 const Admin: React.FC = () => {
@@ -120,7 +120,6 @@ const Admin: React.FC = () => {
           setCsvPreview(parsed);
       };
       reader.readAsText(file);
-      // 同じファイルを再度選択できるようにリセット
       if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -146,7 +145,6 @@ const Admin: React.FC = () => {
 
   const handleReadingChange = (id: string, reading: string) => {
       updateUserReading(id, reading);
-      // ローカルの状態も更新して入力を反映
       setUsers(users.map(u => u.id === id ? { ...u, reading } : u));
   };
 
@@ -169,9 +167,22 @@ const Admin: React.FC = () => {
       setIsEventWizardOpen(true);
   }
 
+  const handleTeamBalance = () => {
+      const sim = getFactionBalanceSimulation(users);
+      setWSimData(sim);
+  };
+
   const finishEventSetup = () => {
       if (wType === EventType.FACTION_WAR) {
           if (!wRedGeneral || !wWhiteGeneral) { alert('大将を決定してください'); return; }
+          if (!wSimData) { alert('チーム編成を実行してください'); return; }
+          
+          // シミュレーション結果を適用
+          const updatedUsers = users.map(u => {
+              const isRed = wSimData.redUsers.some(ru => ru.id === u.id);
+              return { ...u, faction: isRed ? 'RED' as const : 'WHITE' as const };
+          });
+          saveUsers(updatedUsers);
           assignGenerals(wRedGeneral, wWhiteGeneral);
       }
       const endsAt = new Date();
@@ -279,8 +290,8 @@ const Admin: React.FC = () => {
 
       {isEventWizardOpen && (
           <div className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-950/90 backdrop-blur-sm p-4 animate-in fade-in">
-              <div className="bg-slate-900 w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] border border-white/10">
-                  <div className="bg-slate-950 text-white p-6 shrink-0 flex justify-between items-center border-b border-white/10">
+              <div className="bg-slate-900 w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[95vh] border border-white/10">
+                  <div className="bg-slate-800 text-white p-6 shrink-0 flex justify-between items-center border-b border-white/10">
                       <h3 className="text-xl font-black flex items-center gap-2 font-serif-jp"><Calendar /> イベント設定</h3>
                       <button onClick={() => setIsEventWizardOpen(false)} className="bg-white/10 p-2 rounded-full hover:bg-white/20"><X /></button>
                   </div>
@@ -300,19 +311,79 @@ const Admin: React.FC = () => {
                       )}
                       {wizardStep === 2 && (
                           <div className="space-y-6">
-                              <h4 className="text-lg font-bold text-white text-center">チーム編成</h4>
-                              <button onClick={() => { saveUsers(balanceFactions(users)); setWizardStep(3); }} className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold flex items-center justify-center gap-2"><Shuffle size={20} /> 自動編成を実行</button>
+                              <h4 className="text-lg font-bold text-white text-center">戦力シミュレーション</h4>
+                              
+                              {!wSimData ? (
+                                <button onClick={handleTeamBalance} className="w-full bg-indigo-600 text-white py-12 rounded-2xl font-black text-xl flex flex-col items-center justify-center gap-4 shadow-xl active:scale-95 transition-all">
+                                    <Shuffle size={48} />
+                                    <span>自動チーム編成を実行</span>
+                                </button>
+                              ) : (
+                                <div className="space-y-6 animate-in zoom-in duration-300">
+                                    {/* 比較用ゲージ */}
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between text-xs font-black uppercase tracking-widest px-1">
+                                            <span className="text-red-500">紅組 強さ</span>
+                                            <span className="text-slate-500">均衡度</span>
+                                            <span className="text-blue-400">白組 強さ</span>
+                                        </div>
+                                        <div className="h-4 bg-slate-800 rounded-full overflow-hidden flex border border-white/5">
+                                            <div className="h-full bg-red-600 transition-all duration-1000" style={{ width: `${(wSimData.redStats.totalScore / (wSimData.redStats.totalScore + wSimData.whiteStats.totalScore)) * 100}%` }}></div>
+                                            <div className="h-full bg-blue-600 transition-all duration-1000 flex-1"></div>
+                                        </div>
+                                    </div>
+
+                                    {/* 統計カード */}
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="bg-red-900/20 border border-red-900/50 p-4 rounded-2xl space-y-3">
+                                            <div className="text-red-500 font-black flex items-center gap-2"><Users size={16}/> 紅組</div>
+                                            <div className="grid grid-cols-1 gap-2">
+                                                <div className="flex justify-between items-baseline"><span className="text-xs text-slate-500">人数</span><span className="text-xl font-black text-white">{wSimData.redStats.count}人</span></div>
+                                                <div className="flex justify-between items-baseline"><span className="text-xs text-slate-500">平均Rate</span><span className="text-xl font-black text-white">{wSimData.redStats.avgRate}</span></div>
+                                                <div className="flex justify-between items-baseline"><span className="text-xs text-slate-500">活動実績</span><span className="text-xl font-black text-white">{wSimData.redStats.totalDays}</span></div>
+                                            </div>
+                                        </div>
+                                        <div className="bg-blue-900/20 border border-blue-900/50 p-4 rounded-2xl space-y-3">
+                                            <div className="text-blue-400 font-black flex items-center gap-2"><Users size={16}/> 白組</div>
+                                            <div className="grid grid-cols-1 gap-2">
+                                                <div className="flex justify-between items-baseline"><span className="text-xs text-slate-500">人数</span><span className="text-xl font-black text-white">{wSimData.whiteStats.count}人</span></div>
+                                                <div className="flex justify-between items-baseline"><span className="text-xs text-slate-500">平均Rate</span><span className="text-xl font-black text-white">{wSimData.whiteStats.avgRate}</span></div>
+                                                <div className="flex justify-between items-baseline"><span className="text-xs text-slate-500">活動実績</span><span className="text-xl font-black text-white">{wSimData.whiteStats.totalDays}</span></div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <button onClick={handleTeamBalance} className="w-full py-3 rounded-xl font-bold text-slate-400 border border-slate-700 hover:bg-white/5 flex items-center justify-center gap-2 transition-colors">
+                                        <RefreshCw size={16} /> 再シャッフル
+                                    </button>
+                                </div>
+                              )}
                           </div>
                       )}
                       {wizardStep === 3 && (
                           <div className="space-y-6">
                               <h4 className="text-lg font-bold text-white text-center">大将任命</h4>
+                              <p className="text-xs text-center text-slate-500">大将はそれぞれの所属チームからのみ選択可能です。</p>
                               <div className="grid grid-cols-2 gap-4">
-                                  <button onClick={() => setWSelectingTarget('RED')} className={`p-4 rounded-2xl border flex flex-col items-center justify-center h-32 ${wRedGeneral ? 'border-red-500 bg-red-900/20' : 'border-dashed border-red-900/50'}`}>
-                                      {wRedGeneral ? <div className="font-black text-red-400">{users.find(u => u.id === wRedGeneral)?.name}</div> : "紅組大将を選択"}
+                                  <button onClick={() => setWSelectingTarget('RED')} className={`p-4 rounded-2xl border flex flex-col items-center justify-center h-32 transition-all ${wRedGeneral ? 'border-red-500 bg-red-900/20' : 'border-dashed border-red-900/50 hover:bg-red-900/5'}`}>
+                                      {wRedGeneral ? (
+                                          <div className="text-center">
+                                              <Crown className="mx-auto mb-2 text-yellow-500" />
+                                              <div className="font-black text-red-400">{users.find(u => u.id === wRedGeneral)?.name}</div>
+                                          </div>
+                                      ) : (
+                                          <div className="text-slate-600 font-bold text-sm">紅組大将を選択</div>
+                                      )}
                                   </button>
-                                  <button onClick={() => setWSelectingTarget('WHITE')} className={`p-4 rounded-2xl border flex flex-col items-center justify-center h-32 ${wWhiteGeneral ? 'border-slate-500 bg-slate-800' : 'border-dashed border-slate-700'}`}>
-                                      {wWhiteGeneral ? <div className="font-black text-slate-400">{users.find(u => u.id === wWhiteGeneral)?.name}</div> : "白組大将を選択"}
+                                  <button onClick={() => setWSelectingTarget('WHITE')} className={`p-4 rounded-2xl border flex flex-col items-center justify-center h-32 transition-all ${wWhiteGeneral ? 'border-blue-500 bg-blue-900/20' : 'border-dashed border-slate-700 hover:bg-blue-900/5'}`}>
+                                      {wWhiteGeneral ? (
+                                          <div className="text-center">
+                                              <Crown className="mx-auto mb-2 text-yellow-500" />
+                                              <div className="font-black text-blue-400">{users.find(u => u.id === wWhiteGeneral)?.name}</div>
+                                          </div>
+                                      ) : (
+                                          <div className="text-slate-600 font-bold text-sm">白組大将を選択</div>
+                                      )}
                                   </button>
                               </div>
                           </div>
@@ -320,12 +391,20 @@ const Admin: React.FC = () => {
                   </div>
                   <div className="p-4 border-t border-white/5 bg-slate-950 flex justify-end gap-3">
                       {wizardStep === 1 && <button onClick={() => wType === EventType.FACTION_WAR ? setWizardStep(2) : finishEventSetup()} className="bg-slate-200 text-slate-900 px-8 py-3 rounded-xl font-bold">次へ <ChevronRight size={16} /></button>}
-                      {wizardStep > 1 && <button onClick={finishEventSetup} className="bg-slate-200 text-slate-900 px-8 py-3 rounded-xl font-bold">イベント開始</button>}
+                      {wizardStep === 2 && <button onClick={() => setWizardStep(3)} disabled={!wSimData} className="bg-slate-200 disabled:bg-slate-800 disabled:text-slate-600 text-slate-900 px-8 py-3 rounded-xl font-bold">次へ <ChevronRight size={16} /></button>}
+                      {wizardStep === 3 && <button onClick={finishEventSetup} className="bg-slate-200 text-slate-900 px-8 py-3 rounded-xl font-bold flex items-center gap-2"><Swords size={18}/> イベント開始</button>}
                   </div>
               </div>
           </div>
       )}
-      {wSelectingTarget && <UserSelector users={users} onSelect={id => { if(wSelectingTarget === 'RED') setWRedGeneral(id); else setWWhiteGeneral(id); setWSelectingTarget(null); }} onClose={() => setWSelectingTarget(null)} title="大将を選択" />}
+      {wSelectingTarget && (
+        <UserSelector 
+            users={wSimData ? (wSelectingTarget === 'RED' ? wSimData.redUsers : wSimData.whiteUsers) : users}
+            onSelect={id => { if(wSelectingTarget === 'RED') setWRedGeneral(id); else setWWhiteGeneral(id); setWSelectingTarget(null); }} 
+            onClose={() => setWSelectingTarget(null)} 
+            title={`${wSelectingTarget === 'RED' ? '紅組' : '白組'}大将を選択`} 
+        />
+      )}
 
       <div className="flex flex-col md:flex-row justify-between items-end gap-4">
         <div>
@@ -420,7 +499,7 @@ const Admin: React.FC = () => {
                         <button onClick={() => setAdjMode('RATE')} className={`flex-1 py-3 rounded-lg text-xs font-bold transition-all ${adjMode === 'RATE' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-500'}`}>レート</button>
                     </div>
                     <select className="w-full p-3 border border-slate-700 rounded-xl font-bold bg-slate-900 text-white" value={adjUser} onChange={e => setAdjUser(e.target.value)}><option value="">対象を選択...</option>{users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}</select>
-                    <div className="flex gap-2"><input type="number" value={adjValue} onChange={e => setAdjValue(Number(e.target.value))} className="w-24 p-3 border border-slate-700 rounded-xl font-bold text-center bg-slate-900 text-white" /><input type="text" value={adjReason} onChange={setAdjReason} className="flex-1 p-3 border border-slate-700 rounded-xl font-bold bg-slate-900 text-white" /></div>
+                    <div className="flex gap-2"><input type="number" value={adjValue} onChange={e => setAdjValue(Number(e.target.value))} className="w-24 p-3 border border-slate-700 rounded-xl font-bold text-center bg-slate-900 text-white" /><input type="text" value={adjReason} onChange={e => setAdjReason(e.target.value)} className="flex-1 p-3 border border-slate-700 rounded-xl font-bold bg-slate-900 text-white" /></div>
                     <button onClick={handleAdjustmentApply} disabled={!adjUser || isProcessing} className={`w-full text-slate-900 py-4 rounded-xl font-black transition-all relative overflow-hidden ${adjMode === 'POINT' ? 'bg-amber-400 hover:bg-amber-300' : 'bg-blue-400 hover:bg-blue-300'}`}>
                          {isProcessing ? '処理中...' : '反映'}{successMsg && <div className="absolute inset-0 bg-green-500 text-white flex items-center justify-center font-bold animate-in fade-in"><CheckCircle size={20} className="mr-2"/> {successMsg}</div>}
                     </button>
