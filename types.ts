@@ -21,7 +21,8 @@ export interface IconDef {
   char: string;
   name: string;
   conditionDescription: string;
-  type: 'DEFAULT' | 'RATE' | 'WINS' | 'STREAK' | 'SPECIAL' | 'MATCHES';
+  // Added 'DAYS' to support activity day based icon conditions and fix type errors in storage.ts
+  type: 'DEFAULT' | 'RATE' | 'WINS' | 'STREAK' | 'SPECIAL' | 'MATCHES' | 'DAYS';
   category: 'DEFAULT' | 'SHOGI' | 'CHESS' | 'SPECIAL' | 'RANK';
   threshold?: number;
 }

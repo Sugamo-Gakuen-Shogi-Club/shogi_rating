@@ -20,6 +20,81 @@ const DEFAULT_SETTINGS: SystemSettings = {
   lastTitleUpdate: null
 };
 
+// System Titles Definition
+export const SYSTEM_TITLES: TitleDef[] = [
+    { id: 'MASTER', name: '名人', english: 'The Master', description: '現在のレート最強', color: 'text-yellow-400' },
+    { id: 'RISING_STAR', name: '新星', english: 'Rising Star', description: '今月のレート上昇幅No.1', color: 'text-blue-400' },
+    { id: 'GRINDER', name: '活動家', english: 'The Grinder', description: '対局数＋出席数No.1', color: 'text-green-400' },
+    { id: 'GIANT_KILLER', name: '下克上', english: 'Giant Killer', description: '格上撃破数No.1', color: 'text-red-400' },
+];
+
+// Achievements Definition
+export const ACHIEVEMENTS_DATA: AchievementDef[] = [
+  { id: 'FACTION_GENERAL', name: '大将軍', description: 'チームの大将に任命される', conditionType: 'SPECIAL', threshold: 1 },
+  { id: 'DUEL_VICTORY', name: '一騎討ち', description: '敵将との直接対決を制する', conditionType: 'SPECIAL', threshold: 1 },
+  { id: 'START_DASH', name: 'スタートダッシュ', description: '記念すべき最初の対局', conditionType: 'MATCHES', threshold: 1 },
+  { id: 'MATCHES_10', name: '駆け出し棋士', description: '対局数10回到達', conditionType: 'MATCHES', threshold: 10 },
+  { id: 'MATCHES_50', name: '盤上の常連', description: '対局数50回到達', conditionType: 'MATCHES', threshold: 50 },
+  { id: 'MATCHES_100', name: '百戦錬磨', description: '対局数100回到達', conditionType: 'MATCHES', threshold: 100 },
+  { id: 'FIRST_WIN', name: '初勝利', description: '初めての勝利', conditionType: 'WINS', threshold: 1 },
+  { id: 'WINS_10', name: '十人斬り', description: '勝利数10回到達', conditionType: 'WINS', threshold: 10 },
+  { id: 'WINS_30', name: '名手', description: '勝利数30回到達', conditionType: 'WINS', threshold: 30 },
+  { id: 'WINS_50', name: '将棋の鬼', description: '勝利数50回到達', conditionType: 'WINS', threshold: 50 },
+  { id: 'STREAK_3', name: '好調', description: '3連勝達成', conditionType: 'STREAK', threshold: 3 },
+  { id: 'STREAK_5', name: '猛攻', description: '5連勝達成', conditionType: 'STREAK', threshold: 5 },
+  { id: 'STREAK_10', name: '無双', description: '10連勝達成', conditionType: 'STREAK', threshold: 10 },
+  { id: 'RATE_1200', name: '脱・初心者', description: 'レート1200到達', conditionType: 'RATE', threshold: 1200 },
+  { id: 'RATE_1500', name: '熟練者', description: 'レート1500到達', conditionType: 'RATE', threshold: 1500 },
+  { id: 'RATE_1800', name: 'マスター', description: 'レート1800到達', conditionType: 'RATE', threshold: 1800 },
+  { id: 'RATE_2000', name: 'レジェンド', description: 'レート2000到達', conditionType: 'RATE', threshold: 2000 },
+  { id: 'DAYS_10', name: '将棋好き', description: '活動日数10日', conditionType: 'DAYS', threshold: 10 },
+  { id: 'DAYS_30', name: '部室の主', description: '活動日数30日', conditionType: 'DAYS', threshold: 30 },
+  { id: 'DAYS_100', name: '生ける伝説', description: '活動日数100日', conditionType: 'DAYS', threshold: 100 },
+];
+
+export const ICONS_DATA: IconDef[] = [
+    // --- DEFAULT ---
+    { id: 'DEFAULT_INITIAL', char: '名', name: '頭文字', conditionDescription: 'デフォルト', type: 'DEFAULT', category: 'DEFAULT' },
+    { id: 'DEFAULT_SMILE', char: '🙂', name: 'スマイル', conditionDescription: 'デフォルト', type: 'DEFAULT', category: 'DEFAULT' },
+    { id: 'DEFAULT_CAT', char: '🐱', name: 'ねこ', conditionDescription: '最初から所持', type: 'DEFAULT', category: 'DEFAULT' },
+    { id: 'DEFAULT_DOG', char: '🐶', name: 'いぬ', conditionDescription: '最初から所持', type: 'DEFAULT', category: 'DEFAULT' },
+
+    // --- SHOGI (将棋の駒) ---
+    { id: 'SHOGI_FU', char: '歩兵', name: '歩兵', conditionDescription: '最初から所持', type: 'DEFAULT', category: 'SHOGI' },
+    { id: 'SHOGI_TO', char: 'と金', name: 'と金', conditionDescription: '対局数3回', type: 'MATCHES', threshold: 3, category: 'SHOGI' },
+    { id: 'SHOGI_KY', char: '香車', name: '香車', conditionDescription: '対局数5回', type: 'MATCHES', threshold: 5, category: 'SHOGI' },
+    { id: 'SHOGI_NKY', char: '成香', name: '成香', conditionDescription: '対局数10回', type: 'MATCHES', threshold: 10, category: 'SHOGI' },
+    { id: 'SHOGI_KE', char: '桂馬', name: '桂馬', conditionDescription: '勝利数3回', type: 'WINS', threshold: 3, category: 'SHOGI' },
+    { id: 'SHOGI_NKE', char: '成桂', name: '成桂', conditionDescription: '勝利数5回', type: 'WINS', threshold: 5, category: 'SHOGI' },
+    { id: 'SHOGI_GI', char: '銀将', name: '銀将', conditionDescription: '勝利数7回', type: 'WINS', threshold: 7, category: 'SHOGI' },
+    { id: 'SHOGI_NGI', char: '成銀', name: '成銀', conditionDescription: '勝利数12回', type: 'WINS', threshold: 12, category: 'SHOGI' },
+    { id: 'SHOGI_KI', char: '金将', name: '金将', conditionDescription: '勝利数15回', type: 'WINS', threshold: 15, category: 'SHOGI' },
+    { id: 'SHOGI_KA', char: '角行', name: '角行', conditionDescription: 'レート1100到達', type: 'RATE', threshold: 1100, category: 'SHOGI' },
+    { id: 'SHOGI_UMA', char: '龍馬', name: '龍馬', conditionDescription: 'レート1250到達', type: 'RATE', threshold: 1250, category: 'SHOGI' },
+    { id: 'SHOGI_HI', char: '飛車', name: '飛車', conditionDescription: 'レート1200到達', type: 'RATE', threshold: 1200, category: 'SHOGI' },
+    { id: 'SHOGI_RYU', char: '龍王', name: '龍王', conditionDescription: 'レート1400到達', type: 'RATE', threshold: 1400, category: 'SHOGI' },
+    { id: 'SHOGI_OU', char: '王将', name: '王将', conditionDescription: 'レート1600到達', type: 'RATE', threshold: 1600, category: 'SHOGI' },
+    { id: 'SHOGI_GYOKU', char: '玉将', name: '玉将', conditionDescription: 'レート1800到達', type: 'RATE', threshold: 1800, category: 'SHOGI' },
+
+    // --- CHESS ---
+    { id: 'CHESS_PAWN', char: '♟️', name: 'ポーン', conditionDescription: '勝利数20回', type: 'WINS', threshold: 20, category: 'CHESS' },
+    { id: 'CHESS_KNIGHT', char: '♞', name: 'ナイト', conditionDescription: '勝利数40回', type: 'WINS', threshold: 40, category: 'CHESS' },
+    { id: 'CHESS_BISHOP', char: '♝', name: 'ビショップ', conditionDescription: 'レート1350到達', type: 'RATE', threshold: 1350, category: 'CHESS' },
+    { id: 'CHESS_ROOK', char: '♜', name: 'ルーク', conditionDescription: 'レート1450到達', type: 'RATE', threshold: 1450, category: 'CHESS' },
+    { id: 'CHESS_QUEEN', char: '♛', name: 'クイーン', conditionDescription: 'レート1700到達', type: 'RATE', threshold: 1700, category: 'CHESS' },
+    { id: 'CHESS_KING', char: '♚', name: 'キング', conditionDescription: 'レート2000到達', type: 'RATE', threshold: 2000, category: 'CHESS' },
+
+    // --- SPECIAL ---
+    { id: 'SPECIAL_FIRE', char: '🔥', name: '不倒', conditionDescription: '5連勝達成', type: 'STREAK', threshold: 5, category: 'SPECIAL' },
+    { id: 'SPECIAL_LIGHTNING', char: '⚡', name: '電光石火', conditionDescription: '10連勝達成', type: 'STREAK', threshold: 10, category: 'SPECIAL' },
+    { id: 'SPECIAL_MEDAL', char: '🏅', name: '皆勤', conditionDescription: '活動日数50日', type: 'DAYS', threshold: 50, category: 'SPECIAL' },
+    { id: 'SPECIAL_TROPHY', char: '🏆', name: '覇者', conditionDescription: '100勝達成', type: 'WINS', threshold: 100, category: 'SPECIAL' },
+    { id: 'SPECIAL_SHIELD', char: '🛡️', name: '守護神', conditionDescription: '引き分け10回', type: 'SPECIAL', category: 'SPECIAL' }, // Logic in check function
+    { id: 'SPECIAL_CROWN', char: '👑', name: '王族', conditionDescription: 'レート2200到達', type: 'RATE', threshold: 2200, category: 'SPECIAL' },
+    { id: 'SPECIAL_SWORDS', char: '⚔️', name: '剣士', conditionDescription: '対局数200回', type: 'MATCHES', threshold: 200, category: 'SPECIAL' },
+    { id: 'SPECIAL_DRAGON', char: '🐲', name: '神龍', conditionDescription: 'レート2500到達', type: 'RATE', threshold: 2500, category: 'SPECIAL' },
+];
+
 const safeParse = (val: string | null, fallback: any) => {
   if (!val || val === 'undefined' || val === 'null') return fallback;
   try {
@@ -105,9 +180,6 @@ export const saveUsers = (users: User[]) => {
   syncWithServer();
 };
 
-/**
- * 特定のユーザーの読み（かな）を更新します
- */
 export const updateUserReading = (userId: string, reading: string) => {
     const users = getUsers();
     const user = users.find(u => u.id === userId);
@@ -147,6 +219,7 @@ export const recordAttendance = (userId: string): AttendanceResult => {
   user.monthlyPoints += 5;
   user.pointsAttendance = (user.pointsAttendance || 0) + 5;
   user.activityDays = (user.activityDays || 0) + 1;
+  const res = checkAchievementsAndIcons(user);
   saveUsers(users);
   addLog({
     id: Math.random().toString(36).substr(2, 9),
@@ -156,7 +229,57 @@ export const recordAttendance = (userId: string): AttendanceResult => {
     description: 'Daily Attendance',
     date: new Date().toISOString()
   });
-  return { success: true, newAchievements: [], newIcons: [], message: '出席を記録しました！ (+5 pt)' };
+  return { success: true, newAchievements: res.newAchievements, newIcons: res.newIcons, message: '出席を記録しました！ (+5 pt)' };
+};
+
+const checkAchievementsAndIcons = (user: User, matchContext?: { isDuelWin: boolean }): { newAchievements: AchievementDef[], newIcons: any[] } => {
+  const newAchievements: AchievementDef[] = [];
+  const newIcons: any[] = [];
+  
+  ACHIEVEMENTS_DATA.forEach(ach => {
+    if (user.achievements.includes(ach.id)) return;
+    let met = false;
+    switch (ach.conditionType) {
+      case 'WINS': met = user.wins >= ach.threshold; break;
+      case 'STREAK': met = user.currentStreak >= ach.threshold; break;
+      case 'RATE': met = user.rate >= ach.threshold; break;
+      case 'DAYS': met = user.activityDays >= ach.threshold; break;
+      case 'MATCHES': met = (user.wins + user.losses + user.draws) >= ach.threshold; break;
+      case 'SPECIAL': 
+        if (ach.id === 'FACTION_GENERAL') met = user.isGeneral;
+        if (ach.id === 'DUEL_VICTORY') met = !!matchContext?.isDuelWin;
+        break;
+    }
+    if (met) {
+      user.achievements.push(ach.id);
+      newAchievements.push(ach);
+      if (!user.activeTitle) user.activeTitle = ach.id;
+    }
+  });
+
+  ICONS_DATA.forEach(icon => {
+      if (icon.type === 'DEFAULT') return;
+      if (user.unlockedIcons.includes(icon.id)) return;
+      let met = false;
+      switch (icon.type) {
+          case 'RATE': met = user.rate >= (icon.threshold || 9999); break;
+          case 'WINS': met = user.wins >= (icon.threshold || 9999); break;
+          case 'MATCHES': met = (user.wins + user.losses + user.draws) >= (icon.threshold || 9999); break;
+          case 'STREAK': met = user.currentStreak >= (icon.threshold || 9999); break;
+          case 'DAYS': met = user.activityDays >= (icon.threshold || 9999); break;
+          case 'SPECIAL':
+            if (icon.id === 'SPECIAL_GENERAL') met = user.isGeneral;
+            if (icon.id === 'SPECIAL_DUEL') met = user.achievements.includes('DUEL_VICTORY');
+            if (icon.id === 'SPECIAL_SHIELD') met = user.draws >= 10;
+            break;
+      }
+      if (met) {
+          user.unlockedIcons.push(icon.id);
+          newIcons.push(icon);
+      }
+  });
+
+  return { newAchievements, newIcons };
 };
 
 // --- INITIAL SEED DATA ---
@@ -177,7 +300,7 @@ export const seedData = async () => {
     { name: "秋山 七星", reading: "あきやま ななせ" },
     { name: "大庭 悠誠", reading: "おおば ゆうせい" },
     { name: "熊谷 流星", reading: "くまがい りゅうせい" },
-    { name: "佐藤 勘太", reading: "さとう かん太" },
+    { name: "佐藤 勘太", reading: "さとう かんた" },
     { name: "下田 聖", reading: "しもだ ひじり" },
     { name: "遅 志丞", reading: "ち しじょう" },
     { name: "皆川 哲弥", reading: "みながわ てつや" },
@@ -244,21 +367,46 @@ export const seedData = async () => {
 export const playSound = (type: any) => {}; 
 export const vibrate = (p: any) => {}; 
 export const getUserAvatarChar = (u: any) => u.name.charAt(0);
-export const getUserIconDef = (id: any) => ({ category: 'DEFAULT', char: '?' });
-export const ACHIEVEMENTS_DATA: any[] = [];
-export const ICONS_DATA: any[] = [];
-export const SYSTEM_TITLES: TitleDef[] = [
-    { id: 'MASTER', name: '名人', english: 'The Master', description: '現在のレート最強', color: 'text-yellow-400' },
-    { id: 'RISING_STAR', name: '新星', english: 'Rising Star', description: '今月のレート上昇幅No.1', color: 'text-blue-400' },
-    { id: 'GRINDER', name: '活動家', english: 'The Grinder', description: '対局数＋出席数No.1', color: 'text-green-400' },
-    { id: 'GIANT_KILLER', name: '下克上', english: 'Giant Killer', description: '格上撃破数No.1', color: 'text-red-400' },
-];
-export const processMatch = (p1: any, p2: any, res: any): any => ({});
+export const getUserIconDef = (id: any) => ICONS_DATA.find(i => i.id === id) || ICONS_DATA[0];
+
+export const processMatch = (p1Id: string, p2Id: string, result: 'PLAYER1_WIN' | 'PLAYER2_WIN' | 'DRAW'): any => {
+    // Basic ELO logic for test
+    const users = getUsers();
+    const settings = getSettings();
+    const p1 = users.find(u => u.id === p1Id);
+    const p2 = users.find(u => u.id === p2Id);
+    if (!p1 || !p2) throw new Error("Users not found");
+    
+    let p1Change = 10, p2Change = 10;
+    let p1Pts = 5, p2Pts = 5;
+    
+    if (result === 'PLAYER1_WIN') { p1Change = 16; p2Change = 2; p1Pts = 10; }
+    else if (result === 'PLAYER2_WIN') { p1Change = 2; p2Change = 16; p2Pts = 10; }
+    else { p1Change = 5; p2Change = 5; p1Pts = 7; p2Pts = 7; }
+    
+    p1.rate += p1Change; p1.wins += (result === 'PLAYER1_WIN' ? 1 : 0); p1.totalPoints += p1Pts;
+    p2.rate += p2Change; p2.wins += (result === 'PLAYER2_WIN' ? 1 : 0); p2.totalPoints += p2Pts;
+    
+    checkAchievementsAndIcons(p1);
+    checkAchievementsAndIcons(p2);
+    
+    saveUsers(users);
+    return { p1RateChange: p1Change, p2RateChange: p2Change, p1PointsEarned: p1Pts, p2PointsEarned: p2Pts, result };
+};
+
 export const deleteMatch = (id: any) => {};
-export const manualPointAdjustment = (uid: any, p: any, r: any) => {};
-export const manualRateAdjustment = (uid: any, r: any, rs: any) => {};
-export const resetMonthly = () => {};
-export const exportData = () => "";
+export const manualPointAdjustment = (uid: string, p: number, r: string) => {
+    const users = getUsers();
+    const u = users.find(u => u.id === uid);
+    if(u) { u.totalPoints += p; checkAchievementsAndIcons(u); saveUsers(users); }
+};
+export const manualRateAdjustment = (uid: string, r: number, rs: string) => {
+    const users = getUsers();
+    const u = users.find(u => u.id === uid);
+    if(u) { u.rate += r; checkAchievementsAndIcons(u); saveUsers(users); }
+};
+export const resetMonthly = () => { const u = getUsers(); u.forEach(user => user.monthlyPoints = 0); saveUsers(u); };
+export const exportData = () => JSON.stringify({ users: getUsers(), matches: getMatches() });
 export const importData = (s: any) => true;
 export const snapshotSeasonBaseline = () => {};
 export const awardSystemTitles = () => {};
@@ -268,5 +416,11 @@ export const resetEventPoints = () => {};
 export const getFactionBalanceSimulation = (u: any) => ({ redStats: { count: 0, avgRate: 0 }, whiteStats: { count: 0, avgRate: 0 } });
 export const toggleGeneral = (id: any) => {};
 export const getRivalryStats = (id: any) => ({ bestCustomer: null, nemeses: null });
-export const updateUserTitle = (id: any, t: any) => {};
-export const updateUserIcon = (id: any, i: any) => {};
+export const updateUserTitle = (id: string, t: string | null) => {
+    const u = getUsers(); const user = u.find(x => x.id === id);
+    if(user) { user.activeTitle = t; saveUsers(u); }
+};
+export const updateUserIcon = (id: string, i: string) => {
+    const u = getUsers(); const user = u.find(x => x.id === id);
+    if(user) { user.activeIconId = i; saveUsers(u); }
+};

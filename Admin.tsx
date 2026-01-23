@@ -168,7 +168,6 @@ const Admin: React.FC = () => {
     setTimeout(() => { setIsProcessing(false); setSuccessMsg(null); }, 2000);
   };
 
-  // Fix: Added missing handleResetMonthly function
   const handleResetMonthly = () => {
     if (window.confirm('今月の表示ポイントをリセットしますか？')) {
       resetMonthly();
@@ -179,7 +178,7 @@ const Admin: React.FC = () => {
   if (!isAuthenticated) {
     return (
       <div className="flex items-center justify-center min-h-[60vh] p-4">
-        <div className="glass-panel-dark w-full max-w-md p-8 text-center space-y-6 rounded-3xl border border-white/10 shadow-2xl">
+        <div className="glass-panel-dark w-full max-md p-8 text-center space-y-6 rounded-3xl border border-white/10 shadow-2xl">
           <Settings className="mx-auto text-slate-500" size={48} />
           <h2 className="text-2xl font-bold text-white font-serif-jp">管理者ログイン</h2>
           <div>
@@ -259,17 +258,19 @@ const Admin: React.FC = () => {
         <Card title="部員名簿管理" icon={<Users />}>
           <div className="space-y-6">
             <div className="space-y-3 p-4 bg-slate-900/50 rounded-2xl border border-white/5">
-                <div className="flex gap-2">
-                    <input type="text" value={newName} onChange={e => setNewName(e.target.value)} placeholder="名前（例：秀村 紘嗣）" className="flex-1 p-3 border border-slate-700 rounded-xl bg-slate-800 text-white font-bold" />
-                    <input type="text" value={newReading} onChange={e => setNewReading(e.target.value)} placeholder="読み（例：ひでむら ひろし）" className="flex-1 p-3 border border-slate-700 rounded-xl bg-slate-800 text-white font-bold" />
-                    <button onClick={handleAddUser} className="bg-blue-600 text-white px-6 rounded-xl font-bold shadow-lg hover:bg-blue-500"><Plus /></button>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-[1fr_1fr_auto] gap-3">
+                    <input type="text" value={newName} onChange={e => setNewName(e.target.value)} placeholder="名前（例：秀村 紘嗣）" className="w-full p-3 border border-slate-700 rounded-xl bg-slate-800 text-white font-bold focus:ring-2 focus:ring-blue-500 outline-none" />
+                    <input type="text" value={newReading} onChange={e => setNewReading(e.target.value)} placeholder="読み（例：ひでむら ひろし）" className="w-full p-3 border border-slate-700 rounded-xl bg-slate-800 text-white font-bold focus:ring-2 focus:ring-blue-500 outline-none" />
+                    <button onClick={handleAddUser} className="bg-blue-600 text-white px-8 py-3 rounded-xl font-bold shadow-lg hover:bg-blue-500 transition-colors flex items-center justify-center gap-2 md:col-span-2 lg:col-span-1">
+                      <Plus size={20} /> <span className="lg:hidden">部員を追加</span>
+                    </button>
                 </div>
                 <p className="text-[10px] text-slate-500 font-bold px-1 flex items-center gap-1"><Languages size={10}/> 五十音順で並べるために「読み」をひらがなで入力してください。</p>
             </div>
             
-            <div className="max-h-[500px] overflow-y-auto pr-2 space-y-3">
+            <div className="max-h-[500px] overflow-y-auto pr-2 space-y-3 scrollbar-hide">
                {users.map(u => (
-                   <div key={u.id} className="flex flex-col p-4 bg-slate-800 rounded-2xl border border-slate-700 gap-3 group">
+                   <div key={u.id} className="flex flex-col p-4 bg-slate-800 rounded-2xl border border-slate-700 gap-3 group transition-all hover:border-slate-500">
                        <div className="flex items-center justify-between">
                            <div className="flex items-center gap-3">
                                <div className={`w-10 h-10 rounded-full ${u.avatarColor} flex items-center justify-center text-white font-black text-lg font-serif-jp shadow-inner`}>{u.name.charAt(0)}</div>
@@ -280,7 +281,7 @@ const Admin: React.FC = () => {
                            </div>
                            <div className="flex items-center gap-2">
                                <button onClick={() => toggleNewMember(u.id)} className={`px-3 py-1.5 rounded-lg text-[10px] font-black border transition-all ${u.isNewMember ? 'bg-green-900/30 text-green-400 border-green-600' : 'bg-slate-900 text-slate-500 border-slate-700'}`}>{u.isNewMember ? '🔰 新入' : '一般'}</button>
-                               <button onClick={() => handleDeleteUser(u.id)} className="text-slate-500 hover:text-red-500 p-2"><Trash2 size={18} /></button>
+                               <button onClick={() => handleDeleteUser(u.id)} className="text-slate-500 hover:text-red-500 p-2 transition-colors"><Trash2 size={18} /></button>
                            </div>
                        </div>
                        <div className="flex items-center gap-2 pl-2">
@@ -311,7 +312,7 @@ const Admin: React.FC = () => {
                      </div>
                      <div className="pt-4 border-t border-white/5">
                         <p className="text-sm text-slate-400 mb-4">成長度や対局数に基づき「名人」「新星」などの称号を再計算します。</p>
-                        <button onClick={handleUpdateTitles} className="w-full bg-gradient-to-r from-amber-600 to-yellow-600 text-white py-3 rounded-xl font-black shadow-lg">称号を更新する</button>
+                        <button onClick={handleUpdateTitles} className="w-full bg-gradient-to-r from-amber-600 to-yellow-600 text-white py-3 rounded-xl font-black shadow-lg hover:shadow-yellow-500/20 active:scale-[0.98] transition-all">称号を更新する</button>
                      </div>
                 </div>
             </Card>
@@ -324,7 +325,7 @@ const Admin: React.FC = () => {
                     </div>
                     <select className="w-full p-3 border border-slate-700 rounded-xl font-bold bg-slate-900 text-white" value={adjUser} onChange={e => setAdjUser(e.target.value)}><option value="">対象を選択...</option>{users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}</select>
                     <div className="flex gap-2"><input type="number" value={adjValue} onChange={e => setAdjValue(Number(e.target.value))} className="w-24 p-3 border border-slate-700 rounded-xl font-bold text-center bg-slate-900 text-white" /><input type="text" value={adjReason} onChange={e => setAdjReason(e.target.value)} className="flex-1 p-3 border border-slate-700 rounded-xl font-bold bg-slate-900 text-white" /></div>
-                    <button onClick={handleAdjustmentApply} disabled={!adjUser || isProcessing} className={`w-full text-slate-900 py-4 rounded-xl font-black transition-all relative overflow-hidden ${adjMode === 'POINT' ? 'bg-amber-400' : 'bg-blue-400'}`}>
+                    <button onClick={handleAdjustmentApply} disabled={!adjUser || isProcessing} className={`w-full text-slate-900 py-4 rounded-xl font-black transition-all relative overflow-hidden ${adjMode === 'POINT' ? 'bg-amber-400 hover:bg-amber-300' : 'bg-blue-400 hover:bg-blue-300'}`}>
                          {isProcessing ? '処理中...' : '反映'}{successMsg && <div className="absolute inset-0 bg-green-500 text-white flex items-center justify-center font-bold animate-in fade-in"><CheckCircle size={20} className="mr-2"/> {successMsg}</div>}
                     </button>
                 </div>
