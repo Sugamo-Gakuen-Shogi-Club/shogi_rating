@@ -222,126 +222,144 @@ const Dashboard: React.FC = () => {
       )}
 
       {/* HERO SECTION */}
-      {isFactionWar ? (
-          /* FACTION WAR HEAT MODE HERO */
-          <div className="relative rounded-[2.5rem] overflow-hidden min-h-[400px] flex flex-col justify-center items-center text-center shadow-2xl ring-4 ring-red-900/50 group cursor-pointer" onClick={() => setIsFactionModalOpen(true)}>
-                {/* Dynamic Backgrounds */}
-                <div className="absolute inset-0 bg-slate-950">
-                    <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/seigaiha.png')] opacity-20 mix-blend-overlay"></div>
-                    <div className="absolute inset-0 bg-gradient-to-r from-red-900/80 via-transparent to-blue-900/80 animate-pulse"></div>
+      <section className="relative rounded-[2.5rem] overflow-hidden min-h-[340px] flex flex-col shadow-2xl ring-1 ring-white/10">
+        
+        {/* Dynamic Backgrounds */}
+        <div className="absolute inset-0 bg-slate-900">
+             {isFactionWar ? (
+                 <>
+                    {/* Enhanced Faction War Effects */}
+                    <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/seigaiha.png')] opacity-10 mix-blend-overlay"></div>
+                    
+                    {/* Animated gradients */}
+                    <div className="absolute top-0 left-0 w-3/4 h-full bg-gradient-to-r from-red-900/60 via-red-800/20 to-transparent mix-blend-screen animate-pulse"></div>
+                    <div className="absolute top-0 right-0 w-3/4 h-full bg-gradient-to-l from-blue-900/60 via-blue-800/20 to-transparent mix-blend-screen animate-pulse" style={{ animationDelay: '1s' }}></div>
                     
                     {/* Particles (CSS Simulated) */}
                     <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                        <div className="absolute top-[-50%] left-[-20%] w-[100%] h-[200%] bg-gradient-to-b from-red-500/20 to-transparent rotate-[30deg] blur-3xl animate-[shimmer_8s_infinite]"></div>
-                        <div className="absolute top-[-50%] right-[-20%] w-[100%] h-[200%] bg-gradient-to-b from-blue-500/20 to-transparent rotate-[-30deg] blur-3xl animate-[shimmer_8s_infinite_reverse]"></div>
+                        <div className="absolute top-[-50%] left-[-20%] w-[100%] h-[200%] bg-gradient-to-b from-red-500/10 to-transparent rotate-[30deg] blur-3xl animate-[shimmer_8s_infinite]"></div>
+                        <div className="absolute top-[-50%] right-[-20%] w-[100%] h-[200%] bg-gradient-to-b from-blue-500/10 to-transparent rotate-[-30deg] blur-3xl animate-[shimmer_8s_infinite_reverse]"></div>
+                        {/* More flash */}
+                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,0.4)_100%)]"></div>
                     </div>
-                </div>
+                 </>
+             ) : (
+                 <div className="absolute inset-0 bg-gradient-to-br from-slate-800 to-slate-950">
+                     <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5"></div>
+                     <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-500/10 rounded-full blur-[100px] -translate-y-1/2 translate-x-1/2"></div>
+                 </div>
+             )}
+        </div>
 
-                {/* Content */}
-                <div className="relative z-10 w-full max-w-5xl px-4 grid grid-cols-3 items-center">
-                    
-                    {/* Red Side */}
-                    <div className="text-right transform transition-transform group-hover:scale-105 duration-300">
-                        <div className="text-red-500 font-black text-8xl md:text-9xl drop-shadow-[0_0_30px_rgba(220,38,38,0.8)] filter font-serif-jp leading-none">
-                            {factionStats.redScore}
-                        </div>
-                        <div className="text-red-200 font-bold uppercase tracking-widest text-lg md:text-xl mt-2 flex items-center justify-end gap-2 border-t-2 border-red-500/50 pt-2">
-                            RED ARMY <Flame className="text-red-500 fill-red-500 animate-bounce" size={24} />
-                        </div>
-                    </div>
-
-                    {/* Center VS */}
-                    <div className="flex flex-col items-center justify-center">
-                        <div className="text-9xl font-black italic text-transparent bg-clip-text bg-gradient-to-b from-white to-slate-400 drop-shadow-[0_0_20px_white] animate-[pulse_0.5s_infinite] scale-125 font-serif-jp select-none">
-                            VS
-                        </div>
-                        <div className="mt-6 px-6 py-2 bg-yellow-500 text-black font-black uppercase text-xs rounded-full shadow-lg animate-bounce tracking-widest border-2 border-white">
-                            FACTION WAR LIVE
-                        </div>
-                    </div>
-
-                    {/* White Side */}
-                    <div className="text-left transform transition-transform group-hover:scale-105 duration-300">
-                        <div className="text-blue-400 font-black text-8xl md:text-9xl drop-shadow-[0_0_30px_rgba(59,130,246,0.8)] filter font-serif-jp leading-none">
-                            {factionStats.whiteScore}
-                        </div>
-                        <div className="text-blue-200 font-bold uppercase tracking-widest text-lg md:text-xl mt-2 flex items-center justify-start gap-2 border-t-2 border-blue-500/50 pt-2">
-                            <Snowflake className="text-blue-400 fill-blue-400 animate-spin-slow" size={24} /> WHITE ARMY
-                        </div>
-                    </div>
-                </div>
-
-                {/* Gauge at bottom */}
-                <div className="absolute bottom-10 w-3/4 h-3 bg-slate-900/80 rounded-full border border-white/10 overflow-hidden shadow-2xl">
-                    <div 
-                        className="absolute top-0 left-0 h-full bg-gradient-to-r from-red-600 to-red-400 transition-all duration-1000 ease-out"
-                        style={{ width: `${factionStats.redPercent}%` }}
-                    />
-                    <div 
-                        className="absolute top-0 right-0 h-full bg-gradient-to-l from-blue-600 to-blue-400 transition-all duration-1000 ease-out"
-                        style={{ width: `${100 - factionStats.redPercent}%` }}
-                    />
-                    <div className="absolute top-0 left-1/2 w-1 h-full bg-white z-10 shadow-[0_0_10px_white]"></div>
-                </div>
-                
-                <style>{`
-                    @keyframes shimmer {
-                        0% { transform: translateX(-150%); }
-                        100% { transform: translateX(250%); }
-                    }
-                    .animate-spin-slow {
-                        animation: spin 3s linear infinite;
-                    }
-                `}</style>
-          </div>
-      ) : (
-          /* STANDARD MODE HERO */
-          <div className="relative rounded-[2.5rem] overflow-hidden min-h-[340px] flex flex-col shadow-2xl ring-1 ring-white/10">
-            <div className="absolute inset-0 bg-gradient-to-br from-slate-800 to-slate-950">
-                <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5"></div>
-                <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-500/10 rounded-full blur-[100px] -translate-y-1/2 translate-x-1/2"></div>
+        <div className="relative z-10 p-8 flex-1 flex flex-col justify-center items-center text-center">
+            {/* Title */}
+            <h1 className="text-6xl md:text-7xl font-black italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-white to-slate-400 drop-shadow-2xl mb-2 font-sans transform -skew-x-6">
+                CLUB RIVALS
+            </h1>
+            
+            {/* Event Subtitle */}
+            <div className="mb-8">
+                 {isFactionWar ? (
+                     <div className="inline-flex items-center gap-2 px-6 py-2 rounded-full bg-slate-900/80 border border-white/20 backdrop-blur-md shadow-[0_0_15px_rgba(255,255,255,0.1)]">
+                         <Swords size={18} className="text-yellow-400" />
+                         <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-400 via-yellow-200 to-blue-400 font-black tracking-widest uppercase text-base">
+                             {settings.eventName || 'FACTION WAR'}
+                         </span>
+                     </div>
+                 ) : (
+                     <span className="text-slate-400 font-bold tracking-[0.2em] text-sm uppercase">Shogi Club Management System</span>
+                 )}
             </div>
 
-            <div className="relative z-10 p-8 flex-1 flex flex-col justify-center items-center text-center">
-                <h1 className="text-6xl md:text-7xl font-black italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-white to-slate-400 drop-shadow-2xl mb-2 font-sans transform -skew-x-6">
-                    CLUB RIVALS
-                </h1>
-                
-                <div className="mb-8">
-                    <span className="text-slate-400 font-bold tracking-[0.2em] text-sm uppercase">Shogi Club Management System</span>
-                </div>
+            {/* Faction War Gauge - Karaoke Style */}
+            {isFactionWar && (
+                <div className="w-full max-w-5xl mb-8 relative group cursor-pointer" onClick={() => setIsFactionModalOpen(true)}>
+                    {/* Content Grid */}
+                    <div className="grid grid-cols-3 items-end mb-4 px-2">
+                        {/* Red Stats */}
+                        <div className="text-right pr-4 transform transition-transform group-hover:scale-105 duration-300">
+                             <div className="text-6xl md:text-7xl font-black text-red-500 drop-shadow-[0_0_20px_rgba(239,68,68,0.8)] font-mono leading-none">{factionStats.redScore}</div>
+                             <div className="text-xs font-black uppercase tracking-widest text-red-300 flex items-center justify-end gap-1 mt-1"><Flame size={12}/> Red Army</div>
+                        </div>
 
-                {/* Stats Grid */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full max-w-4xl mt-auto">
-                    <div className="bg-slate-950/40 backdrop-blur-md border border-white/5 rounded-2xl p-4 flex flex-col items-center">
-                        <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-1">Today's Attendance</span>
-                        <div className="flex items-baseline gap-1">
-                            <span className="text-3xl font-black text-white">{todaysAttendance}</span>
-                            <span className="text-xs font-bold text-slate-500">人</span>
+                        {/* Center VS - Added padding right to prevent italic clip */}
+                        <div className="flex flex-col items-center justify-center pb-2">
+                             <div className="text-8xl md:text-9xl font-black italic text-transparent bg-clip-text bg-gradient-to-b from-white to-slate-400 drop-shadow-[0_0_20px_white] animate-[pulse_0.5s_infinite] scale-125 font-serif-jp select-none pr-6">
+                                 VS
+                             </div>
+                             <div className="bg-slate-900/80 px-4 py-1.5 rounded-full text-[10px] font-bold text-white border border-yellow-500/50 flex items-center gap-2 group-hover:bg-slate-800 transition-colors shadow-[0_0_10px_rgba(250,204,21,0.3)] mt-4">
+                                 <Users size={12} className="text-yellow-400"/> チーム編成
+                             </div>
+                        </div>
+
+                        {/* White Stats */}
+                        <div className="text-left pl-4 transform transition-transform group-hover:scale-105 duration-300">
+                             <div className="text-6xl md:text-7xl font-black text-blue-400 drop-shadow-[0_0_20px_rgba(96,165,250,0.8)] font-mono leading-none">{factionStats.whiteScore}</div>
+                             <div className="text-xs font-black uppercase tracking-widest text-blue-300 flex items-center justify-start gap-1 mt-1">White Army <Snowflake size={12}/></div>
                         </div>
                     </div>
-                    <div className="bg-slate-950/40 backdrop-blur-md border border-white/5 rounded-2xl p-4 flex flex-col items-center">
-                        <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-1">Total Members</span>
-                        <div className="flex items-baseline gap-1">
-                            <span className="text-3xl font-black text-white">{users.length}</span>
-                            <span className="text-xs font-bold text-slate-500">名</span>
+
+                    {/* Bar */}
+                    <div className="h-6 bg-slate-900/50 rounded-full overflow-hidden relative border border-white/20 shadow-inner backdrop-blur-sm mx-4">
+                        {/* Red Segment */}
+                        <div 
+                            className="absolute top-0 left-0 h-full bg-gradient-to-r from-red-900 via-red-600 to-red-500 transition-all duration-1000 ease-out box-shadow-[0_0_20px_rgba(239,68,68,0.5)]"
+                            style={{ width: `${factionStats.redPercent}%` }}
+                        >
+                            <div className="absolute inset-0 bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.4),transparent)] w-[50%] animate-[shimmer_2s_infinite]"></div>
                         </div>
-                    </div>
-                    <div className="bg-slate-950/40 backdrop-blur-md border border-white/5 rounded-2xl p-4 flex flex-col items-center">
-                        <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-1">Season</span>
-                        <div className="text-lg font-black text-white mt-1 whitespace-nowrap">{settings.currentSeason}</div>
-                    </div>
-                    <div className="bg-slate-950/40 backdrop-blur-md border border-white/5 rounded-2xl p-4 flex flex-col items-center">
-                        <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-1">Status</span>
-                        <div className="flex items-center gap-2 mt-1">
-                            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-                            <span className="text-sm font-bold text-slate-200">Online</span>
+                        {/* White Segment */}
+                        <div 
+                            className="absolute top-0 right-0 h-full bg-gradient-to-l from-blue-900 via-blue-600 to-blue-500 transition-all duration-1000 ease-out box-shadow-[0_0_20px_rgba(59,130,246,0.5)]"
+                            style={{ width: `${100 - factionStats.redPercent}%` }}
+                        >
+                             <div className="absolute inset-0 bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.4),transparent)] w-[50%] animate-[shimmer_2s_infinite]"></div>
                         </div>
+                        
+                        {/* Center Marker */}
+                        <div className="absolute top-0 left-1/2 w-1 h-full bg-white z-10 shadow-[0_0_10px_white]"></div>
                     </div>
                 </div>
+            )}
+
+            {/* Stats Grid */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full max-w-4xl mt-auto">
+                 <div className="bg-slate-950/40 backdrop-blur-md border border-white/5 rounded-2xl p-4 flex flex-col items-center">
+                     <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-1">Today's Attendance</span>
+                     <div className="flex items-baseline gap-1">
+                         <span className="text-3xl font-black text-white">{todaysAttendance}</span>
+                         <span className="text-xs font-bold text-slate-500">人</span>
+                     </div>
+                 </div>
+                 <div className="bg-slate-950/40 backdrop-blur-md border border-white/5 rounded-2xl p-4 flex flex-col items-center">
+                     <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-1">Total Members</span>
+                     <div className="flex items-baseline gap-1">
+                         <span className="text-3xl font-black text-white">{users.length}</span>
+                         <span className="text-xs font-bold text-slate-500">名</span>
+                     </div>
+                 </div>
+                 <div className="bg-slate-950/40 backdrop-blur-md border border-white/5 rounded-2xl p-4 flex flex-col items-center">
+                     <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-1">Season</span>
+                     <div className="text-lg font-black text-white mt-1 whitespace-nowrap">{settings.currentSeason}</div>
+                 </div>
+                  <div className="bg-slate-950/40 backdrop-blur-md border border-white/5 rounded-2xl p-4 flex flex-col items-center">
+                     <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-1">Status</span>
+                     <div className="flex items-center gap-2 mt-1">
+                         <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                         <span className="text-sm font-bold text-slate-200">Online</span>
+                     </div>
+                 </div>
             </div>
-          </div>
-      )}
+        </div>
+
+        {/* Global Styles for Animations */}
+        <style>{`
+            @keyframes shimmer {
+                0% { transform: translateX(-150%); }
+                100% { transform: translateX(250%); }
+            }
+        `}</style>
+      </section>
 
       {/* TITLE HOLDERS SECTION */}
       <section>

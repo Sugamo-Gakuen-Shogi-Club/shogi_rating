@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { HashRouter, Routes, Route, useLocation, Link } from 'react-router-dom';
-import { Home, Trophy, User as UserIcon, Settings, PlusCircle, BookOpen, Cloud } from 'lucide-react';
-import { seedData, loadFromCloud } from './storage';
+import { Home, Trophy, User as UserIcon, Settings, PlusCircle, BookOpen, Cloud, CloudOff, RefreshCw } from 'lucide-react';
+import { seedData, loadFromCloud, getUsers } from './storage';
 
 // Pages
 import Dashboard from './Dashboard';
@@ -13,10 +13,8 @@ import Admin from './Admin';
 import { Guide } from './Guide';
 import { Screensaver } from './Screensaver';
 
-// Layout Component
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
-
   const navItems = [
     { path: '/', icon: Home, label: 'ホーム' },
     { path: '/rankings', icon: Trophy, label: 'ランキング' },
@@ -28,72 +26,43 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row font-sans text-slate-200">
-      {/* Glass Sidebar for Tablet/Desktop */}
       <aside className="hidden md:flex flex-col w-72 h-screen sticky top-0 bg-slate-950/80 backdrop-blur-xl border-r border-white/5 z-30">
         <div className="p-8 pb-4">
-          <h1 className="text-3xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-300 italic">
-            RIVALS
-          </h1>
+          <h1 className="text-3xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-300 italic">RIVALS</h1>
           <p className="text-[10px] text-slate-400 font-bold tracking-widest uppercase mt-1">Shogi Club Manager</p>
         </div>
-        
         <nav className="flex-1 px-4 space-y-3 mt-4">
           {navItems.map((item) => {
             const isActive = location.pathname === item.path;
             return (
-              <Link
-                key={item.path}
-                to={item.path}
-                className={`flex items-center gap-4 px-5 py-4 rounded-2xl transition-all duration-300 group relative overflow-hidden ${
-                  isActive
-                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50 scale-[1.02]'
-                    : 'text-slate-400 hover:bg-white/5 hover:text-white'
-                }`}
-              >
-                {isActive && <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-transparent pointer-events-none"></div>}
-                <item.icon size={22} className={`transition-transform duration-300 ${isActive ? 'scale-110' : 'group-hover:scale-110'}`} />
+              <Link key={item.path} to={item.path} className={`flex items-center gap-4 px-5 py-4 rounded-2xl transition-all duration-300 group relative overflow-hidden ${isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50 scale-[1.02]' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}>
+                <item.icon size={22} className={`${isActive ? 'scale-110' : 'group-hover:scale-110'}`} />
                 <span className="font-bold tracking-tight">{item.label}</span>
-                {isActive && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_10px_white]"></div>}
               </Link>
             );
           })}
         </nav>
-        
         <div className="p-6 text-[10px] text-slate-500 text-center border-t border-white/5">
           <div className="font-bold text-slate-400">巣鴨学園 将棋部</div>
-          <div className="mt-1">出席＆対局促進アプリ</div>
-          <div className="mt-2 opacity-50">🄫秀村 紘嗣</div>
+          <div className="mt-2 opacity-50">©秀村 紘嗣</div>
         </div>
       </aside>
 
-      {/* Mobile Header (Glass) */}
       <header className="md:hidden fixed top-0 left-0 right-0 bg-slate-950/90 backdrop-blur-md text-white px-6 py-4 flex justify-between items-center z-40 border-b border-white/5 shadow-lg">
-        <div className="font-black text-xl italic tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-cyan-300">
-          RIVALS
-        </div>
-        <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">Shogi Club</div>
+        <div className="font-black text-xl italic tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-cyan-300">RIVALS</div>
       </header>
 
-      {/* Mobile Bottom Nav (Floating) */}
-      <div className="md:hidden fixed bottom-6 left-4 right-4 bg-slate-900/95 backdrop-blur-xl text-white rounded-[2rem] p-2 flex justify-between items-center z-40 shadow-2xl border border-white/10 ring-1 ring-black/50 overflow-x-auto">
-        {navItems.map(item => {
-            const isActive = location.pathname === item.path;
-            return (
-                 <Link key={item.path} to={item.path} className={`flex-1 flex flex-col items-center justify-center py-2 relative transition-all min-w-[60px] ${isActive ? 'text-blue-400 -translate-y-1' : 'text-slate-400 active:scale-95'}`}>
-                     {isActive && <div className="absolute inset-0 bg-blue-500/20 blur-xl rounded-full"></div>}
-                     <item.icon size={24} strokeWidth={isActive ? 3 : 2} className="relative z-10" />
-                     {isActive && <div className="w-1 h-1 bg-blue-400 rounded-full mt-1"></div>}
-                 </Link>
-            )
-        })}
+      <div className="md:hidden fixed bottom-6 left-4 right-4 bg-slate-900/95 backdrop-blur-xl text-white rounded-[2rem] p-2 flex justify-between items-center z-40 shadow-2xl border border-white/10 overflow-x-auto">
+        {navItems.map(item => (
+          <Link key={item.path} to={item.path} className={`flex-1 flex flex-col items-center justify-center py-2 transition-all min-w-[60px] ${location.pathname === item.path ? 'text-blue-400' : 'text-slate-400'}`}>
+            <item.icon size={24} />
+          </Link>
+        ))}
       </div>
 
-      {/* Main Content */}
       <main className="flex-1 flex flex-col relative overflow-hidden pt-[70px] md:pt-0">
-        <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-10 scrollbar-hide">
-          <div className="max-w-6xl mx-auto h-full pb-24 md:pb-0">
-            {children}
-          </div>
+        <div className="flex-1 overflow-y-auto p-4 md:p-10 scrollbar-hide">
+          <div className="max-w-6xl mx-auto h-full pb-24 md:pb-0">{children}</div>
         </div>
       </main>
     </div>
@@ -102,7 +71,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
 const App: React.FC = () => {
   const [isIdle, setIsIdle] = useState(false);
-  const [isSyncing, setIsSyncing] = useState(true);
+  const [initStatus, setInitStatus] = useState<'LOADING' | 'SUCCESS' | 'ERROR'>('LOADING');
   const timerRef = useRef<number | null>(null);
   const IDLE_TIMEOUT = 45000;
 
@@ -113,41 +82,51 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
-    const initData = async () => {
-      // サーバーからのロードを試みる
-      await loadFromCloud();
-      seedData();
-      setIsSyncing(false);
+    const initialize = async () => {
+      // 1. Try to load from cloud first
+      const loaded = await loadFromCloud();
+      
+      // 2. Check if we have any data (local or cloud)
+      const currentUsers = getUsers();
+      
+      if (currentUsers.length === 0) {
+        // 3. If no data anywhere, seed with the 38-member list
+        await seedData();
+        setInitStatus('SUCCESS');
+      } else {
+        setInitStatus('SUCCESS');
+      }
     };
 
-    initData();
+    initialize();
     resetTimer();
 
-    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
-    const handleActivity = () => resetTimer();
-
-    events.forEach(event => window.addEventListener(event, handleActivity));
+    const events = ['mousedown', 'mousemove', 'keypress', 'touchstart'];
+    events.forEach(e => window.addEventListener(e, resetTimer));
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
-      events.forEach(event => window.removeEventListener(event, handleActivity));
+      events.forEach(e => window.removeEventListener(e, resetTimer));
     };
   }, []);
 
-  if (isSyncing) {
+  if (initStatus === 'LOADING') {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center space-y-4">
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center space-y-6">
         <div className="relative">
           <Cloud size={64} className="text-blue-500 animate-pulse" />
-          <div className="absolute inset-0 border-4 border-white/5 rounded-full animate-ping opacity-20"></div>
+          <RefreshCw size={24} className="absolute -bottom-2 -right-2 text-white animate-spin" />
         </div>
-        <div className="text-white font-black text-xl italic tracking-widest animate-pulse">SYNCING DATA...</div>
+        <div className="text-center">
+          <h2 className="text-white font-black text-xl tracking-widest uppercase">Fetching Cloud Data</h2>
+          <p className="text-slate-500 text-sm mt-2 font-bold animate-pulse">Synchronizing club roster...</p>
+        </div>
       </div>
     );
   }
 
   return (
     <HashRouter>
-      {isIdle && <Screensaver onDismiss={() => resetTimer()} />}
+      {isIdle && <Screensaver onDismiss={resetTimer} />}
       <Layout>
         <Routes>
           <Route path="/" element={<Dashboard />} />

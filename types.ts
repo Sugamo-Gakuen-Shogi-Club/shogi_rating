@@ -66,6 +66,10 @@ export interface User {
   faction?: 'RED' | 'WHITE';
   isGeneral: boolean;
   
+  // Seasonal Snapshot
+  seasonStartRate: number;
+  seasonStartPoints: number;
+
   // System Title (The Four Kings)
   systemTitle: SystemTitle | null;
 
