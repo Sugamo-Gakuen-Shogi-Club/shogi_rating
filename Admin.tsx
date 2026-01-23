@@ -1,10 +1,10 @@
 
-import React, { useState, useEffect } from 'react';
-import { getUsers, saveUsers, getSettings, saveSettings, manualPointAdjustment, manualRateAdjustment, resetMonthly, isEventActive, exportData, importData, getMatches, deleteMatch, balanceFactions, toggleGeneral, assignGenerals, resetEventPoints, getFactionBalanceSimulation, awardSystemTitles, snapshotSeasonBaseline, updateUserReading } from './storage';
+import React, { useState, useEffect, useRef } from 'react';
+import { getUsers, saveUsers, getSettings, saveSettings, manualPointAdjustment, manualRateAdjustment, resetMonthly, isEventActive, exportData, importData, getMatches, deleteMatch, balanceFactions, toggleGeneral, assignGenerals, resetEventPoints, getFactionBalanceSimulation, awardSystemTitles, snapshotSeasonBaseline, updateUserReading, parseUserCSV, bulkAddUsers } from './storage';
 import { User, SystemSettings, MatchRecord, Season, EventType } from './types';
 import { Card } from './Card';
 import { NumPad } from './NumPad';
-import { Settings, Trash2, Plus, Calendar, Download, History, CheckCircle, Shuffle, Users, Crown, ChevronRight, X, RefreshCw, Languages } from 'lucide-react';
+import { Settings, Trash2, Plus, Calendar, Download, History, CheckCircle, Shuffle, Users, Crown, ChevronRight, X, RefreshCw, Languages, FileUp, Upload } from 'lucide-react';
 import { UserSelector } from './UserSelector';
 
 const Admin: React.FC = () => {
@@ -27,6 +27,10 @@ const Admin: React.FC = () => {
   // 新規部員フォーム
   const [newName, setNewName] = useState('');
   const [newReading, setNewReading] = useState('');
+
+  // CSV 一括追加
+  const [csvPreview, setCsvPreview] = useState<Partial<User>[] | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [adjMode, setAdjMode] = useState<'POINT' | 'RATE'>('POINT');
   const [adjUser, setAdjUser] = useState('');
@@ -102,6 +106,32 @@ const Admin: React.FC = () => {
     refreshData();
   };
 
+  const handleCsvUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (event) => {
+          const content = event.target?.result as string;
+          const parsed = parseUserCSV(content);
+          if (parsed.length === 0) {
+              alert('有効なデータが見つかりませんでした。');
+              return;
+          }
+          setCsvPreview(parsed);
+      };
+      reader.readAsText(file);
+      // 同じファイルを再度選択できるようにリセット
+      if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const confirmBulkAdd = () => {
+      if (!csvPreview) return;
+      bulkAddUsers(csvPreview);
+      setCsvPreview(null);
+      refreshData();
+      alert(`${csvPreview.length}名の部員を追加しました。`);
+  };
+
   const handleDeleteUser = (id: string) => {
     if (window.confirm('本当に削除しますか？')) {
       saveUsers(users.filter(u => u.id !== id));
@@ -175,6 +205,19 @@ const Admin: React.FC = () => {
     }
   };
 
+  const handleImport = () => {
+    if (!backupText) return;
+    if (window.confirm('現在のすべてのデータを上書きして復元しますか？')) {
+        const success = importData(backupText);
+        if (success) {
+            alert('データの復元に成功しました。再読み込みします。');
+            window.location.reload();
+        } else {
+            alert('データの形式が正しくありません。');
+        }
+    }
+  };
+
   if (!isAuthenticated) {
     return (
       <div className="flex items-center justify-center min-h-[60vh] p-4">
@@ -193,9 +236,50 @@ const Admin: React.FC = () => {
 
   return (
     <div className="space-y-8 pb-12 animate-in fade-in duration-500">
+      {/* CSV プレビューモーダル */}
+      {csvPreview && (
+          <div className="fixed inset-0 z-[160] flex items-center justify-center bg-slate-950/95 backdrop-blur-md p-4 animate-in fade-in">
+              <div className="bg-slate-900 w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] border border-white/10">
+                  <div className="bg-slate-800 text-white p-6 shrink-0 flex justify-between items-center border-b border-white/10">
+                      <h3 className="text-xl font-black flex items-center gap-2 font-serif-jp"><FileUp size={24} className="text-blue-400" /> 一括登録の確認</h3>
+                      <button onClick={() => setCsvPreview(null)} className="bg-white/10 p-2 rounded-full hover:bg-white/20"><X /></button>
+                  </div>
+                  <div className="p-6 overflow-y-auto flex-1">
+                      <p className="text-sm text-slate-400 mb-4 font-bold">以下の {csvPreview.length} 名の部員を追加します。よろしいですか？</p>
+                      <div className="bg-slate-950 rounded-2xl border border-white/5 overflow-hidden">
+                          <table className="w-full text-left text-sm">
+                              <thead className="bg-slate-800 text-slate-400 font-bold">
+                                  <tr>
+                                      <th className="px-4 py-3">名前</th>
+                                      <th className="px-4 py-3">読み</th>
+                                      <th className="px-4 py-3 text-center">区分</th>
+                                  </tr>
+                              </thead>
+                              <tbody className="divide-y divide-white/5">
+                                  {csvPreview.map((p, i) => (
+                                      <tr key={i} className="text-slate-300">
+                                          <td className="px-4 py-3 font-bold">{p.name}</td>
+                                          <td className="px-4 py-3 font-mono text-xs">{p.reading}</td>
+                                          <td className="px-4 py-3 text-center">
+                                              {p.isNewMember ? <span className="text-[10px] bg-green-900/40 text-green-400 px-2 py-0.5 rounded border border-green-800">新入</span> : <span className="text-[10px] text-slate-600">一般</span>}
+                                          </td>
+                                      </tr>
+                                  ))}
+                              </tbody>
+                          </table>
+                      </div>
+                  </div>
+                  <div className="p-6 border-t border-white/5 bg-slate-950 flex justify-end gap-3">
+                      <button onClick={() => setCsvPreview(null)} className="px-6 py-3 rounded-xl font-bold text-slate-400 hover:text-white transition-colors">キャンセル</button>
+                      <button onClick={confirmBulkAdd} className="bg-blue-600 text-white px-10 py-3 rounded-xl font-black shadow-lg shadow-blue-900/20 active:scale-95 transition-all">追加を実行</button>
+                  </div>
+              </div>
+          </div>
+      )}
+
       {isEventWizardOpen && (
           <div className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-950/90 backdrop-blur-sm p-4 animate-in fade-in">
-              <div className="bg-slate-950 w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] border border-white/10">
+              <div className="bg-slate-900 w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] border border-white/10">
                   <div className="bg-slate-950 text-white p-6 shrink-0 flex justify-between items-center border-b border-white/10">
                       <h3 className="text-xl font-black flex items-center gap-2 font-serif-jp"><Calendar /> イベント設定</h3>
                       <button onClick={() => setIsEventWizardOpen(false)} className="bg-white/10 p-2 rounded-full hover:bg-white/20"><X /></button>
@@ -257,6 +341,7 @@ const Admin: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <Card title="部員名簿管理" icon={<Users />}>
           <div className="space-y-6">
+            {/* 個別登録フォーム */}
             <div className="space-y-3 p-4 bg-slate-900/50 rounded-2xl border border-white/5">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-[1fr_1fr_auto] gap-3">
                     <input type="text" value={newName} onChange={e => setNewName(e.target.value)} placeholder="名前（例：秀村 紘嗣）" className="w-full p-3 border border-slate-700 rounded-xl bg-slate-800 text-white font-bold focus:ring-2 focus:ring-blue-500 outline-none" />
@@ -265,7 +350,18 @@ const Admin: React.FC = () => {
                       <Plus size={20} /> <span className="lg:hidden">部員を追加</span>
                     </button>
                 </div>
-                <p className="text-[10px] text-slate-500 font-bold px-1 flex items-center gap-1"><Languages size={10}/> 五十音順で並べるために「読み」をひらがなで入力してください。</p>
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mt-2">
+                    <p className="text-[10px] text-slate-500 font-bold px-1 flex items-center gap-1"><Languages size={10}/> 五十音順のために「読み」をひらがなで入力してください。</p>
+                    {/* CSV 一括追加ボタン */}
+                    <button 
+                        onClick={() => fileInputRef.current?.click()}
+                        className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-lg text-xs font-bold transition-all border border-slate-700 shadow-sm"
+                    >
+                        <FileUp size={16} className="text-blue-400" />
+                        CSVで一括追加
+                    </button>
+                    <input type="file" ref={fileInputRef} onChange={handleCsvUpload} accept=".csv" className="hidden" />
+                </div>
             </div>
             
             <div className="max-h-[500px] overflow-y-auto pr-2 space-y-3 scrollbar-hide">
@@ -324,7 +420,7 @@ const Admin: React.FC = () => {
                         <button onClick={() => setAdjMode('RATE')} className={`flex-1 py-3 rounded-lg text-xs font-bold transition-all ${adjMode === 'RATE' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-500'}`}>レート</button>
                     </div>
                     <select className="w-full p-3 border border-slate-700 rounded-xl font-bold bg-slate-900 text-white" value={adjUser} onChange={e => setAdjUser(e.target.value)}><option value="">対象を選択...</option>{users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}</select>
-                    <div className="flex gap-2"><input type="number" value={adjValue} onChange={e => setAdjValue(Number(e.target.value))} className="w-24 p-3 border border-slate-700 rounded-xl font-bold text-center bg-slate-900 text-white" /><input type="text" value={adjReason} onChange={e => setAdjReason(e.target.value)} className="flex-1 p-3 border border-slate-700 rounded-xl font-bold bg-slate-900 text-white" /></div>
+                    <div className="flex gap-2"><input type="number" value={adjValue} onChange={e => setAdjValue(Number(e.target.value))} className="w-24 p-3 border border-slate-700 rounded-xl font-bold text-center bg-slate-900 text-white" /><input type="text" value={adjReason} onChange={setAdjReason} className="flex-1 p-3 border border-slate-700 rounded-xl font-bold bg-slate-900 text-white" /></div>
                     <button onClick={handleAdjustmentApply} disabled={!adjUser || isProcessing} className={`w-full text-slate-900 py-4 rounded-xl font-black transition-all relative overflow-hidden ${adjMode === 'POINT' ? 'bg-amber-400 hover:bg-amber-300' : 'bg-blue-400 hover:bg-blue-300'}`}>
                          {isProcessing ? '処理中...' : '反映'}{successMsg && <div className="absolute inset-0 bg-green-500 text-white flex items-center justify-center font-bold animate-in fade-in"><CheckCircle size={20} className="mr-2"/> {successMsg}</div>}
                     </button>
@@ -332,10 +428,36 @@ const Admin: React.FC = () => {
             </Card>
 
             <Card title="データ保守" icon={<Download />}>
-                <div className="space-y-3">
+                <div className="space-y-4">
                     <button onClick={handleResetMonthly} className="w-full p-3 border border-slate-700 rounded-xl font-bold text-slate-400 flex items-center justify-center gap-3 hover:bg-white/5 transition-colors"><History size={18}/> 今月の表示ポイントをリセット</button>
-                    <button onClick={() => { const json = exportData(); setBackupText(json); setShowBackupArea(true); }} className="w-full p-3 border border-blue-900 rounded-xl font-bold text-blue-400 flex items-center justify-center gap-3 hover:bg-blue-900/10 transition-colors"><Download size={18}/> バックアップを生成</button>
-                    {showBackupArea && <div className="mt-4 space-y-2 animate-in slide-in-from-top duration-300"><textarea className="w-full h-32 p-3 text-xs font-mono border border-slate-700 rounded-xl bg-slate-950 text-white" value={backupText} onChange={e => setBackupText(e.target.value)} /><button onClick={async () => { await navigator.clipboard.writeText(backupText); alert('コピー完了'); }} className="w-full text-xs text-blue-400 font-bold underline">JSONをクリップボードにコピー</button></div>}
+                    
+                    <div className="grid grid-cols-2 gap-3">
+                        <button onClick={() => { const json = exportData(); setBackupText(json); setShowBackupArea(true); }} className="w-full p-3 border border-blue-900 rounded-xl font-bold text-blue-400 flex items-center justify-center gap-3 hover:bg-blue-900/10 transition-colors">
+                            <Download size={18}/> バックアップ
+                        </button>
+                        <button onClick={() => { setShowBackupArea(true); setBackupText(''); }} className="w-full p-3 border border-green-900 rounded-xl font-bold text-green-400 flex items-center justify-center gap-3 hover:bg-green-900/10 transition-colors">
+                            <Upload size={18}/> データ復元
+                        </button>
+                    </div>
+
+                    {showBackupArea && (
+                        <div className="mt-4 space-y-3 animate-in slide-in-from-top duration-300">
+                            <div className="flex items-center justify-between">
+                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">JSON Data System</label>
+                                <button onClick={() => setShowBackupArea(false)} className="text-slate-500 hover:text-white"><X size={14}/></button>
+                            </div>
+                            <textarea 
+                                className="w-full h-32 p-3 text-xs font-mono border border-slate-700 rounded-xl bg-slate-950 text-white focus:border-blue-500 outline-none" 
+                                placeholder="復元する場合はここにJSONを貼り付けてください..."
+                                value={backupText} 
+                                onChange={e => setBackupText(e.target.value)} 
+                            />
+                            <div className="flex gap-2">
+                                <button onClick={async () => { if(!backupText) return; await navigator.clipboard.writeText(backupText); alert('コピー完了'); }} className="flex-1 text-xs text-blue-400 font-bold underline bg-blue-900/10 py-2 rounded-lg">クリップボードにコピー</button>
+                                <button onClick={handleImport} disabled={!backupText} className="flex-1 text-xs text-green-400 font-black bg-green-900/20 py-2 rounded-lg border border-green-900/50 disabled:opacity-30">このデータで復元する</button>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </Card>
         </div>

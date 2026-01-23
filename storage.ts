@@ -53,13 +53,10 @@ export const ACHIEVEMENTS_DATA: AchievementDef[] = [
 ];
 
 export const ICONS_DATA: IconDef[] = [
-    // --- DEFAULT ---
     { id: 'DEFAULT_INITIAL', char: '名', name: '頭文字', conditionDescription: 'デフォルト', type: 'DEFAULT', category: 'DEFAULT' },
     { id: 'DEFAULT_SMILE', char: '🙂', name: 'スマイル', conditionDescription: 'デフォルト', type: 'DEFAULT', category: 'DEFAULT' },
     { id: 'DEFAULT_CAT', char: '🐱', name: 'ねこ', conditionDescription: '最初から所持', type: 'DEFAULT', category: 'DEFAULT' },
     { id: 'DEFAULT_DOG', char: '🐶', name: 'いぬ', conditionDescription: '最初から所持', type: 'DEFAULT', category: 'DEFAULT' },
-
-    // --- SHOGI (将棋の駒) ---
     { id: 'SHOGI_FU', char: '歩兵', name: '歩兵', conditionDescription: '最初から所持', type: 'DEFAULT', category: 'SHOGI' },
     { id: 'SHOGI_TO', char: 'と金', name: 'と金', conditionDescription: '対局数3回', type: 'MATCHES', threshold: 3, category: 'SHOGI' },
     { id: 'SHOGI_KY', char: '香車', name: '香車', conditionDescription: '対局数5回', type: 'MATCHES', threshold: 5, category: 'SHOGI' },
@@ -75,21 +72,17 @@ export const ICONS_DATA: IconDef[] = [
     { id: 'SHOGI_RYU', char: '龍王', name: '龍王', conditionDescription: 'レート1400到達', type: 'RATE', threshold: 1400, category: 'SHOGI' },
     { id: 'SHOGI_OU', char: '王将', name: '王将', conditionDescription: 'レート1600到達', type: 'RATE', threshold: 1600, category: 'SHOGI' },
     { id: 'SHOGI_GYOKU', char: '玉将', name: '玉将', conditionDescription: 'レート1800到達', type: 'RATE', threshold: 1800, category: 'SHOGI' },
-
-    // --- CHESS ---
     { id: 'CHESS_PAWN', char: '♟️', name: 'ポーン', conditionDescription: '勝利数20回', type: 'WINS', threshold: 20, category: 'CHESS' },
     { id: 'CHESS_KNIGHT', char: '♞', name: 'ナイト', conditionDescription: '勝利数40回', type: 'WINS', threshold: 40, category: 'CHESS' },
     { id: 'CHESS_BISHOP', char: '♝', name: 'ビショップ', conditionDescription: 'レート1350到達', type: 'RATE', threshold: 1350, category: 'CHESS' },
     { id: 'CHESS_ROOK', char: '♜', name: 'ルーク', conditionDescription: 'レート1450到達', type: 'RATE', threshold: 1450, category: 'CHESS' },
     { id: 'CHESS_QUEEN', char: '♛', name: 'クイーン', conditionDescription: 'レート1700到達', type: 'RATE', threshold: 1700, category: 'CHESS' },
     { id: 'CHESS_KING', char: '♚', name: 'キング', conditionDescription: 'レート2000到達', type: 'RATE', threshold: 2000, category: 'CHESS' },
-
-    // --- SPECIAL ---
     { id: 'SPECIAL_FIRE', char: '🔥', name: '不倒', conditionDescription: '5連勝達成', type: 'STREAK', threshold: 5, category: 'SPECIAL' },
     { id: 'SPECIAL_LIGHTNING', char: '⚡', name: '電光石火', conditionDescription: '10連勝達成', type: 'STREAK', threshold: 10, category: 'SPECIAL' },
     { id: 'SPECIAL_MEDAL', char: '🏅', name: '皆勤', conditionDescription: '活動日数50日', type: 'DAYS', threshold: 50, category: 'SPECIAL' },
     { id: 'SPECIAL_TROPHY', char: '🏆', name: '覇者', conditionDescription: '100勝達成', type: 'WINS', threshold: 100, category: 'SPECIAL' },
-    { id: 'SPECIAL_SHIELD', char: '🛡️', name: '守護神', conditionDescription: '引き分け10回', type: 'SPECIAL', category: 'SPECIAL' }, // Logic in check function
+    { id: 'SPECIAL_SHIELD', char: '🛡️', name: '守護神', conditionDescription: '引き分け10回', type: 'SPECIAL', category: 'SPECIAL' }, 
     { id: 'SPECIAL_CROWN', char: '👑', name: '王族', conditionDescription: 'レート2200到達', type: 'RATE', threshold: 2200, category: 'SPECIAL' },
     { id: 'SPECIAL_SWORDS', char: '⚔️', name: '剣士', conditionDescription: '対局数200回', type: 'MATCHES', threshold: 200, category: 'SPECIAL' },
     { id: 'SPECIAL_DRAGON', char: '🐲', name: '神龍', conditionDescription: 'レート2500到達', type: 'RATE', threshold: 2500, category: 'SPECIAL' },
@@ -282,6 +275,63 @@ const checkAchievementsAndIcons = (user: User, matchContext?: { isDuelWin: boole
   return { newAchievements, newIcons };
 };
 
+// --- CSV UTILITIES ---
+
+/**
+ * 部員リストのCSVをパースします。
+ * 形式: 名前,読み,新入フラグ(0or1)
+ */
+export const parseUserCSV = (csv: string): Partial<User>[] => {
+    const lines = csv.split('\n');
+    return lines.filter(line => line.trim() !== '').map(line => {
+        const [name, reading, isNew] = line.split(',').map(s => s.trim());
+        return {
+            name: name || '名称未設定',
+            reading: reading || '',
+            isNewMember: isNew === '1'
+        };
+    });
+};
+
+/**
+ * 複数の部員を一括で追加します
+ */
+export const bulkAddUsers = (userStubs: Partial<User>[]) => {
+    const users = getUsers();
+    const newUsers: User[] = userStubs.map(stub => ({
+        id: Math.random().toString(36).substr(2, 9),
+        name: stub.name || '名称未設定',
+        reading: stub.reading,
+        isNewMember: !!stub.isNewMember,
+        rate: 1000,
+        seasonStartRate: 1000,
+        seasonStartPoints: 0,
+        faction: Math.random() > 0.5 ? 'RED' : 'WHITE',
+        isGeneral: false,
+        systemTitle: null,
+        totalPoints: 0,
+        pointsMatch: 0,
+        pointsAttendance: 0,
+        pointsSpecial: 0,
+        monthlyPoints: 0,
+        eventPoints: 0,
+        currentStreak: 0,
+        maxStreak: 0,
+        wins: 0,
+        losses: 0,
+        draws: 0,
+        lastAttendance: null,
+        activityDays: 0,
+        rateHistory: [{ date: new Date().toISOString(), rate: 1000 }],
+        achievements: [],
+        activeTitle: null,
+        avatarColor: `bg-${['red','blue','green','yellow','purple','pink'][Math.floor(Math.random()*6)]}-500`,
+        activeIconId: 'DEFAULT_INITIAL',
+        unlockedIcons: ['DEFAULT_INITIAL', 'DEFAULT_SMILE', 'SHOGI_FU']
+    }));
+    saveUsers([...users, ...newUsers]);
+};
+
 // --- INITIAL SEED DATA ---
 
 export const seedData = async () => {
@@ -300,7 +350,7 @@ export const seedData = async () => {
     { name: "秋山 七星", reading: "あきやま ななせ" },
     { name: "大庭 悠誠", reading: "おおば ゆうせい" },
     { name: "熊谷 流星", reading: "くまがい りゅうせい" },
-    { name: "佐藤 勘太", reading: "さとう かんた" },
+    { name: "佐藤 勘太", reading: "さとう かん太" },
     { name: "下田 聖", reading: "しもだ ひじり" },
     { name: "遅 志丞", reading: "ち しじょう" },
     { name: "皆川 哲弥", reading: "みながわ てつや" },
@@ -406,8 +456,17 @@ export const manualRateAdjustment = (uid: string, r: number, rs: string) => {
     if(u) { u.rate += r; checkAchievementsAndIcons(u); saveUsers(users); }
 };
 export const resetMonthly = () => { const u = getUsers(); u.forEach(user => user.monthlyPoints = 0); saveUsers(u); };
-export const exportData = () => JSON.stringify({ users: getUsers(), matches: getMatches() });
-export const importData = (s: any) => true;
+export const exportData = () => JSON.stringify({ users: getUsers(), matches: getMatches(), settings: getSettings(), logs: getLogs() });
+export const importData = (json: string) => {
+    try {
+        const d = JSON.parse(json);
+        saveUsers(d.users || []);
+        localStorage.setItem(MATCHES_KEY, JSON.stringify(d.matches || []));
+        saveSettings(d.settings || DEFAULT_SETTINGS);
+        localStorage.setItem(LOGS_KEY, JSON.stringify(d.logs || []));
+        return true;
+    } catch(e) { return false; }
+};
 export const snapshotSeasonBaseline = () => {};
 export const awardSystemTitles = () => {};
 export const balanceFactions = (u: any) => u;
