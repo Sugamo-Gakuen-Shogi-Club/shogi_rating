@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { User, EventType } from './types';
 import { Search, X, Filter, CheckCircle, User as UserIcon, Users, RefreshCw, Crown } from 'lucide-react';
-import { getUserAvatarChar, getSettings, isEventActive, getUserIconDef } from './storage';
+import { getUserAvatarChar, getSettings, isEventActive, getUserIconDef, getLocalDateString } from './storage';
 import { ShogiPiece } from './ShogiPiece';
 
 interface UserSelectorProps {
@@ -79,7 +79,7 @@ export const UserSelector: React.FC<UserSelectorProps> = ({
       return a.name.localeCompare(b.name);
   });
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = getLocalDateString();
 
   const content = (
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-2 md:p-4 animate-in fade-in duration-200">
@@ -179,7 +179,7 @@ export const UserSelector: React.FC<UserSelectorProps> = ({
                 <div className="flex-1 overflow-y-auto p-4 scrollbar-thin">
                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3 pb-20">
                         {filteredUsers.map(u => {
-                            const last = u.lastAttendance ? new Date(u.lastAttendance).toISOString().split('T')[0] : null;
+                            const last = u.lastAttendance ? getLocalDateString(u.lastAttendance) : null;
                             const isAttendedToday = today === last;
                             const iconDef = getUserIconDef(u.activeIconId);
                             const avatarChar = getUserAvatarChar(u);
@@ -197,7 +197,7 @@ export const UserSelector: React.FC<UserSelectorProps> = ({
                                 disabled={isDisabled}
                                 className={`relative flex flex-col items-center p-4 rounded-2xl border transition-all text-center group overflow-hidden
                                     ${isDisabled 
-                                        ? 'bg-slate-950 border-slate-800 grayscale brightness-75 cursor-default' // High readability for disabled state
+                                        ? 'bg-slate-950 border-slate-800 grayscale brightness-75 cursor-default' 
                                         : isFactionWar && isRed 
                                             ? 'bg-red-950/20 border-red-900/50 hover:border-red-500 hover:shadow-xl hover:shadow-red-900/20 hover:-translate-y-1 cursor-pointer'
                                             : isFactionWar && !isRed

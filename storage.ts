@@ -6,7 +6,7 @@ const MATCHES_KEY = 'club_rivals_matches';
 const SETTINGS_KEY = 'club_rivals_settings';
 const LOGS_KEY = 'club_rivals_logs';
 
-// Firebase Realtime Database URL (REST API requires .json suffix)
+// Firebase Realtime Database URL
 const CLOUD_API_URL = 'https://club-rivals-test1-default-rtdb.asia-southeast1.firebasedatabase.app/rivals_data.json';
 
 const DEFAULT_SETTINGS: SystemSettings = {
@@ -20,7 +20,6 @@ const DEFAULT_SETTINGS: SystemSettings = {
   lastTitleUpdate: null
 };
 
-// System Titles Definition
 export const SYSTEM_TITLES: TitleDef[] = [
     { id: 'MASTER', name: '名人', english: 'The Master', description: '現在のレート最強', color: 'text-yellow-400' },
     { id: 'RISING_STAR', name: '新星', english: 'Rising Star', description: '今月のレート上昇幅No.1', color: 'text-blue-400' },
@@ -28,14 +27,13 @@ export const SYSTEM_TITLES: TitleDef[] = [
     { id: 'GIANT_KILLER', name: '下克上', english: 'Giant Killer', description: '格上撃破数No.1', color: 'text-red-400' },
 ];
 
-// Achievements Definition
 export const ACHIEVEMENTS_DATA: AchievementDef[] = [
   { id: 'FACTION_GENERAL', name: '大将軍', description: 'チームの大将に任命される', conditionType: 'SPECIAL', threshold: 1 },
   { id: 'DUEL_VICTORY', name: '一騎討ち', description: '敵将との直接対決を制する', conditionType: 'SPECIAL', threshold: 1 },
   { id: 'START_DASH', name: 'スタートダッシュ', description: '記念すべき最初の対局', conditionType: 'MATCHES', threshold: 1 },
   { id: 'MATCHES_10', name: '駆け出し棋士', description: '対局数10回到達', conditionType: 'MATCHES', threshold: 10 },
   { id: 'MATCHES_50', name: '盤上の常連', description: '対局数50回到達', conditionType: 'MATCHES', threshold: 50 },
-  { id: 'MATCHES_100', name: '百戦錬磨', description: '対局数100回到達', conditionType: 'MATCHES', threshold: 100 },
+  { id: 'MATCHES_100', name: '百戦練磨', description: '対局数100回到達', conditionType: 'MATCHES', threshold: 100 },
   { id: 'FIRST_WIN', name: '初勝利', description: '初めての勝利', conditionType: 'WINS', threshold: 1 },
   { id: 'WINS_10', name: '十人斬り', description: '勝利数10回到達', conditionType: 'WINS', threshold: 10 },
   { id: 'WINS_30', name: '名手', description: '勝利数30回到達', conditionType: 'WINS', threshold: 30 },
@@ -97,6 +95,17 @@ const safeParse = (val: string | null, fallback: any) => {
     console.error("JSON parse error:", e, "Value:", val);
     return fallback;
   }
+};
+
+/**
+ * 日本のローカル日付文字列 (YYYY-MM-DD) を取得します。
+ */
+export const getLocalDateString = (date?: Date | string) => {
+    const d = date ? new Date(date) : new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
 };
 
 // --- CLOUD SYNC LOGIC ---
@@ -164,7 +173,13 @@ export const getUsers = (): User[] => {
   return users.map(user => ({
     ...user,
     unlockedIcons: Array.from(new Set([...(user.unlockedIcons || []), 'DEFAULT_INITIAL', 'DEFAULT_SMILE', 'SHOGI_FU'])),
-    activeIconId: user.activeIconId || 'DEFAULT_INITIAL'
+    activeIconId: user.activeIconId || 'DEFAULT_INITIAL',
+    totalPoints: user.totalPoints || 0,
+    monthlyPoints: user.monthlyPoints || 0,
+    activityDays: user.activityDays || 0,
+    pointsAttendance: user.pointsAttendance || 0,
+    pointsMatch: user.pointsMatch || 0,
+    pointsSpecial: user.pointsSpecial || 0
   }));
 };
 
@@ -193,7 +208,7 @@ export const getLogs = (): ActivityLog[] => {
 };
 
 const addLog = (l: any) => {
-    const logs = safeParse(localStorage.getItem(LOGS_KEY), []);
+    const logs = getLogs();
     logs.unshift(l);
     localStorage.setItem(LOGS_KEY, JSON.stringify(logs.slice(0, 100)));
 };
@@ -204,16 +219,22 @@ export const recordAttendance = (userId: string): AttendanceResult => {
   const users = getUsers();
   const user = users.find(u => u.id === userId);
   if (!user) return { success: false, newAchievements: [], newIcons: [], message: 'ユーザーが見つかりません' };
-  const today = new Date().toISOString().split('T')[0];
-  const last = user.lastAttendance ? new Date(user.lastAttendance).toISOString().split('T')[0] : null;
+  
+  const today = getLocalDateString();
+  const last = user.lastAttendance ? getLocalDateString(user.lastAttendance) : null;
+  
   if (today === last) return { success: false, newAchievements: [], newIcons: [], message: '本日はすでに出席済みです' };
+  
+  // 更新処理
   user.lastAttendance = new Date().toISOString();
   user.totalPoints += 5;
   user.monthlyPoints += 5;
   user.pointsAttendance = (user.pointsAttendance || 0) + 5;
   user.activityDays = (user.activityDays || 0) + 1;
+  
   const res = checkAchievementsAndIcons(user);
   saveUsers(users);
+  
   addLog({
     id: Math.random().toString(36).substr(2, 9),
     userId: user.id,
@@ -222,6 +243,7 @@ export const recordAttendance = (userId: string): AttendanceResult => {
     description: 'Daily Attendance',
     date: new Date().toISOString()
   });
+  
   return { success: true, newAchievements: res.newAchievements, newIcons: res.newIcons, message: '出席を記録しました！ (+5 pt)' };
 };
 
@@ -328,7 +350,6 @@ export const bulkAddUsers = (userStubs: Partial<User>[]) => {
 // --- TEAM BALANCE LOGIC ---
 
 const calculatePowerScore = (user: User): number => {
-    // レート(30%) + 出席(70%) の重み付けで「アクティブな実力」を算出
     return (user.rate * 0.3) + (user.activityDays * 300);
 };
 
@@ -343,7 +364,6 @@ export const getFactionBalanceSimulation = (users: User[]) => {
     let redTotalScore = 0;
     let whiteTotalScore = 0;
 
-    // 欲張り法（Greedy）による分配
     scoredUsers.forEach(u => {
         if (redTotalScore <= whiteTotalScore) {
             red.push(u);
@@ -466,7 +486,6 @@ export const getUserAvatarChar = (u: any) => u.name.charAt(0);
 export const getUserIconDef = (id: any) => ICONS_DATA.find(i => i.id === id) || ICONS_DATA[0];
 
 export const processMatch = (p1Id: string, p2Id: string, result: 'PLAYER1_WIN' | 'PLAYER2_WIN' | 'DRAW'): any => {
-    // Basic ELO logic for test
     const users = getUsers();
     const settings = getSettings();
     const p1 = users.find(u => u.id === p1Id);
