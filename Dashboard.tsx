@@ -273,28 +273,34 @@ const Dashboard: React.FC = () => {
 
             {/* Faction War Gauge - Karaoke Style */}
             {isFactionWar && (
-                <div className="w-full max-w-3xl mb-8 relative group cursor-pointer" onClick={() => setIsFactionModalOpen(true)}>
-                    {/* Scores */}
-                    <div className="flex justify-between items-end mb-2 px-2">
-                        <div className="flex flex-col items-start">
-                             <div className="text-5xl font-black text-red-500 drop-shadow-[0_0_15px_rgba(239,68,68,0.8)] font-mono">{factionStats.redScore}</div>
-                             <div className="text-[10px] font-black uppercase tracking-widest text-red-300 flex items-center gap-1"><Flame size={12}/> Red Army</div>
+                <div className="w-full max-w-5xl mb-8 relative group cursor-pointer" onClick={() => setIsFactionModalOpen(true)}>
+                    {/* Content Grid */}
+                    <div className="grid grid-cols-3 items-end mb-4 px-2">
+                        {/* Red Stats */}
+                        <div className="text-right pr-4 transform transition-transform group-hover:scale-105 duration-300">
+                             <div className="text-6xl md:text-7xl font-black text-red-500 drop-shadow-[0_0_20px_rgba(239,68,68,0.8)] font-mono leading-none">{factionStats.redScore}</div>
+                             <div className="text-xs font-black uppercase tracking-widest text-red-300 flex items-center justify-end gap-1 mt-1"><Flame size={12}/> Red Army</div>
                         </div>
-                        
-                        <div className="mb-4 animate-bounce">
-                             <div className="bg-slate-900/80 px-4 py-1.5 rounded-full text-[10px] font-bold text-white border border-yellow-500/50 flex items-center gap-2 group-hover:bg-slate-800 transition-colors shadow-[0_0_10px_rgba(250,204,21,0.3)]">
-                                 <Users size={12} className="text-yellow-400"/> チーム編成を確認
+
+                        {/* Center VS - Added padding right to prevent italic clip */}
+                        <div className="flex flex-col items-center justify-center pb-2">
+                             <div className="text-8xl md:text-9xl font-black italic text-transparent bg-clip-text bg-gradient-to-b from-white to-slate-400 drop-shadow-[0_0_20px_white] animate-[pulse_0.5s_infinite] scale-125 font-serif-jp select-none pr-6">
+                                 VS
+                             </div>
+                             <div className="bg-slate-900/80 px-4 py-1.5 rounded-full text-[10px] font-bold text-white border border-yellow-500/50 flex items-center gap-2 group-hover:bg-slate-800 transition-colors shadow-[0_0_10px_rgba(250,204,21,0.3)] mt-4">
+                                 <Users size={12} className="text-yellow-400"/> チーム編成
                              </div>
                         </div>
 
-                        <div className="flex flex-col items-end">
-                             <div className="text-5xl font-black text-blue-400 drop-shadow-[0_0_15px_rgba(96,165,250,0.8)] font-mono">{factionStats.whiteScore}</div>
-                             <div className="text-[10px] font-black uppercase tracking-widest text-blue-300 flex items-center gap-1">White Army <Snowflake size={12}/></div>
+                        {/* White Stats */}
+                        <div className="text-left pl-4 transform transition-transform group-hover:scale-105 duration-300">
+                             <div className="text-6xl md:text-7xl font-black text-blue-400 drop-shadow-[0_0_20px_rgba(96,165,250,0.8)] font-mono leading-none">{factionStats.whiteScore}</div>
+                             <div className="text-xs font-black uppercase tracking-widest text-blue-300 flex items-center justify-start gap-1 mt-1">White Army <Snowflake size={12}/></div>
                         </div>
                     </div>
 
                     {/* Bar */}
-                    <div className="h-6 bg-slate-900/50 rounded-full overflow-hidden relative border border-white/20 shadow-inner backdrop-blur-sm">
+                    <div className="h-6 bg-slate-900/50 rounded-full overflow-hidden relative border border-white/20 shadow-inner backdrop-blur-sm mx-4">
                         {/* Red Segment */}
                         <div 
                             className="absolute top-0 left-0 h-full bg-gradient-to-r from-red-900 via-red-600 to-red-500 transition-all duration-1000 ease-out box-shadow-[0_0_20px_rgba(239,68,68,0.5)]"
