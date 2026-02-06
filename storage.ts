@@ -74,6 +74,10 @@ export const ICONS_DATA: IconDef[] = [
     { id: 'CHESS_ROOK', char: '♜', name: 'ルーク', conditionDescription: 'レート1450到達', type: 'RATE', threshold: 1450, category: 'CHESS' },
     { id: 'CHESS_QUEEN', char: '♛', name: 'クイーン', conditionDescription: 'レート1700到達', type: 'RATE', threshold: 1700, category: 'CHESS' },
     { id: 'CHESS_KING', char: '♚', name: 'キング', conditionDescription: 'レート2000到達', type: 'RATE', threshold: 2000, category: 'CHESS' },
+    { id: 'SPECIAL_DAYS_3', char: '🌱', name: '新芽', conditionDescription: '活動日数3日', type: 'DAYS', threshold: 3, category: 'SPECIAL' },
+    { id: 'SPECIAL_DAYS_7', char: '🌿', name: '若葉', conditionDescription: '活動日数7日', type: 'DAYS', threshold: 7, category: 'SPECIAL' },
+    { id: 'SPECIAL_DAYS_14', char: '🍀', name: '四つ葉', conditionDescription: '活動日数14日', type: 'DAYS', threshold: 14, category: 'SPECIAL' },
+    { id: 'SPECIAL_DAYS_21', char: '🌳', name: '大樹', conditionDescription: '活動日数21日', type: 'DAYS', threshold: 21, category: 'SPECIAL' },
 ];
 
 /** 日本時間の日付文字列を取得 (YYYY-MM-DD) */
@@ -218,6 +222,7 @@ const checkAchievementsAndIcons = (user: User, matchContext?: { isDuelWin: boole
           case 'WINS': met = (user.wins || 0) >= (icon.threshold || 9999); break;
           case 'MATCHES': met = ((user.wins || 0) + (user.losses || 0) + (user.draws || 0)) >= (icon.threshold || 9999); break;
           case 'STREAK': met = (user.currentStreak || 0) >= (icon.threshold || 9999); break;
+          case 'DAYS': met = (user.activityDays || 0) >= (icon.threshold || 9999); break;
           case 'SPECIAL':
             if (icon.id === 'SPECIAL_GENERAL') met = !!user.isGeneral;
             if (icon.id === 'SPECIAL_DUEL') met = achievements.includes('DUEL_VICTORY') || !!matchContext?.isDuelWin;
@@ -233,20 +238,225 @@ export const vibrate = (p: any) => {};
 export const getUserAvatarChar = (u: any) => (u.activeIconId && u.activeIconId !== 'DEFAULT_INITIAL') ? (ICONS_DATA.find(i => i.id === u.activeIconId)?.char || u.name.charAt(0)) : u.name.charAt(0);
 export const getUserIconDef = (id: any) => ICONS_DATA.find(i => i.id === id) || ICONS_DATA[0];
 
-export const processMatch = (p1Id: string, p2Id: string, result: 'PLAYER1_WIN' | 'PLAYER2_WIN' | 'DRAW'): any => {
+/** 対戦記録を処理し、レート・ポイントを計算する */
+export const processMatch = (p1Id: string, p2Id: string, result: 'PLAYER1_WIN' | 'PLAYER2_WIN' | 'DRAW'): MatchProcessResult => {
     const users = getUsers();
+    const matches = getMatches();
+    const settings = getSettings();
     const p1 = users.find(u => u.id === p1Id);
     const p2 = users.find(u => u.id === p2Id);
     if (!p1 || !p2) throw new Error("Users not found");
-    let p1Change = 10, p2Change = 10, p1Pts = 5, p2Pts = 5;
-    if (result === 'PLAYER1_WIN') { p1Change = 16; p2Change = 2; p1Pts = 10; p1.wins++; p2.losses++; p1.currentStreak++; p2.currentStreak = 0; }
-    else if (result === 'PLAYER2_WIN') { p1Change = 2; p2Change = 16; p2Pts = 10; p2.wins++; p1.losses++; p2.currentStreak++; p1.currentStreak = 0; }
-    else { p1Change = 5; p2Change = 5; p1Pts = 7; p2Pts = 7; p1.draws++; p2.draws++; p1.currentStreak = 0; p2.currentStreak = 0; }
-    p1.rate += p1Change; p1.totalPoints += p1Pts; p2.rate += p2Change; p2.totalPoints += p2Pts;
-    const resP1 = checkAchievementsAndIcons(p1);
-    const resP2 = checkAchievementsAndIcons(p2);
+    
+    const isDuel = p1.isGeneral && p2.isGeneral;
+    
+    // ===== レート計算 (Elo Rating System) =====
+    const K_FACTOR = 32; // 変動幅係数
+    const rateDiff = p1.rate - p2.rate;
+    const expectedP1 = 1 / (1 + Math.pow(10, -rateDiff / 400));
+    const expectedP2 = 1 - expectedP1;
+    
+    let p1Score = 0;
+    let p2Score = 0;
+    let p1RateChange = 0;
+    let p2RateChange = 0;
+    
+    if (result === 'PLAYER1_WIN') {
+        p1Score = 1; p2Score = 0;
+        p1RateChange = Math.max(10, Math.round(K_FACTOR * (p1Score - expectedP1)));
+        p2RateChange = -2; // 敗者は固定 -2
+        p1.wins++; p2.losses++;
+        p1.currentStreak++; p2.currentStreak = 0;
+        
+        // ジャイアントキリング判定（レート差100以上の格上に勝利）
+        if (rateDiff <= -100) {
+            p1RateChange = Math.round(p1RateChange * 1.5);
+        }
+    } else if (result === 'PLAYER2_WIN') {
+        p1Score = 0; p2Score = 1;
+        p1RateChange = -2; // 敗者は固定 -2
+        p2RateChange = Math.max(10, Math.round(K_FACTOR * (p2Score - expectedP2)));
+        p2.wins++; p1.losses++;
+        p2.currentStreak++; p1.currentStreak = 0;
+        
+        // ジャイアントキリング判定（レート差100以上の格上に勝利）
+        if (rateDiff >= 100) {
+            p2RateChange = Math.round(p2RateChange * 1.5);
+        }
+    } else {
+        // 引き分け
+        p1Score = 0.5; p2Score = 0.5;
+        p1RateChange = 5; // 引き分けは固定 +5
+        p2RateChange = 5;
+        p1.draws++; p2.draws++;
+        p1.currentStreak = 0; p2.currentStreak = 0;
+    }
+    
+    // レート更新
+    p1.rate += p1RateChange;
+    p2.rate += p2RateChange;
+    
+    // maxStreakの更新
+    if (p1.currentStreak > p1.maxStreak) p1.maxStreak = p1.currentStreak;
+    if (p2.currentStreak > p2.maxStreak) p2.maxStreak = p2.currentStreak;
+    
+    // レート履歴に記録
+    const now = new Date().toISOString();
+    p1.rateHistory.push({ date: now, rate: p1.rate });
+    p2.rateHistory.push({ date: now, rate: p2.rate });
+    
+    // ===== ポイント計算 =====
+    const calculatePoints = (user: User, isWinner: boolean, isDraw: boolean, opponentIsNew: boolean): PointBreakdown => {
+        let base = 0;
+        if (isWinner) base = 10; // 勝利
+        else if (isDraw) base = 7; // 引き分け
+        else base = 5; // 敗北でもポイント獲得
+        
+        // 連勝ボーナス
+        let streakBonus = 0;
+        if (user.currentStreak === 3) streakBonus = 10;
+        else if (user.currentStreak === 5) streakBonus = 20;
+        else if (user.currentStreak >= 10) streakBonus = 30;
+        
+        // 新入部員交流ボーナス
+        let newMemberBonus = opponentIsNew ? 5 : 0;
+        
+        // イベント倍率
+        let eventMultiplier = 1;
+        if (isEventActive()) {
+            eventMultiplier = settings.eventMultiplier;
+        }
+        
+        // 連戦補正（スパム防止）
+        let spamPenalty = 1.0;
+        const recentMatches = matches.filter(m => 
+            (m.player1Id === user.id || m.player2Id === user.id) &&
+            new Date(m.date).getTime() > Date.now() - (5 * 60 * 1000) // 過去5分以内
+        );
+        if (recentMatches.length >= 3) spamPenalty = 0.5;
+        
+        // 合計計算
+        let subtotal = (base + streakBonus + newMemberBonus) * eventMultiplier;
+        let total = Math.round(subtotal * spamPenalty);
+        
+        return {
+            base,
+            streakBonus,
+            newMemberBonus,
+            eventMultiplier,
+            spamPenalty,
+            total
+        };
+    };
+    
+    const p1PointsDetail = calculatePoints(p1, result === 'PLAYER1_WIN', result === 'DRAW', p2.isNewMember);
+    const p2PointsDetail = calculatePoints(p2, result === 'PLAYER2_WIN', result === 'DRAW', p1.isNewMember);
+    
+    // ポイント更新
+    p1.totalPoints += p1PointsDetail.total;
+    p1.monthlyPoints += p1PointsDetail.total;
+    p1.eventPoints = (p1.eventPoints || 0) + p1PointsDetail.total;
+    p1.pointsMatch = (p1.pointsMatch || 0) + p1PointsDetail.total;
+    
+    p2.totalPoints += p2PointsDetail.total;
+    p2.monthlyPoints += p2PointsDetail.total;
+    p2.eventPoints = (p2.eventPoints || 0) + p2PointsDetail.total;
+    p2.pointsMatch = (p2.pointsMatch || 0) + p2PointsDetail.total;
+    
+    // 実績とアイコンのチェック
+    const isDuelWin1 = isDuel && result === 'PLAYER1_WIN';
+    const isDuelWin2 = isDuel && result === 'PLAYER2_WIN';
+    const resP1 = checkAchievementsAndIcons(p1, { isDuelWin: isDuelWin1 });
+    const resP2 = checkAchievementsAndIcons(p2, { isDuelWin: isDuelWin2 });
+    
+    // 対戦記録を保存
+    const matchRecord: MatchRecord = {
+        id: Math.random().toString(36).substr(2, 9),
+        date: now,
+        player1Id: p1Id,
+        player2Id: p2Id,
+        result,
+        p1RateChange,
+        p2RateChange,
+        p1PointsEarned: p1PointsDetail.total,
+        p2PointsEarned: p2PointsDetail.total,
+        isDuel
+    };
+    
+    matches.unshift(matchRecord);
+    localStorage.setItem(MATCHES_KEY, JSON.stringify(matches.slice(0, 1000))); // 最大1000件まで保持
+    
+    // ログ記録
+    const logs = getLogs();
+    if (result === 'PLAYER1_WIN') {
+        logs.unshift({
+            id: Math.random().toString(36).substr(2, 9),
+            userId: p1Id,
+            type: ActivityType.MATCH_WIN,
+            points: p1PointsDetail.total,
+            description: `勝利 vs ${p2.name}`,
+            date: now
+        });
+        logs.unshift({
+            id: Math.random().toString(36).substr(2, 9),
+            userId: p2Id,
+            type: ActivityType.MATCH_LOSS,
+            points: p2PointsDetail.total,
+            description: `敗北 vs ${p1.name}`,
+            date: now
+        });
+    } else if (result === 'PLAYER2_WIN') {
+        logs.unshift({
+            id: Math.random().toString(36).substr(2, 9),
+            userId: p2Id,
+            type: ActivityType.MATCH_WIN,
+            points: p2PointsDetail.total,
+            description: `勝利 vs ${p1.name}`,
+            date: now
+        });
+        logs.unshift({
+            id: Math.random().toString(36).substr(2, 9),
+            userId: p1Id,
+            type: ActivityType.MATCH_LOSS,
+            points: p1PointsDetail.total,
+            description: `敗北 vs ${p2.name}`,
+            date: now
+        });
+    } else {
+        logs.unshift({
+            id: Math.random().toString(36).substr(2, 9),
+            userId: p1Id,
+            type: ActivityType.MATCH_DRAW,
+            points: p1PointsDetail.total,
+            description: `引き分け vs ${p2.name}`,
+            date: now
+        });
+        logs.unshift({
+            id: Math.random().toString(36).substr(2, 9),
+            userId: p2Id,
+            type: ActivityType.MATCH_DRAW,
+            points: p2PointsDetail.total,
+            description: `引き分け vs ${p1.name}`,
+            date: now
+        });
+    }
+    localStorage.setItem(LOGS_KEY, JSON.stringify(logs.slice(0, 200)));
+    
     saveUsers(users);
-    return { p1RateChange: p1Change, p2RateChange: p2Change, p1PointsEarned: p1Pts, p2PointsEarned: p2Pts, result, newAchievementsP1: resP1.newAchievements, newAchievementsP2: resP2.newAchievements, p1PointsDetail: { base: p1Pts, spamPenalty: 1 }, p2PointsDetail: { base: p2Pts, spamPenalty: 1 } };
+    
+    return {
+        p1RateChange,
+        p2RateChange,
+        p1PointsDetail,
+        p2PointsDetail,
+        p1PointsEarned: p1PointsDetail.total,
+        p2PointsEarned: p2PointsDetail.total,
+        newAchievementsP1: resP1.newAchievements,
+        newAchievementsP2: resP2.newAchievements,
+        newIconsP1: resP1.newIcons,
+        newIconsP2: resP2.newIcons,
+        isDuel,
+        result
+    };
 };
 
 export const manualPointAdjustment = (uid: string, p: number, r: string) => {
@@ -344,7 +554,82 @@ export const awardSystemTitles = () => {};
 export const deleteMatch = (id: any) => {};
 export const balanceFactions = (u: any) => u;
 export const toggleGeneral = (id: any) => {};
-export const getRivalryStats = (id: any) => ({ bestCustomer: null, nemeses: null });
+/** ライバル分析: お得意様（最も勝ち越している相手）と天敵（最も負け越している相手）を取得 */
+export const getRivalryStats = (userId: string): { bestCustomer: RivalData | null, nemeses: RivalData | null } => {
+    const matches = getMatches();
+    const users = getUsers();
+    const user = users.find(u => u.id === userId);
+    if (!user) return { bestCustomer: null, nemeses: null };
+    
+    // 対戦相手ごとの戦績を集計
+    const opponentStats = new Map<string, { wins: number, losses: number, draws: number }>();
+    
+    matches.forEach(m => {
+        let opponentId: string | null = null;
+        let isWin = false;
+        let isLoss = false;
+        let isDraw = false;
+        
+        if (m.player1Id === userId) {
+            opponentId = m.player2Id;
+            if (m.result === 'PLAYER1_WIN') isWin = true;
+            else if (m.result === 'PLAYER2_WIN') isLoss = true;
+            else isDraw = true;
+        } else if (m.player2Id === userId) {
+            opponentId = m.player1Id;
+            if (m.result === 'PLAYER2_WIN') isWin = true;
+            else if (m.result === 'PLAYER1_WIN') isLoss = true;
+            else isDraw = true;
+        }
+        
+        if (opponentId) {
+            const current = opponentStats.get(opponentId) || { wins: 0, losses: 0, draws: 0 };
+            if (isWin) current.wins++;
+            if (isLoss) current.losses++;
+            if (isDraw) current.draws++;
+            opponentStats.set(opponentId, current);
+        }
+    });
+    
+    // RivalData形式に変換
+    const rivalDataList: RivalData[] = [];
+    opponentStats.forEach((stats, opponentId) => {
+        const opponent = users.find(u => u.id === opponentId);
+        if (!opponent) return;
+        
+        const total = stats.wins + stats.losses + stats.draws;
+        if (total < 3) return; // 3回以上対戦した相手のみ
+        
+        const winRate = total > 0 ? stats.wins / total : 0;
+        
+        rivalDataList.push({
+            opponentId,
+            opponentName: opponent.name,
+            wins: stats.wins,
+            losses: stats.losses,
+            draws: stats.draws,
+            total,
+            winRate
+        });
+    });
+    
+    if (rivalDataList.length === 0) return { bestCustomer: null, nemeses: null };
+    
+    // お得意様: 勝率が最も高い相手
+    const bestCustomer = rivalDataList.reduce((best, current) => 
+        (current.winRate > best.winRate) ? current : best
+    );
+    
+    // 天敵: 勝率が最も低い相手
+    const nemeses = rivalDataList.reduce((worst, current) => 
+        (current.winRate < worst.winRate) ? current : worst
+    );
+    
+    return {
+        bestCustomer: bestCustomer.winRate >= 0.6 ? bestCustomer : null,
+        nemeses: nemeses.winRate <= 0.4 ? nemeses : null
+    };
+};
 export const updateUserTitle = (id: string, t: string | null) => { const u = getUsers(); const user = u.find(x => x.id === id); if(user) { user.activeTitle = t; saveUsers(u); } };
 export const updateUserIcon = (id: string, i: string) => { const u = getUsers(); const user = u.find(x => x.id === id); if(user) { user.activeIconId = i; saveUsers(u); } };
 
