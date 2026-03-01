@@ -21,7 +21,6 @@ export interface IconDef {
   char: string;
   name: string;
   conditionDescription: string;
-  // Added 'DAYS' to support activity day based icon conditions and fix type errors in storage.ts
   type: 'DEFAULT' | 'RATE' | 'WINS' | 'STREAK' | 'SPECIAL' | 'MATCHES' | 'DAYS';
   category: 'DEFAULT' | 'SHOGI' | 'CHESS' | 'SPECIAL' | 'RANK';
   threshold?: number;
@@ -63,10 +62,12 @@ export interface User {
   name: string;
   reading?: string;
   isNewMember: boolean;
+  // ★ 追加: 休眠フラグ（falseのとき退部扱い）
+  isActive: boolean;
   rate: number;
   faction?: 'RED' | 'WHITE';
   isGeneral: boolean;
-  
+
   // Seasonal Snapshot
   seasonStartRate: number;
   seasonStartPoints: number;
@@ -96,7 +97,7 @@ export interface User {
   activityDays: number;
   rateHistory: RateHistoryPoint[];
   achievements: string[];
-  activeTitle: string | null; // Cosmetic title
+  activeTitle: string | null;
   avatarColor: string;
 }
 
@@ -138,7 +139,7 @@ export interface PointBreakdown {
     streakBonus: number;
     newMemberBonus: number;
     eventMultiplier: number;
-    spamPenalty: number; // 1.0 = normal, 0.5 = penalty
+    spamPenalty: number;
     total: number;
 }
 
@@ -180,4 +181,23 @@ export interface RivalData {
   draws: number;
   total: number;
   winRate: number;
+}
+
+// ★ 追加: 同期ステータス
+export type SyncStatus = 'SYNCED' | 'SYNCING' | 'PENDING' | 'ERROR' | 'NEVER';
+
+export interface SyncMeta {
+  status: SyncStatus;
+  lastSync: string | null;
+  localTimestamp: string | null;
+  pendingChanges: number;
+  lastError?: string;
+}
+
+export interface AutoBackupEntry {
+  date: string;
+  key: string;
+  userCount: number;
+  matchCount: number;
+  timestamp: string;
 }
