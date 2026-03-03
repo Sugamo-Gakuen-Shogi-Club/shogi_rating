@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { getUsers, getMatches, ACHIEVEMENTS_DATA, updateUserTitle, getRivalryStats, ICONS_DATA, updateUserIcon, getUserAvatarChar, getLogs, getSettings, isEventActive, getUserIconDef, SYSTEM_TITLES } from './storage';
+import { getUsers, getMatches, ACHIEVEMENTS_DATA, updateUserTitle, getRivalryStats, ICONS_DATA, updateUserIcon, getUserAvatarChar, getLogs, getSettings, isEventActive, getUserIconDef, SYSTEM_TITLES, submitRankApplication, getRankApplications, clearOfficialRank } from './storage';
+import { RankApplication } from './types';
 import { User, MatchRecord, IconDef, ActivityLog, ActivityType, EventType, RivalData } from './types';
 import { Card } from './Card';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -193,12 +194,17 @@ const Profile: React.FC = () => {
   const [isSelectorOpen, setIsSelectorOpen] = useState(false);
   const [isIconModalOpen, setIsIconModalOpen] = useState(false);
   const [isTitleModalOpen, setIsTitleModalOpen] = useState(false);
+  const [isRankModalOpen, setIsRankModalOpen] = useState(false);
+  const [rankSource, setRankSource] = useState('');
+  const [rankValue, setRankValue] = useState('');
+  const [rankApps, setRankApps] = useState<RankApplication[]>([]);
   const navigate = useNavigate();
 
   useEffect(() => {
     setUsers(getUsers());
     setMatches(getMatches());
     setLogs(getLogs());
+    setRankApps(getRankApplications());
   }, []);
 
   useEffect(() => {
@@ -287,6 +293,40 @@ const Profile: React.FC = () => {
             onClose={() => setIsSelectorOpen(false)}
             title="別の部員を選択"
           />
+      )}
+
+
+      {isRankModalOpen && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-in fade-in zoom-in duration-200">
+          <div className="bg-slate-900 w-full max-w-md rounded-3xl shadow-2xl overflow-hidden border border-white/10">
+            <div className="p-5 border-b border-white/5 bg-slate-800 flex items-center justify-between">
+              <h3 className="text-lg font-black text-white flex items-center gap-2"><Award className="text-purple-400"/> 段位・級位を申請</h3>
+              <button onClick={() => setIsRankModalOpen(false)} className="p-2 bg-slate-700 text-slate-300 rounded-full hover:bg-slate-600"><ArrowLeft size={20}/></button>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-xs text-slate-400">申請後、管理者が確認・承認するとプロフィールとランキングに表示されます。</p>
+              <div>
+                <label className="block text-xs font-bold text-slate-400 mb-1">出典（将棋ウォーズ / 将棋連盟道場 など）</label>
+                <input type="text" value={rankSource} onChange={e => setRankSource(e.target.value)} placeholder="例: 将棋ウォーズ" className="w-full p-3 bg-slate-800 border border-slate-700 rounded-xl text-white font-bold outline-none focus:ring-2 focus:ring-purple-500"/>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-400 mb-1">段位・級位</label>
+                <input type="text" value={rankValue} onChange={e => setRankValue(e.target.value)} placeholder="例: 3級 / 初段 / 二段" className="w-full p-3 bg-slate-800 border border-slate-700 rounded-xl text-white font-bold outline-none focus:ring-2 focus:ring-purple-500"/>
+              </div>
+              {(() => { const myApp = rankApps.find(a => a.userId === selectedId && a.status === 'PENDING'); return myApp ? <div className="text-xs text-amber-400 bg-amber-900/20 border border-amber-700/40 rounded-xl p-3 font-bold">申請中: {myApp.source} {myApp.rank}（管理者の確認待ち）</div> : null; })()}
+              {user.officialRank && (
+                <div className="flex items-center justify-between text-xs text-green-400 bg-green-900/20 border border-green-700/40 rounded-xl p-3">
+                  <span className="font-bold">承認済み: {user.officialRank.source} {user.officialRank.rank}</span>
+                  <button onClick={() => { if (window.confirm('登録済みの段位・級位を削除しますか？')) { clearOfficialRank(user.id); setUsers(getUsers()); setIsRankModalOpen(false); } }} className="text-red-400 hover:text-red-300 ml-2">削除</button>
+                </div>
+              )}
+            </div>
+            <div className="p-5 border-t border-white/5 bg-slate-950 flex justify-end gap-3">
+              <button onClick={() => setIsRankModalOpen(false)} className="px-6 py-3 rounded-xl font-bold text-slate-400">キャンセル</button>
+              <button onClick={() => { if (!rankSource.trim() || !rankValue.trim()) { alert('出典と段位・級位を入力してください'); return; } submitRankApplication(user.id, rankSource.trim(), rankValue.trim()); setRankApps(getRankApplications()); setIsRankModalOpen(false); setRankSource(''); setRankValue(''); alert('申請しました。管理者の確認をお待ちください。'); }} className="bg-purple-600 text-white px-8 py-3 rounded-xl font-black">申請する</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {isIconModalOpen && (
@@ -429,6 +469,13 @@ const Profile: React.FC = () => {
                     </select>
                 </div>
              </div>
+                {/* Rank application */}
+                <div className="flex items-center justify-center md:justify-start gap-2 bg-slate-800/50 p-2 rounded-lg border border-white/5 mt-2">
+                  <button onClick={() => setIsRankModalOpen(true)} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-black transition-all ${user.officialRank ? 'bg-purple-900/30 text-purple-300 border border-purple-700/40' : 'bg-slate-700 text-slate-400 hover:text-white'}`}>
+                    <Award size={14}/>
+                    {user.officialRank ? `${user.officialRank.source} ${user.officialRank.rank}` : '段位・級位を申請'}
+                  </button>
+                </div>
          </div>
       </div>
       
