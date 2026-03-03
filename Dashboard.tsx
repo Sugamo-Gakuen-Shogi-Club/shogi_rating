@@ -2,7 +2,8 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { getUsers, recordAttendance, getSettings, isEventActive, getLogs, getUserAvatarChar, playSound, vibrate, SYSTEM_TITLES, getLocalDateString } from './storage';
-import { User, ActivityType, EventType, AchievementDef, IconDef, SystemTitle } from './types';
+import { User, ActivityType, EventType, AchievementDef, IconDef } from './types';
+import type { SystemTitle } from './types';
 import { Card } from './Card';
 import { Trophy, Users, Calendar, ArrowRight, Zap, Crown, Flame, Snowflake, Search, Activity, Swords, X } from 'lucide-react';
 import { UserSelector } from './UserSelector';
