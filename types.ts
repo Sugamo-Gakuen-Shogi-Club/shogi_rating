@@ -50,28 +50,11 @@ export enum EventType {
 export type SystemTitle = 'MASTER' | 'RISING_STAR' | 'GRINDER' | 'GIANT_KILLER';
 
 export interface TitleDef {
-  id: SystemTitle;
-  name: string;
-  english: string;
-  description: string;
-  color: string;
-}
-
-export interface OfficialRank {
-  source: string;
-  rank: string;
-  approvedAt: string;
-  approvedBy: string;
-}
-
-export interface RankApplication {
-  id: string;
-  userId: string;
-  source: string;
-  rank: string;
-  requestedAt: string;
-  status: 'PENDING' | 'APPROVED' | 'REJECTED';
-  rejectReason?: string;
+    id: SystemTitle;
+    name: string;
+    english: string;
+    description: string;
+    color: string;
 }
 
 export interface User {
@@ -79,22 +62,32 @@ export interface User {
   name: string;
   reading?: string;
   isNewMember: boolean;
+  // ★ 追加: 休眠フラグ（falseのとき退部扱い）
   isActive: boolean;
   rate: number;
   faction?: 'RED' | 'WHITE';
   isGeneral: boolean;
+
+  // Seasonal Snapshot
   seasonStartRate: number;
   seasonStartPoints: number;
+
+  // System Title (The Four Kings)
   systemTitle: SystemTitle | null;
-  officialRank?: OfficialRank;
+
+  // Icon System
   activeIconId: string;
   unlockedIcons: string[];
+
+  // Point Breakdown
   totalPoints: number;
   pointsMatch: number;
   pointsAttendance: number;
   pointsSpecial: number;
+
   monthlyPoints: number;
   eventPoints: number;
+
   currentStreak: number;
   maxStreak: number;
   wins: number;
@@ -130,8 +123,6 @@ export interface SystemSettings {
   currentSeason: Season;
   lastMonthlyReset: string;
   lastTitleUpdate: string | null;
-  maintenanceMode: boolean;
-  maintenanceBackupKey: string | null;
 }
 
 export interface ActivityLog {
@@ -144,12 +135,12 @@ export interface ActivityLog {
 }
 
 export interface PointBreakdown {
-  base: number;
-  streakBonus: number;
-  newMemberBonus: number;
-  eventMultiplier: number;
-  spamPenalty: number;
-  total: number;
+    base: number;
+    streakBonus: number;
+    newMemberBonus: number;
+    eventMultiplier: number;
+    spamPenalty: number;
+    total: number;
 }
 
 export interface MatchProcessResult {
@@ -180,7 +171,6 @@ export interface BackupData {
   settings: SystemSettings;
   logs: ActivityLog[];
   timestamp: string;
-  rankApplications?: RankApplication[];
 }
 
 export interface RivalData {
@@ -193,6 +183,7 @@ export interface RivalData {
   winRate: number;
 }
 
+// ★ 追加: 同期ステータス
 export type SyncStatus = 'SYNCED' | 'SYNCING' | 'PENDING' | 'ERROR' | 'NEVER';
 
 export interface SyncMeta {
@@ -209,14 +200,27 @@ export interface AutoBackupEntry {
   userCount: number;
   matchCount: number;
   timestamp: string;
-  label?: string;
 }
 
-export interface UndoSnapshot {
+// ── Undo ──────────────────────────────────────────────────────
+export type UndoActionType = 'MATCH' | 'ATTENDANCE';
+
+export interface UndoEntry {
   id: string;
+  type: UndoActionType;
   timestamp: string;
-  label: string;
-  users: User[];
-  matches: MatchRecord[];
-  logs: ActivityLog[];
+  description: string;        // 表示用テキスト e.g. "対局: 山田 vs 田中 (山田勝)"
+  snapshot: {
+    users: User[];
+    matches: MatchRecord[];
+    logs: ActivityLog[];
+  };
+}
+
+// ── Maintenance Mode ──────────────────────────────────────────
+export interface MaintenanceMeta {
+  active: boolean;
+  startedAt: string | null;
+  backupKey: string | null;   // Firebase上のバックアップキー
+  note: string;
 }
