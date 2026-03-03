@@ -20,7 +20,7 @@ import {
   CheckCircle, Shuffle, Users, Crown, ChevronRight, X,
   RefreshCw, Languages, FileUp, Upload, Swords, Cloud,
   CloudOff, AlertCircle, Loader, UserCheck, UserX, RotateCcw,
-  Undo2, Wrench, ShieldCheck, ShieldAlert, FlaskConical,
+  Undo2, Wrench, ShieldCheck, AlertTriangle, Zap,
 } from 'lucide-react';
 import { UserSelector } from './UserSelector';
 
@@ -516,7 +516,7 @@ const Admin: React.FC = () => {
               ? 'bg-yellow-900/20 border-yellow-700/40 text-yellow-300'
               : 'bg-slate-800/60 border-slate-700/40 text-slate-400'
           }`}>
-            {isActive ? <ShieldAlert size={18} className="text-yellow-400 shrink-0" /> : <ShieldCheck size={18} className="text-slate-500 shrink-0" />}
+            {isActive ? <AlertTriangle size={18} className="text-yellow-400 shrink-0" /> : <ShieldCheck size={18} className="text-slate-500 shrink-0" />}
             <div className="flex-1 min-w-0">
               <div>{isActive ? '🔧 メンテナンスモード 稼働中' : '通常モード'}</div>
               {isActive && maintenanceMeta.startedAt && (
@@ -609,7 +609,7 @@ const Admin: React.FC = () => {
                   disabled={maintenanceLoading}
                   className="flex flex-col items-center justify-center gap-1.5 bg-slate-700 hover:bg-slate-600 disabled:bg-slate-800 disabled:text-slate-600 text-slate-200 py-4 rounded-xl font-bold transition-all active:scale-95 text-center border border-slate-600"
                 >
-                  {maintenanceLoading ? <Loader size={18} className="animate-spin" /> : <FlaskConical size={18} />}
+                  {maintenanceLoading ? <Loader size={18} className="animate-spin" /> : <Zap size={18} />}
                   <span className="text-xs leading-tight">終了して<br />データ保持</span>
                 </button>
               </div>
