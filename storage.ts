@@ -41,6 +41,45 @@ const DEFAULT_UNLOCKED_ICONS = ['DEFAULT_INITIAL', 'DEFAULT_SMILE', 'DEFAULT_CAT
 // ============================================================
 // STATIC DATA
 // ============================================================
+// ============================================================
+// 段級テーブル (Rateベース)
+// ============================================================
+export interface RankDef {
+  label: string;       // 表示名 e.g. "初段"
+  minRate: number;
+  color: string;       // Tailwind text-color class
+  badge: string;       // Tailwind bg/border for badge
+  isKyu: boolean;      // true=級位, false=段位
+}
+
+export const RANK_TABLE: RankDef[] = [
+  { label: '10級', minRate:    0, color: 'text-slate-400',   badge: 'bg-slate-800 border-slate-600',         isKyu: true  },
+  { label: '9級',  minRate:  850, color: 'text-slate-400',   badge: 'bg-slate-800 border-slate-600',         isKyu: true  },
+  { label: '8級',  minRate:  900, color: 'text-slate-400',   badge: 'bg-slate-800 border-slate-600',         isKyu: true  },
+  { label: '7級',  minRate:  950, color: 'text-slate-300',   badge: 'bg-slate-700 border-slate-500',         isKyu: true  },
+  { label: '6級',  minRate: 1000, color: 'text-slate-300',   badge: 'bg-slate-700 border-slate-500',         isKyu: true  },
+  { label: '5級',  minRate: 1050, color: 'text-slate-200',   badge: 'bg-slate-700 border-slate-400',         isKyu: true  },
+  { label: '4級',  minRate: 1100, color: 'text-slate-200',   badge: 'bg-slate-700 border-slate-400',         isKyu: true  },
+  { label: '3級',  minRate: 1150, color: 'text-sky-300',     badge: 'bg-sky-900/40 border-sky-600',          isKyu: true  },
+  { label: '2級',  minRate: 1200, color: 'text-sky-300',     badge: 'bg-sky-900/40 border-sky-600',          isKyu: true  },
+  { label: '1級',  minRate: 1275, color: 'text-sky-200',     badge: 'bg-sky-900/50 border-sky-500',          isKyu: true  },
+  { label: '初段', minRate: 1350, color: 'text-amber-300',   badge: 'bg-amber-900/40 border-amber-600',      isKyu: false },
+  { label: '二段', minRate: 1450, color: 'text-amber-300',   badge: 'bg-amber-900/40 border-amber-600',      isKyu: false },
+  { label: '三段', minRate: 1575, color: 'text-orange-300',  badge: 'bg-orange-900/40 border-orange-500',    isKyu: false },
+  { label: '四段', minRate: 1700, color: 'text-rose-300',    badge: 'bg-rose-900/40 border-rose-500',        isKyu: false },
+  { label: '五段', minRate: 1850, color: 'text-red-300',     badge: 'bg-red-900/40 border-red-500',          isKyu: false },
+  { label: '六段', minRate: 2000, color: 'text-yellow-300',  badge: 'bg-yellow-900/50 border-yellow-500',    isKyu: false },
+];
+
+/** Rateから段級を返す */
+export const getRankByRate = (rate: number): RankDef => {
+  // 降順で最初にminRate以下になったものを返す
+  for (let i = RANK_TABLE.length - 1; i >= 0; i--) {
+    if (rate >= RANK_TABLE[i].minRate) return RANK_TABLE[i];
+  }
+  return RANK_TABLE[0];
+};
+
 export const SYSTEM_TITLES: TitleDef[] = [
   { id: 'MASTER',       name: '名人',   english: 'The Master',    description: '現在のレート最強',          color: 'text-yellow-400' },
   { id: 'RISING_STAR',  name: '新星',   english: 'Rising Star',   description: '今シーズンの成長幅No.1',    color: 'text-blue-400' },
