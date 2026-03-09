@@ -175,6 +175,7 @@ export interface BackupData {
   matches: MatchRecord[];
   settings: SystemSettings;
   logs: ActivityLog[];
+  rankApplications?: RankApplication[];
   timestamp: string;
 }
 
