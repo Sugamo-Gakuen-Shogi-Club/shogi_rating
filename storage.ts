@@ -806,7 +806,6 @@ export const processMatch = (
   const resultLabel = result === 'PLAYER1_WIN' ? `${p1.name} 勝ち` : result === 'PLAYER2_WIN' ? `${p2.name} 勝ち` : '引き分け';
   pushUndoSnapshot('MATCH', `対局: ${p1.name} vs ${p2.name}（${resultLabel}）`);
 
-  const settings = getSettings();
   const eventActive = isEventActive();
   const eventMult = eventActive ? (settings.eventMultiplier || 1) : 1;
 
