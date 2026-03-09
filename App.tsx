@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { HashRouter, Routes, Route, useLocation, Link } from 'react-router-dom';
-import { Home, Trophy, User as UserIcon, Settings, PlusCircle, BookOpen, Cloud, CloudOff, RefreshCw, Loader, AlertCircle } from 'lucide-react';
-import { seedData, loadFromCloud, getUsers, getSyncStatus, manualSync } from './storage';
-import type { LoadResult } from './storage';
+import { Home, Trophy, User as UserIcon, Settings, PlusCircle, BookOpen, Cloud, CloudOff, RefreshCw, Loader, AlertCircle, Wrench } from 'lucide-react';
+import { seedData, loadFromCloud, getUsers, getSyncStatus, manualSync, LoadResult, getMaintenanceState } from './storage';
 import { SyncMeta } from './types';
 
 import Dashboard  from './Dashboard';
@@ -12,6 +11,28 @@ import Profile    from './Profile';
 import Admin      from './Admin';
 import { Guide }  from './Guide';
 import { Screensaver } from './Screensaver';
+import UndoPanel  from './UndoPanel';
+
+/** Maintenance mode banner shown across all pages */
+const MaintenanceBanner: React.FC = () => {
+  const [active, setActive] = useState(getMaintenanceState().active);
+
+  useEffect(() => {
+    const h = (e: Event) => setActive((e as CustomEvent).detail?.active ?? false);
+    window.addEventListener('rivals-maintenance-changed', h);
+    return () => window.removeEventListener('rivals-maintenance-changed', h);
+  }, []);
+
+  if (!active) return null;
+
+  return (
+    <div className="fixed top-0 left-0 right-0 z-[200] bg-orange-600 text-white px-4 py-2 flex items-center justify-center gap-3 font-black text-sm shadow-lg">
+      <Wrench size={16} className="animate-spin" />
+      <span>メンテナンスモード稼働中 — 変更はサンドボックスに書き込まれています</span>
+      <Wrench size={16} className="animate-spin" />
+    </div>
+  );
+};
 
 // ─── Sync indicator (sidebar bottom) ────────────────────────
 const SyncIndicator: React.FC = () => {
@@ -241,6 +262,7 @@ const App: React.FC = () => {
 
   return (
     <HashRouter>
+      <MaintenanceBanner />
       {isIdle && <Screensaver onDismiss={resetTimer} />}
       <Layout>
         <Routes>
@@ -252,6 +274,8 @@ const App: React.FC = () => {
           <Route path="/admin"    element={<Admin />} />
         </Routes>
       </Layout>
+      {/* 全ページ共通フローティングUndoボタン */}
+      <UndoPanel />
     </HashRouter>
   );
 };

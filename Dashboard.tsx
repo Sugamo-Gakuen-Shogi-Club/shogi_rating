@@ -1,9 +1,8 @@
 
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { getUsers, recordAttendance, getSettings, isEventActive, getLogs, getUserAvatarChar, playSound, vibrate, SYSTEM_TITLES, getLocalDateString } from './storage';
-import { User, ActivityType, EventType, AchievementDef, IconDef } from './types';
-import type { SystemTitle } from './types';
+import { getUsers, recordAttendance, getSettings, isEventActive, getLogs, getUserAvatarChar, playSound, vibrate, SYSTEM_TITLES, getLocalDateString, getMatches } from './storage';
+import { User, MatchRecord, ActivityType, EventType, AchievementDef, IconDef, SystemTitle } from './types';
 import { Card } from './Card';
 import { Trophy, Users, Calendar, ArrowRight, Zap, Crown, Flame, Snowflake, Search, Activity, Swords, X } from 'lucide-react';
 import { UserSelector } from './UserSelector';
@@ -15,6 +14,7 @@ declare const confetti: any;
 
 const Dashboard: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
+  const [matches, setMatches] = useState<MatchRecord[]>([]);
   const [isAttendanceOpen, setIsAttendanceOpen] = useState(false);
   const [isFactionModalOpen, setIsFactionModalOpen] = useState(false);
   
@@ -27,10 +27,12 @@ const Dashboard: React.FC = () => {
 
   useEffect(() => {
     setUsers(getUsers());
+    setMatches(getMatches());
     
     // Auto-refresh interval for live feel
     const interval = setInterval(() => {
         setUsers(getUsers());
+        setMatches(getMatches());
     }, 10000);
     return () => clearInterval(interval);
   }, []);
@@ -84,16 +86,36 @@ const Dashboard: React.FC = () => {
   ).length;
 
   const factionStats = useMemo(() => {
-      let redScore = 0;
-      let whiteScore = 0;
+      let redScore = 0, whiteScore = 0;
+      let redWins = 0, whiteWins = 0, duelWins = { red: 0, white: 0 };
+
       users.forEach(u => {
           if (u.faction === 'RED') redScore += (u.eventPoints || 0);
           if (u.faction === 'WHITE') whiteScore += (u.eventPoints || 0);
       });
+
+      // 対局記録からイベント中の勝敗を集計
+      const eventStart = settings.eventEndsAt
+        ? new Date(new Date(settings.eventEndsAt).getTime() - (settings.lastMonthlyReset ? 0 : 0))
+        : null;
+
+      matches.forEach(m => {
+          const winner = m.result === 'PLAYER1_WIN' ? m.player1Id : m.result === 'PLAYER2_WIN' ? m.player2Id : null;
+          if (!winner) return;
+          const winnerUser = users.find(u => u.id === winner);
+          if (!winnerUser) return;
+          if (winnerUser.faction === 'RED') redWins++;
+          else if (winnerUser.faction === 'WHITE') whiteWins++;
+          if (m.isDuel) {
+              if (winnerUser.faction === 'RED') duelWins.red++;
+              else if (winnerUser.faction === 'WHITE') duelWins.white++;
+          }
+      });
+
       const total = redScore + whiteScore;
       const redPercent = total === 0 ? 50 : (redScore / total) * 100;
-      return { redScore, whiteScore, redPercent };
-  }, [users]);
+      return { redScore, whiteScore, redPercent, redWins, whiteWins, duelWins };
+  }, [users, matches]);
 
   const titleHolders = useMemo(() => {
       const holders: Record<SystemTitle, User | undefined> = {
@@ -280,6 +302,7 @@ const Dashboard: React.FC = () => {
                         <div className="flex flex-col items-start">
                              <div className="text-5xl font-black text-red-500 drop-shadow-[0_0_15px_rgba(239,68,68,0.8)] font-mono">{factionStats.redScore}</div>
                              <div className="text-[10px] font-black uppercase tracking-widest text-red-300 flex items-center gap-1"><Flame size={12}/> Red Army</div>
+                             <div className="text-[10px] text-red-400/70 mt-0.5">{factionStats.redWins}勝{factionStats.duelWins.red > 0 ? ` (一騎討ち${factionStats.duelWins.red})` : ''}</div>
                         </div>
                         
                         <div className="mb-4 animate-bounce">
@@ -291,6 +314,7 @@ const Dashboard: React.FC = () => {
                         <div className="flex flex-col items-end">
                              <div className="text-5xl font-black text-blue-400 drop-shadow-[0_0_15px_rgba(96,165,250,0.8)] font-mono">{factionStats.whiteScore}</div>
                              <div className="text-[10px] font-black uppercase tracking-widest text-blue-300 flex items-center gap-1">White Army <Snowflake size={12}/></div>
+                             <div className="text-[10px] text-blue-400/70 mt-0.5">{factionStats.whiteWins}勝{factionStats.duelWins.white > 0 ? ` (一騎討ち${factionStats.duelWins.white})` : ''}</div>
                         </div>
                     </div>
 

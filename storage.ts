@@ -2,8 +2,10 @@ import {
   User, MatchRecord, SystemSettings, ActivityLog, ActivityType,
   AchievementDef, AttendanceResult, BackupData, PointBreakdown,
   EventType, Season, IconDef, RivalData, SystemTitle, TitleDef,
-  SyncStatus, SyncMeta, AutoBackupEntry, UndoEntry, UndoActionType,
-  MaintenanceMeta
+  SyncStatus, SyncMeta, AutoBackupEntry,
+  UndoEntry, UndoActionType,
+  MaintenanceState,
+  RankEntry, RankApplication
 } from './types';
 
 // ============================================================
@@ -14,13 +16,17 @@ const MATCHES_KEY   = 'club_rivals_matches';
 const SETTINGS_KEY  = 'club_rivals_settings';
 const LOGS_KEY      = 'club_rivals_logs';
 const SYNC_META_KEY = 'club_rivals_sync_meta';
-const AUTOBACKUP_PREFIX    = 'club_rivals_backup_';
-const UNDO_KEY             = 'club_rivals_undo_stack';
-const MAINTENANCE_META_KEY = 'club_rivals_maintenance_meta';
-const UNDO_MAX = 10;  // 保持するUndoエントリ最大数
-const LOGS_MAX = 200;
+const AUTOBACKUP_PREFIX = 'club_rivals_backup_';
+const UNDO_KEY      = 'club_rivals_undo_stack';
+const MAINTENANCE_KEY = 'club_rivals_maintenance';
+const RANK_APPS_KEY   = 'club_rivals_rank_apps';
+const UNDO_MAX      = 10;
+const LOGS_MAX      = 200;
 
-const CLOUD_API_URL = 'https://club-rivals-test1-default-rtdb.asia-southeast1.firebasedatabase.app/rivals_data.json';
+const FIREBASE_BASE = 'https://club-rivals-test1-default-rtdb.asia-southeast1.firebasedatabase.app';
+const CLOUD_API_URL         = `${FIREBASE_BASE}/rivals_data.json`;
+const MAINTENANCE_BACKUP_URL = `${FIREBASE_BASE}/maintenance_backup.json`;
+const MAINTENANCE_SANDBOX_URL = `${FIREBASE_BASE}/maintenance_sandbox.json`;
 
 // ============================================================
 // DEFAULTS
@@ -36,50 +42,14 @@ const DEFAULT_SETTINGS: SystemSettings = {
   lastTitleUpdate: null
 };
 
+// 初期レートは0（負けで減る仕様のため）
+const INITIAL_RATE = 0;
+
 const DEFAULT_UNLOCKED_ICONS = ['DEFAULT_INITIAL', 'DEFAULT_SMILE', 'DEFAULT_CAT', 'DEFAULT_DOG', 'SHOGI_FU'];
 
 // ============================================================
 // STATIC DATA
 // ============================================================
-// ============================================================
-// 段級テーブル (Rateベース)
-// ============================================================
-export interface RankDef {
-  label: string;       // 表示名 e.g. "初段"
-  minRate: number;
-  color: string;       // Tailwind text-color class
-  badge: string;       // Tailwind bg/border for badge
-  isKyu: boolean;      // true=級位, false=段位
-}
-
-export const RANK_TABLE: RankDef[] = [
-  { label: '10級', minRate:    0, color: 'text-slate-400',   badge: 'bg-slate-800 border-slate-600',         isKyu: true  },
-  { label: '9級',  minRate:  850, color: 'text-slate-400',   badge: 'bg-slate-800 border-slate-600',         isKyu: true  },
-  { label: '8級',  minRate:  900, color: 'text-slate-400',   badge: 'bg-slate-800 border-slate-600',         isKyu: true  },
-  { label: '7級',  minRate:  950, color: 'text-slate-300',   badge: 'bg-slate-700 border-slate-500',         isKyu: true  },
-  { label: '6級',  minRate: 1000, color: 'text-slate-300',   badge: 'bg-slate-700 border-slate-500',         isKyu: true  },
-  { label: '5級',  minRate: 1050, color: 'text-slate-200',   badge: 'bg-slate-700 border-slate-400',         isKyu: true  },
-  { label: '4級',  minRate: 1100, color: 'text-slate-200',   badge: 'bg-slate-700 border-slate-400',         isKyu: true  },
-  { label: '3級',  minRate: 1150, color: 'text-sky-300',     badge: 'bg-sky-900/40 border-sky-600',          isKyu: true  },
-  { label: '2級',  minRate: 1200, color: 'text-sky-300',     badge: 'bg-sky-900/40 border-sky-600',          isKyu: true  },
-  { label: '1級',  minRate: 1275, color: 'text-sky-200',     badge: 'bg-sky-900/50 border-sky-500',          isKyu: true  },
-  { label: '初段', minRate: 1350, color: 'text-amber-300',   badge: 'bg-amber-900/40 border-amber-600',      isKyu: false },
-  { label: '二段', minRate: 1450, color: 'text-amber-300',   badge: 'bg-amber-900/40 border-amber-600',      isKyu: false },
-  { label: '三段', minRate: 1575, color: 'text-orange-300',  badge: 'bg-orange-900/40 border-orange-500',    isKyu: false },
-  { label: '四段', minRate: 1700, color: 'text-rose-300',    badge: 'bg-rose-900/40 border-rose-500',        isKyu: false },
-  { label: '五段', minRate: 1850, color: 'text-red-300',     badge: 'bg-red-900/40 border-red-500',          isKyu: false },
-  { label: '六段', minRate: 2000, color: 'text-yellow-300',  badge: 'bg-yellow-900/50 border-yellow-500',    isKyu: false },
-];
-
-/** Rateから段級を返す */
-export const getRankByRate = (rate: number): RankDef => {
-  // 降順で最初にminRate以下になったものを返す
-  for (let i = RANK_TABLE.length - 1; i >= 0; i--) {
-    if (rate >= RANK_TABLE[i].minRate) return RANK_TABLE[i];
-  }
-  return RANK_TABLE[0];
-};
-
 export const SYSTEM_TITLES: TitleDef[] = [
   { id: 'MASTER',       name: '名人',   english: 'The Master',    description: '現在のレート最強',          color: 'text-yellow-400' },
   { id: 'RISING_STAR',  name: '新星',   english: 'Rising Star',   description: '今シーズンの成長幅No.1',    color: 'text-blue-400' },
@@ -172,6 +142,75 @@ const updateSyncMeta = (update: Partial<SyncMeta>) => {
 };
 
 // ============================================================
+// UNDO SYSTEM
+// ============================================================
+
+export const getUndoStack = (): UndoEntry[] => {
+  try {
+    const raw = localStorage.getItem(UNDO_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+};
+
+/**
+ * スナップショットを取ってUndoスタックに積む。
+ * 破壊的操作（processMatch, recordAttendance, manualAdjust, deactivate…）の直前に呼ぶ。
+ */
+export const pushUndoSnapshot = (
+  actionType: UndoActionType,
+  description: string
+): void => {
+  const entry: UndoEntry = {
+    id:         randomId(),
+    actionType,
+    description,
+    timestamp:  new Date().toISOString(),
+    snapshot: {
+      users:   getRawUsers(),
+      matches: getMatches(),
+      logs:    getLogs(),
+    },
+  };
+  const stack = getUndoStack();
+  const next = [entry, ...stack].slice(0, UNDO_MAX);
+  localStorage.setItem(UNDO_KEY, JSON.stringify(next));
+  // Undoスタックの変更をUIに通知
+  window.dispatchEvent(new CustomEvent('rivals-undo-changed', { detail: next }));
+};
+
+/**
+ * 直近の操作を取り消す。
+ * 対象エントリのsnapshotをlocalStorageに書き戻し、Firebaseにも同期する。
+ */
+export const undoLastAction = (entryId?: string): UndoEntry | null => {
+  const stack = getUndoStack();
+  if (stack.length === 0) return null;
+
+  const idx = entryId ? stack.findIndex(e => e.id === entryId) : 0;
+  if (idx === -1) return null;
+  const entry = stack[idx];
+
+  // スナップショットを復元
+  localStorage.setItem(USERS_KEY,   JSON.stringify(entry.snapshot.users));
+  localStorage.setItem(MATCHES_KEY, JSON.stringify(entry.snapshot.matches));
+  localStorage.setItem(LOGS_KEY,    JSON.stringify(entry.snapshot.logs));
+
+  // そのエントリ以降（新しい側）をすべてスタックから削除
+  const next = stack.slice(idx + 1);
+  localStorage.setItem(UNDO_KEY, JSON.stringify(next));
+  window.dispatchEvent(new CustomEvent('rivals-undo-changed', { detail: next }));
+
+  // クラウドにも同期（取り消し後の状態を正とする）
+  syncWithServer();
+  return entry;
+};
+
+export const clearUndoStack = (): void => {
+  localStorage.removeItem(UNDO_KEY);
+  window.dispatchEvent(new CustomEvent('rivals-undo-changed', { detail: [] }));
+};
+
+// ============================================================
 // AUTO BACKUP
 // ============================================================
 export const saveAutoBackup = (): void => {
@@ -224,169 +263,163 @@ export const restoreFromAutoBackup = (key: string): boolean => {
 };
 
 // ============================================================
-// UNDO STACK
-// ============================================================
-
-export const getUndoStack = (): UndoEntry[] => {
-  try {
-    const s = localStorage.getItem(UNDO_KEY);
-    return s ? JSON.parse(s) : [];
-  } catch { return []; }
-};
-
-const saveUndoStack = (stack: UndoEntry[]): void => {
-  localStorage.setItem(UNDO_KEY, JSON.stringify(stack.slice(0, UNDO_MAX)));
-};
-
-/** Snapshotを積む（対局・出席前に呼ぶ） */
-export const pushUndoSnapshot = (
-  type: UndoActionType,
-  description: string
-): void => {
-  const entry: UndoEntry = {
-    id: randomId(),
-    type,
-    timestamp: new Date().toISOString(),
-    description,
-    snapshot: {
-      users:   getRawUsers(),
-      matches: getMatches(),
-      logs:    getLogs(),
-    },
-  };
-  const stack = getUndoStack();
-  stack.unshift(entry);
-  saveUndoStack(stack);
-};
-
-/** 直近のUndoエントリを1つ取得（ポップはしない） */
-export const peekUndo = (): UndoEntry | null => {
-  const stack = getUndoStack();
-  return stack[0] ?? null;
-};
-
-/** 直近1件を取り消し。成功したらtrueを返す */
-export const undoLastAction = (): boolean => {
-  const stack = getUndoStack();
-  if (stack.length === 0) return false;
-  const entry = stack[0];
-  try {
-    localStorage.setItem(USERS_KEY,   JSON.stringify(entry.snapshot.users));
-    localStorage.setItem(MATCHES_KEY, JSON.stringify(entry.snapshot.matches));
-    localStorage.setItem(LOGS_KEY,    JSON.stringify(entry.snapshot.logs));
-    // スタックから除去
-    saveUndoStack(stack.slice(1));
-    syncWithServer();
-    return true;
-  } catch { return false; }
-};
-
-/** Undoスタックをクリア（メンテナンス終了時など） */
-export const clearUndoStack = (): void => {
-  localStorage.removeItem(UNDO_KEY);
-};
-
-// ============================================================
 // MAINTENANCE MODE
 // ============================================================
 
-const MAINTENANCE_CLOUD_URL =
-  'https://club-rivals-test1-default-rtdb.asia-southeast1.firebasedatabase.app/maintenance_backup.json';
-
-const getMaintenanceMetaDefault = (): MaintenanceMeta => ({
-  active: false, startedAt: null, backupKey: null, note: ''
-});
-
-export const getMaintenanceMeta = (): MaintenanceMeta => {
-  try {
-    const s = localStorage.getItem(MAINTENANCE_META_KEY);
-    return s ? { ...getMaintenanceMetaDefault(), ...JSON.parse(s) } : getMaintenanceMetaDefault();
-  } catch { return getMaintenanceMetaDefault(); }
+const DEFAULT_MAINTENANCE: MaintenanceState = {
+  active: false,
+  startedAt: null,
+  startedBy: '',
+  backupTimestamp: null,
+  backupVerified: false,
+  note: '',
 };
 
-const saveMaintenanceMeta = (meta: MaintenanceMeta): void => {
-  localStorage.setItem(MAINTENANCE_META_KEY, JSON.stringify(meta));
-  window.dispatchEvent(new CustomEvent('rivals-maintenance-changed', { detail: meta }));
+export const getMaintenanceState = (): MaintenanceState => {
+  try {
+    const raw = localStorage.getItem(MAINTENANCE_KEY);
+    return raw ? { ...DEFAULT_MAINTENANCE, ...JSON.parse(raw) } : DEFAULT_MAINTENANCE;
+  } catch { return DEFAULT_MAINTENANCE; }
+};
+
+const saveMaintenanceState = (state: MaintenanceState): void => {
+  localStorage.setItem(MAINTENANCE_KEY, JSON.stringify(state));
+  window.dispatchEvent(new CustomEvent('rivals-maintenance-changed', { detail: state }));
 };
 
 /**
- * メンテナンスモード開始:
- * 1. 現在の全データをFirebaseの /maintenance_backup に保存
- * 2. ローカルのメンテナンスメタを更新
+ * メンテナンスモード開始
+ * 1. 現在のデータをFirebase /maintenance_backup に保存
+ * 2. 同じデータをFirebase /maintenance_sandbox にコピー
+ * 3. 以後の書き込みはsandboxへ（pushToCloudが自動切替）
+ * 4. localStorageにメンテ状態を保存
  */
-export const startMaintenanceMode = async (note = ''): Promise<{ ok: boolean; error?: string }> => {
+export const startMaintenanceMode = async (note: string, startedBy = '管理者'): Promise<{ success: boolean; error?: string }> => {
   try {
     const timestamp = new Date().toISOString();
-    const backup: BackupData = {
-      users:    getRawUsers(),
-      matches:  getMatches(),
+    const data: BackupData = {
+      users: getRawUsers(),
+      matches: getMatches(),
       settings: getSettings(),
-      logs:     getLogs(),
+      logs: getLogs(),
       timestamp,
     };
-    const res = await fetch(MAINTENANCE_CLOUD_URL, {
+
+    // 1. 本番データをmaintenance_backupに保存
+    const backupRes = await fetch(MAINTENANCE_BACKUP_URL, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...backup, savedAt: timestamp }),
+      body: JSON.stringify({ ...data, backedUpAt: timestamp }),
     });
-    if (!res.ok) throw new Error(`Firebase PUT failed: HTTP ${res.status}`);
+    if (!backupRes.ok) throw new Error(`バックアップ保存失敗: HTTP ${backupRes.status}`);
 
-    saveMaintenanceMeta({ active: true, startedAt: timestamp, backupKey: timestamp, note });
-    return { ok: true };
+    // 2. 同じデータをsandboxにもコピー（メンテ中の作業開始点として）
+    const sandboxRes = await fetch(MAINTENANCE_SANDBOX_URL, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!sandboxRes.ok) throw new Error(`サンドボックス初期化失敗: HTTP ${sandboxRes.status}`);
+
+    // 3. ローカルにも自動バックアップ
+    saveAutoBackup();
+
+    // 4. メンテナンス状態を保存
+    const state: MaintenanceState = {
+      active: true,
+      startedAt: timestamp,
+      startedBy,
+      backupTimestamp: timestamp,
+      backupVerified: true,
+      note,
+    };
+    saveMaintenanceState(state);
+    updateSyncMeta({ status: 'PENDING', pendingChanges: 0 });
+
+    return { success: true };
   } catch (e: any) {
-    return { ok: false, error: e?.message || 'Unknown error' };
+    return { success: false, error: e?.message || '不明なエラー' };
   }
 };
 
 /**
- * メンテナンスモード終了:
- * - ローカルのテストデータを破棄して Firebase バックアップから復元
- * - メタをリセット
+ * メンテナンスモード終了
+ * discard=true → sandboxデータを破棄し、backupから本番を復元
+ * discard=false → sandboxデータを本番に昇格（変更を本番反映）
  */
-export const endMaintenanceMode = async (restoreFromBackup: boolean): Promise<{ ok: boolean; error?: string }> => {
+export const endMaintenanceMode = async (discard: boolean): Promise<{ success: boolean; error?: string }> => {
   try {
-    if (restoreFromBackup) {
-      const res = await fetch(`${MAINTENANCE_CLOUD_URL}?nocache=${Date.now()}`);
-      if (!res.ok) throw new Error(`Firebase GET failed: HTTP ${res.status}`);
-      const data: BackupData | null = await res.json();
-      if (!data || !Array.isArray(data.users)) throw new Error('バックアップデータが不正です');
+    if (discard) {
+      // backupから本番データを取得して復元
+      const res = await fetch(`${MAINTENANCE_BACKUP_URL}?nocache=${Date.now()}`);
+      if (!res.ok) throw new Error(`バックアップ取得失敗: HTTP ${res.status}`);
+      const backup: BackupData | null = await res.json();
+      if (!backup || !Array.isArray(backup.users)) throw new Error('バックアップデータが無効です');
 
-      localStorage.setItem(USERS_KEY,    JSON.stringify(data.users));
-      localStorage.setItem(MATCHES_KEY,  JSON.stringify(data.matches  || []));
-      localStorage.setItem(SETTINGS_KEY, JSON.stringify(data.settings || {}));
-      localStorage.setItem(LOGS_KEY,     JSON.stringify(data.logs     || []));
+      // ローカルに書き戻す
+      localStorage.setItem(USERS_KEY,    JSON.stringify(backup.users));
+      localStorage.setItem(MATCHES_KEY,  JSON.stringify(backup.matches || []));
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(backup.settings || {}));
+      localStorage.setItem(LOGS_KEY,     JSON.stringify(backup.logs || []));
 
-      // Firebaseメインデータも同期
-      syncWithServer();
+      // 本番Firebaseに書き戻す
+      const restoreRes = await fetch(CLOUD_API_URL, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...backup, timestamp: new Date().toISOString() }),
+      });
+      if (!restoreRes.ok) throw new Error(`本番復元失敗: HTTP ${restoreRes.status}`);
+    } else {
+      // sandboxの内容を本番に昇格
+      const sandboxRes = await fetch(`${MAINTENANCE_SANDBOX_URL}?nocache=${Date.now()}`);
+      if (!sandboxRes.ok) throw new Error(`サンドボックス取得失敗: HTTP ${sandboxRes.status}`);
+      const sandbox: BackupData | null = await sandboxRes.json();
+      if (!sandbox || !Array.isArray(sandbox.users)) throw new Error('サンドボックスデータが無効です');
+
+      const promoteRes = await fetch(CLOUD_API_URL, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...sandbox, timestamp: new Date().toISOString() }),
+      });
+      if (!promoteRes.ok) throw new Error(`本番への昇格失敗: HTTP ${promoteRes.status}`);
     }
-    saveMaintenanceMeta(getMaintenanceMetaDefault());
+
+    // sandboxを削除
+    await fetch(MAINTENANCE_SANDBOX_URL, { method: 'DELETE' }).catch(() => {});
+
+    // メンテ状態をリセット
+    saveMaintenanceState(DEFAULT_MAINTENANCE);
     clearUndoStack();
-    return { ok: true };
+    updateSyncMeta({ status: 'SYNCED', lastSync: new Date().toISOString(), pendingChanges: 0 });
+
+    return { success: true };
   } catch (e: any) {
-    return { ok: false, error: e?.message || 'Unknown error' };
+    return { success: false, error: e?.message || '不明なエラー' };
   }
 };
 
 /**
- * Firebaseのメンテナンスバックアップから現在との差分チェック
+ * Firebaseのbackupデータを確認取得（メンテ画面の「バックアップ確認」ボタン用）
  */
-export const checkMaintenanceBackupStatus = async (): Promise<{
+export const verifyMaintenanceBackup = async (): Promise<{
   ok: boolean;
-  backupTimestamp?: string;
-  currentUserCount?: number;
-  backupUserCount?: number;
+  userCount?: number;
+  matchCount?: number;
+  savedAt?: string;
   error?: string;
 }> => {
   try {
-    const res = await fetch(`${MAINTENANCE_CLOUD_URL}?nocache=${Date.now()}`);
+    const res = await fetch(`${MAINTENANCE_BACKUP_URL}?nocache=${Date.now()}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data: any = await res.json();
-    if (!data) return { ok: true, backupTimestamp: undefined };
+    const data: BackupData & { backedUpAt?: string } = await res.json();
+    if (!data || !Array.isArray(data.users)) throw new Error('データが空です');
+    const state = getMaintenanceState();
+    saveMaintenanceState({ ...state, backupVerified: true });
     return {
       ok: true,
-      backupTimestamp: data.savedAt || data.timestamp,
-      currentUserCount: getRawUsers().length,
-      backupUserCount: (data.users || []).length,
+      userCount: data.users.length,
+      matchCount: (data.matches || []).length,
+      savedAt: data.backedUpAt || data.timestamp,
     };
   } catch (e: any) {
     return { ok: false, error: e?.message };
@@ -400,7 +433,7 @@ export type LoadResult = 'CLOUD_LOADED' | 'LOCAL_NEWER' | 'FAILED' | 'EMPTY';
 
 let _syncTimer: number | null = null;
 
-/** Internal: push current local data to Firebase */
+/** Internal: push current local data to Firebase (or sandbox if maintenance) */
 const pushToCloud = async (): Promise<boolean> => {
   try {
     const timestamp = new Date().toISOString();
@@ -411,7 +444,11 @@ const pushToCloud = async (): Promise<boolean> => {
       logs: getLogs(),
       timestamp,
     };
-    const res = await fetch(CLOUD_API_URL, {
+    // メンテナンスモード中はsandboxに書く
+    const maint = getMaintenanceState();
+    const url = maint.active ? MAINTENANCE_SANDBOX_URL : CLOUD_API_URL;
+
+    const res = await fetch(url, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -533,7 +570,7 @@ const normalizeUser = (user: any): User => ({
     ? Array.from(new Set([...user.unlockedIcons, ...DEFAULT_UNLOCKED_ICONS]))
     : [...DEFAULT_UNLOCKED_ICONS],
   activeIconId:   user.activeIconId   || 'DEFAULT_INITIAL',
-  rate:           user.rate           ?? 1000,
+  rate:           user.rate           ?? INITIAL_RATE,
   wins:           user.wins           ?? 0,
   losses:         user.losses         ?? 0,
   draws:          user.draws          ?? 0,
@@ -546,7 +583,7 @@ const normalizeUser = (user: any): User => ({
   pointsAttendance: user.pointsAttendance ?? 0,
   pointsSpecial:  user.pointsSpecial  ?? 0,
   eventPoints:    user.eventPoints    ?? 0,
-  seasonStartRate:   user.seasonStartRate   ?? user.rate ?? 1000,
+  seasonStartRate:   user.seasonStartRate   ?? user.rate ?? INITIAL_RATE,
   seasonStartPoints: user.seasonStartPoints ?? user.totalPoints ?? 0,
   systemTitle:    user.systemTitle    ?? null,
   faction:        user.faction        ?? 'WHITE',
@@ -556,7 +593,9 @@ const normalizeUser = (user: any): User => ({
   lastAttendance: user.lastAttendance ?? null,
   avatarColor:    user.avatarColor    || 'bg-blue-500',
   rateHistory:    Array.isArray(user.rateHistory) ? user.rateHistory
-    : [{ date: new Date().toISOString(), rate: user.rate || 1000 }],
+    : [{ date: new Date().toISOString(), rate: user.rate ?? INITIAL_RATE }],
+  ranks:          Array.isArray(user.ranks) ? user.ranks : [],
+  profilePin:     user.profilePin ?? '0000',
 });
 
 /** All users including inactive (internal use / admin) */
@@ -676,7 +715,7 @@ export const recordAttendance = (userId: string): AttendanceResult => {
     return { success: false, newAchievements: [], newIcons: [], message: '本日はすでに出席済みです' };
   }
 
-  // ── Undo snapshot ──────────────────────────────────────────
+  // ★ Undo snapshot
   pushUndoSnapshot('ATTENDANCE', `出席: ${user.name}`);
 
   const pts = 5;
@@ -709,11 +748,20 @@ export const recordAttendance = (userId: string): AttendanceResult => {
 const eloExpected = (rA: number, rB: number): number =>
   1 / (1 + Math.pow(10, (rB - rA) / 400));
 
-/** Elo rating delta. Minimum +1 so rating never drops. */
+/**
+ * Elo rating delta.
+ * 勝ち → 正（最低+1）
+ * 負け → 負（最大-1）
+ * 引き分け → 両者微増（±0〜+3程度）
+ * レートは0未満にはならない
+ */
 const eloChange = (myRate: number, oppRate: number, score: number): number => {
   const K = 32;
   const expected = eloExpected(myRate, oppRate);
-  return Math.max(1, Math.round(K * (score - expected)));
+  const raw = Math.round(K * (score - expected));
+  if (score === 1)   return Math.max(1,  raw);   // 勝ち: 最低+1
+  if (score === 0)   return Math.min(-1, raw);   // 負け: 最大-1（負の数）
+  return Math.max(0, raw);                       // 引き分け: 0以上
 };
 
 /** Spam check: >3 matches in last 30 minutes → 0.5 penalty */
@@ -737,9 +785,15 @@ export const processMatch = (
   const p2 = allUsers.find(u => u.id === p2Id);
   if (!p1 || !p2) throw new Error('ユーザーが見つかりません');
 
-  // ── Undo snapshot（変更前の状態を保存） ──────────────────
-  const resultLabel = result === 'PLAYER1_WIN' ? `${p1.name}勝` : result === 'PLAYER2_WIN' ? `${p2.name}勝` : '引き分け';
-  pushUndoSnapshot('MATCH', `対局: ${p1.name} vs ${p2.name} (${resultLabel})`);
+  // ★ 自動一騎討ち判定: 紅白戦中に両大将が異なるfactionで対局
+  const settings = getSettings();
+  const isFactionWar = isEventActive() && settings.eventType === EventType.FACTION_WAR;
+  const autoIsDuel = isFactionWar && p1.isGeneral && p2.isGeneral && p1.faction !== p2.faction;
+  const effectiveDuel = isDuel || autoIsDuel;
+
+  // ★ Undo snapshot（処理前に保存）
+  const resultLabel = result === 'PLAYER1_WIN' ? `${p1.name} 勝ち` : result === 'PLAYER2_WIN' ? `${p2.name} 勝ち` : '引き分け';
+  pushUndoSnapshot('MATCH', `対局: ${p1.name} vs ${p2.name}（${resultLabel}）`);
 
   const settings = getSettings();
   const eventActive = isEventActive();
@@ -795,8 +849,8 @@ export const processMatch = (
   }
 
   // Rate (with rateHistory update ← FIX)
-  p1.rate += p1RateChange;
-  p2.rate += p2RateChange;
+  p1.rate = Math.max(0, p1.rate + p1RateChange);
+  p2.rate = Math.max(0, p2.rate + p2RateChange);
   p1.rateHistory = [...(p1.rateHistory || []), { date: now, rate: p1.rate }];
   p2.rateHistory = [...(p2.rateHistory || []), { date: now, rate: p2.rate }];
 
@@ -812,8 +866,8 @@ export const processMatch = (
   if (eventActive) p2.eventPoints = (p2.eventPoints || 0) + p2Detail.total;
 
   // Achievements & Icons
-  const resP1 = checkAchievementsAndIcons(p1, { isDuelWin: isDuel && p1IsWinner });
-  const resP2 = checkAchievementsAndIcons(p2, { isDuelWin: isDuel && p2IsWinner });
+  const resP1 = checkAchievementsAndIcons(p1, { isDuelWin: effectiveDuel && p1IsWinner });
+  const resP2 = checkAchievementsAndIcons(p2, { isDuelWin: effectiveDuel && p2IsWinner });
 
   saveUsers(allUsers);
 
@@ -828,7 +882,7 @@ export const processMatch = (
     p2RateChange,
     p1PointsEarned: p1Detail.total,
     p2PointsEarned: p2Detail.total,
-    isDuel,
+    isDuel: effectiveDuel,
   };
   const matches = getMatches();
   matches.unshift(matchRecord);
@@ -840,14 +894,14 @@ export const processMatch = (
       id: randomId(), userId: p1Id,
       type: p1IsWinner ? ActivityType.MATCH_WIN : isDraw2 ? ActivityType.MATCH_DRAW : ActivityType.MATCH_LOSS,
       points: p1Detail.total,
-      description: `対局 vs ${p2.name}`,
+      description: `対局 vs ${p2.name}${effectiveDuel ? ' ⚔一騎討ち' : ''}`,
       date: now,
     },
     {
       id: randomId(), userId: p2Id,
       type: p2IsWinner ? ActivityType.MATCH_WIN : isDraw2 ? ActivityType.MATCH_DRAW : ActivityType.MATCH_LOSS,
       points: p2Detail.total,
-      description: `対局 vs ${p1.name}`,
+      description: `対局 vs ${p1.name}${effectiveDuel ? ' ⚔一騎討ち' : ''}`,
       date: now,
     },
   ]);
@@ -858,7 +912,7 @@ export const processMatch = (
     p1PointsEarned: p1Detail.total, p2PointsEarned: p2Detail.total,
     newAchievementsP1: resP1.newAchievements, newAchievementsP2: resP2.newAchievements,
     newIconsP1: resP1.newIcons, newIconsP2: resP2.newIcons,
-    isDuel, result,
+    isDuel: effectiveDuel, result,
   };
 };
 
@@ -997,13 +1051,19 @@ export const awardSystemTitles = (): void => {
 export const deactivateUser = (id: string): void => {
   const all = getRawUsers();
   const u = all.find(x => x.id === id);
-  if (u) { u.isActive = false; u.isGeneral = false; saveUsers(all); }
+  if (u) {
+    pushUndoSnapshot('USER_DEACTIVATE', `休眠: ${u.name}`);
+    u.isActive = false; u.isGeneral = false; saveUsers(all);
+  }
 };
 
 export const reactivateUser = (id: string): void => {
   const all = getRawUsers();
   const u = all.find(x => x.id === id);
-  if (u) { u.isActive = true; saveUsers(all); }
+  if (u) {
+    pushUndoSnapshot('USER_REACTIVATE', `再入班: ${u.name}`);
+    u.isActive = true; saveUsers(all);
+  }
 };
 
 export const getInactiveUsers = (): User[] =>
@@ -1016,6 +1076,8 @@ export const manualPointAdjustment = (uid: string, pts: number, reason: string):
   const all = getRawUsers();
   const u = all.find(x => x.id === uid);
   if (!u) return;
+  // ★ Undo snapshot
+  pushUndoSnapshot('POINT_ADJUST', `ポイント調整: ${u.name} (${pts >= 0 ? '+' : ''}${pts}pt)`);
   u.totalPoints    += pts;
   u.pointsSpecial   = (u.pointsSpecial || 0) + pts;
   u.monthlyPoints  += pts;
@@ -1034,6 +1096,8 @@ export const manualRateAdjustment = (uid: string, delta: number, reason: string)
   const all = getRawUsers();
   const u = all.find(x => x.id === uid);
   if (!u) return;
+  // ★ Undo snapshot
+  pushUndoSnapshot('RATE_ADJUST', `レート調整: ${u.name} (${delta >= 0 ? '+' : ''}${delta})`);
   u.rate += delta;
   u.rateHistory = [...(u.rateHistory || []), { date: new Date().toISOString(), rate: u.rate }];
   checkAchievementsAndIcons(u);
@@ -1081,8 +1145,8 @@ const newUserBase = (name: string, reading?: string, isNewMember = false): User 
   reading,
   isActive:         true,
   isNewMember,
-  rate:             1000,
-  seasonStartRate:  1000,
+  rate:             INITIAL_RATE,
+  seasonStartRate:  INITIAL_RATE,
   seasonStartPoints: 0,
   faction:          'WHITE',
   isGeneral:        false,
@@ -1100,12 +1164,14 @@ const newUserBase = (name: string, reading?: string, isNewMember = false): User 
   draws:            0,
   lastAttendance:   null,
   activityDays:     0,
-  rateHistory:      [{ date: new Date().toISOString(), rate: 1000 }],
+  rateHistory:      [{ date: new Date().toISOString(), rate: INITIAL_RATE }],
   achievements:     [],
   activeTitle:      null,
   avatarColor:      `bg-${['red','blue','green','yellow','purple','pink'][Math.floor(Math.random()*6)]}-500`,
   activeIconId:     'DEFAULT_INITIAL',
   unlockedIcons:    [...DEFAULT_UNLOCKED_ICONS],
+  ranks:            [],
+  profilePin:       '0000',
 });
 
 export const bulkAddUsers = (stubs: Partial<User>[]): void => {
@@ -1139,9 +1205,24 @@ export const getFactionBalanceSimulation = (users: User[]) => {
 
 export const assignGenerals = (redId: string, whiteId: string): void => {
   const all = getRawUsers();
+  // まず全員のisGeneralをリセット
   all.forEach(u => { u.isGeneral = false; });
-  const r = all.find(u => u.id === redId);   if (r) r.isGeneral = true;
-  const w = all.find(u => u.id === whiteId); if (w) w.isGeneral = true;
+
+  const r = all.find(u => u.id === redId);
+  const w = all.find(u => u.id === whiteId);
+  if (r) {
+    r.isGeneral = true;
+    // ★ 大将軍実績チェック（isGeneralをtrueにした後）
+    if (!r.achievements.includes('FACTION_GENERAL')) {
+      r.achievements.push('FACTION_GENERAL');
+    }
+  }
+  if (w) {
+    w.isGeneral = true;
+    if (!w.achievements.includes('FACTION_GENERAL')) {
+      w.achievements.push('FACTION_GENERAL');
+    }
+  }
   saveUsers(all);
 };
 
@@ -1196,6 +1277,150 @@ export const seedData = async (): Promise<void> => {
     id:      `u${100 + i}`,
     faction: (i % 2 === 0 ? 'RED' : 'WHITE') as 'RED' | 'WHITE',
   })));
+};
+
+// ============================================================
+// 級位・段位 申請システム
+// ============================================================
+
+export const getRankApplications = (): RankApplication[] => {
+  try {
+    const raw = localStorage.getItem(RANK_APPS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+};
+
+export const getPendingRankApplications = (): RankApplication[] =>
+  getRankApplications().filter(a => a.status === 'PENDING');
+
+const saveRankApplications = (apps: RankApplication[]): void => {
+  localStorage.setItem(RANK_APPS_KEY, JSON.stringify(apps));
+  window.dispatchEvent(new CustomEvent('rivals-rank-apps-changed', { detail: apps }));
+};
+
+/**
+ * 部員が申請を提出する
+ * 同じユーザーの同じsourceに対してPENDING申請が既にある場合は上書き更新
+ */
+export const submitRankApplication = (
+  userId: string,
+  source: string,
+  rank: string,
+  note: string
+): { success: boolean; error?: string } => {
+  const users = getUsers();
+  const user = users.find(u => u.id === userId);
+  if (!user) return { success: false, error: 'ユーザーが見つかりません' };
+
+  const trimSource = source.trim();
+  const trimRank   = rank.trim();
+  if (!trimSource || !trimRank) return { success: false, error: '入力が不完全です' };
+
+  const apps = getRankApplications();
+
+  // 同じユーザー・同じsourceのPENDING申請があれば更新
+  const existingIdx = apps.findIndex(
+    a => a.userId === userId && a.source === trimSource && a.status === 'PENDING'
+  );
+
+  const entry: RankApplication = {
+    id:          existingIdx >= 0 ? apps[existingIdx].id : randomId(),
+    userId,
+    userName:    user.name,
+    source:      trimSource,
+    rank:        trimRank,
+    note:        note.trim(),
+    submittedAt: new Date().toISOString(),
+    status:      'PENDING',
+  };
+
+  if (existingIdx >= 0) apps[existingIdx] = entry;
+  else apps.unshift(entry);
+
+  saveRankApplications(apps);
+  return { success: true };
+};
+
+/**
+ * 管理者が申請を承認する
+ * User.ranks に追加して保存
+ */
+export const approveRankApplication = (
+  appId: string,
+  reviewNote = ''
+): boolean => {
+  const apps = getRankApplications();
+  const app = apps.find(a => a.id === appId);
+  if (!app || app.status !== 'PENDING') return false;
+
+  // User.ranks に追加
+  const allUsers = getRawUsers();
+  const user = allUsers.find(u => u.id === app.userId);
+  if (!user) return false;
+
+  // 同じsourceの古いランクを更新 or 新規追加
+  const newRank: RankEntry = {
+    id:         randomId(),
+    source:     app.source,
+    rank:       app.rank,
+    approvedAt: new Date().toISOString(),
+  };
+  const existingIdx = (user.ranks || []).findIndex(r => r.source === app.source);
+  if (existingIdx >= 0) user.ranks[existingIdx] = newRank;
+  else user.ranks = [...(user.ranks || []), newRank];
+
+  saveUsers(allUsers);
+
+  // 申請ステータス更新
+  app.status     = 'APPROVED';
+  app.reviewedAt = new Date().toISOString();
+  app.reviewNote = reviewNote;
+  saveRankApplications(apps);
+  syncWithServer();
+  return true;
+};
+
+/**
+ * 管理者が申請を却下する
+ */
+export const rejectRankApplication = (
+  appId: string,
+  reviewNote = ''
+): boolean => {
+  const apps = getRankApplications();
+  const app = apps.find(a => a.id === appId);
+  if (!app || app.status !== 'PENDING') return false;
+
+  app.status     = 'REJECTED';
+  app.reviewedAt = new Date().toISOString();
+  app.reviewNote = reviewNote;
+  saveRankApplications(apps);
+  return true;
+};
+
+/**
+ * 管理者が承認済みランクを剥奪する
+ */
+export const removeRank = (userId: string, rankId: string): void => {
+  const all = getRawUsers();
+  const user = all.find(u => u.id === userId);
+  if (!user) return;
+  user.ranks = (user.ranks || []).filter(r => r.id !== rankId);
+  saveUsers(all);
+};
+
+/**
+ * 管理者が個人ページPINを変更する
+ * 4桁数字のみ許可
+ */
+export const updateProfilePin = (userId: string, newPin: string): { success: boolean; error?: string } => {
+  if (!/^\d{4}$/.test(newPin)) return { success: false, error: '4桁の数字で入力してください' };
+  const all = getRawUsers();
+  const u = all.find(x => x.id === userId);
+  if (!u) return { success: false, error: 'ユーザーが見つかりません' };
+  u.profilePin = newPin;
+  saveUsers(all);
+  return { success: true };
 };
 
 // ============================================================

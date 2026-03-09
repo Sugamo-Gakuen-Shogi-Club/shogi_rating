@@ -83,12 +83,16 @@ const MatchEntry: React.FC = () => {
 
     setIsSubmitting(true);
     try {
-      const record = processMatch(p1, p2, result);
-      
       const p1User = users.find(u => u.id === p1);
       const p2User = users.find(u => u.id === p2);
       const p1Name = p1User?.name || '';
       const p2Name = p2User?.name || '';
+
+      // 大将同士 × 異なるfaction = 一騎討ち（storage側でも自動判定されるが明示的に渡す）
+      const isFactionWarNow = isEventActive() && settings.eventType === EventType.FACTION_WAR;
+      const isDuelMatch = isFactionWarNow && !!p1User?.isGeneral && !!p2User?.isGeneral && p1User.faction !== p2User.faction;
+
+      const record = processMatch(p1, p2, result, isDuelMatch);
 
       setSuccessData({
         p1Name,
@@ -370,15 +374,29 @@ const MatchEntry: React.FC = () => {
       const u = users.find(user => user.id === userId);
       if (!u) return null;
       const avatarChar = getUserAvatarChar(u);
+      const isFW = isEventActive() && getSettings().eventType === EventType.FACTION_WAR;
 
       return (
         <div className="flex flex-col items-center animate-pop-in">
-          <div className={`w-24 h-24 md:w-32 md:h-32 rounded-full ${u.avatarColor} p-1 shadow-lg border-4 border-slate-700 mb-3`}>
-              <div className="w-full h-full rounded-full bg-slate-900/50 backdrop-blur-[1px] flex items-center justify-center text-4xl md:text-5xl text-white font-serif-jp">
-                  {avatarChar}
+          <div className="relative">
+            <div className={`w-24 h-24 md:w-32 md:h-32 rounded-full ${u.avatarColor} p-1 shadow-lg border-4 ${isFW && u.faction === 'RED' ? 'border-red-500' : isFW && u.faction === 'WHITE' ? 'border-blue-500' : 'border-slate-700'} mb-3`}>
+                <div className="w-full h-full rounded-full bg-slate-900/50 backdrop-blur-[1px] flex items-center justify-center text-4xl md:text-5xl text-white font-serif-jp">
+                    {avatarChar}
+                </div>
+            </div>
+            {/* ★ 大将バッジ */}
+            {u.isGeneral && (
+              <div className="absolute -top-2 -right-2 bg-yellow-500 rounded-full w-8 h-8 flex items-center justify-center shadow-lg border-2 border-yellow-300" title="大将">
+                <Crown size={16} className="text-slate-900" />
               </div>
+            )}
           </div>
           <div className="font-bold text-lg text-white">{u.name}</div>
+          {isFW && (
+            <div className={`text-[10px] font-black px-2 py-0.5 rounded-full mt-1 ${u.faction === 'RED' ? 'bg-red-600 text-white' : 'bg-blue-600 text-white'}`}>
+              {u.faction === 'RED' ? '紅組' : '白組'}{u.isGeneral ? ' ★大将' : ''}
+            </div>
+          )}
           <div className="font-mono text-sm text-slate-400">Rate: {Math.round(u.rate)}</div>
         </div>
       );
@@ -407,6 +425,19 @@ const MatchEntry: React.FC = () => {
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400">Versus</span> Mode
         </h2>
         <p className="text-slate-400 font-medium">対戦結果を入力してください</p>
+        {/* ★ 一騎討ちバナー */}
+        {(() => {
+          const p1User = users.find(u => u.id === p1);
+          const p2User = users.find(u => u.id === p2);
+          const factionWar = isEventActive() && getSettings().eventType === EventType.FACTION_WAR;
+          const duel = factionWar && p1User?.isGeneral && p2User?.isGeneral && p1User.faction !== p2User.faction;
+          if (!duel) return null;
+          return (
+            <div className="mt-3 inline-flex items-center gap-2 bg-gradient-to-r from-red-900/60 to-blue-900/60 border border-yellow-500/50 text-yellow-300 px-6 py-2 rounded-full font-black text-sm animate-pulse shadow-lg">
+              <Swords size={16} /> 大将同士の一騎討ち！ <Swords size={16} />
+            </div>
+          );
+        })()}
       </div>
 
       {/* VS Screen Layout */}

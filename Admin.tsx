@@ -8,11 +8,11 @@ import {
   parseUserCSV, bulkAddUsers,
   deactivateUser, reactivateUser, getInactiveUsers,
   manualSync, getSyncStatus, getAutoBackups, restoreFromAutoBackup,
-  // ★ 新機能: Undo & Maintenance
-  peekUndo, undoLastAction, getUndoStack,
-  startMaintenanceMode, endMaintenanceMode, getMaintenanceMeta, checkMaintenanceBackupStatus,
+  getMaintenanceState,
+  getPendingRankApplications, approveRankApplication, rejectRankApplication,
+  updateProfilePin,
 } from './storage';
-import { User, SystemSettings, Season, EventType, SyncMeta, AutoBackupEntry, UndoEntry, MaintenanceMeta } from './types';
+import { User, SystemSettings, Season, EventType, SyncMeta, AutoBackupEntry, MaintenanceState, RankApplication } from './types';
 import { Card } from './Card';
 import { NumPad } from './NumPad';
 import {
@@ -20,9 +20,10 @@ import {
   CheckCircle, Shuffle, Users, Crown, ChevronRight, X,
   RefreshCw, Languages, FileUp, Upload, Swords, Cloud,
   CloudOff, AlertCircle, Loader, UserCheck, UserX, RotateCcw,
-  Undo2, Wrench, ShieldCheck, AlertTriangle, Zap,
+  Wrench, Medal, Check, KeyRound
 } from 'lucide-react';
 import { UserSelector } from './UserSelector';
+import MaintenancePanel from './MaintenancePanel';
 
 const Admin: React.FC = () => {
   const [pin, setPin] = useState('');
@@ -36,22 +37,21 @@ const Admin: React.FC = () => {
   const [syncMeta, setSyncMeta] = useState<SyncMeta>(getSyncStatus());
   const [isSyncing, setIsSyncing] = useState(false);
 
+  // Maintenance
+  const [maintActive, setMaintActive] = useState(getMaintenanceState().active);
+
+  // Rank applications
+  const [rankApps, setRankApps] = useState<RankApplication[]>([]);
+  const [rejectNote, setRejectNote] = useState<Record<string, string>>({});
+
+  // PIN management
+  const [pinTargetId, setPinTargetId] = useState('');
+  const [newPin, setNewPin] = useState('');
+  const [pinMsg, setPinMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+
   // Auto backups
   const [autoBackups, setAutoBackups] = useState<AutoBackupEntry[]>([]);
   const [restoringKey, setRestoringKey] = useState<string | null>(null);
-
-  // Undo
-  const [undoStack, setUndoStack] = useState<UndoEntry[]>([]);
-  const [undoInProgress, setUndoInProgress] = useState(false);
-
-  // Maintenance mode
-  const [maintenanceMeta, setMaintenanceMeta] = useState<MaintenanceMeta>(getMaintenanceMeta());
-  const [maintenanceNote, setMaintenanceNote] = useState('');
-  const [maintenanceLoading, setMaintenanceLoading] = useState(false);
-  const [maintenanceMsg, setMaintenanceMsg] = useState<string | null>(null);
-  const [maintenanceBackupStatus, setMaintenanceBackupStatus] = useState<{
-    backupTimestamp?: string; currentUserCount?: number; backupUserCount?: number; checked?: boolean;
-  } | null>(null);
 
   // Event wizard
   const [isEventWizardOpen, setIsEventWizardOpen] = useState(false);
@@ -94,80 +94,9 @@ const Admin: React.FC = () => {
     return () => window.removeEventListener('rivals-sync-changed', h);
   }, []);
 
-  // Listen for maintenance mode changes
-  useEffect(() => {
-    const h = (e: Event) => setMaintenanceMeta((e as CustomEvent<MaintenanceMeta>).detail);
-    window.addEventListener('rivals-maintenance-changed', h);
-    return () => window.removeEventListener('rivals-maintenance-changed', h);
-  }, []);
-
   const handleLogin = () => {
     if (pin === settings.adminPin) { setIsAuthenticated(true); refreshData(); }
     else { alert('PINが違います'); setPin(''); }
-  };
-
-  // ──────────────────────────────────────────────────────────
-  // UNDO
-  // ──────────────────────────────────────────────────────────
-  const handleUndo = async () => {
-    const top = undoStack[0];
-    if (!top) return;
-    const label = top.type === 'MATCH' ? '対局' : '出席';
-    if (!window.confirm(`直近の${label}「${top.description}」を取り消しますか？\n※この操作は元に戻せません`)) return;
-    setUndoInProgress(true);
-    const ok = undoLastAction();
-    if (ok) {
-      refreshData();
-      alert('取り消しました。');
-    } else {
-      alert('取り消しに失敗しました。');
-    }
-    setUndoInProgress(false);
-  };
-
-  // ──────────────────────────────────────────────────────────
-  // MAINTENANCE MODE
-  // ──────────────────────────────────────────────────────────
-  const handleStartMaintenance = async () => {
-    if (!window.confirm('メンテナンスモードを開始します。\n現在のデータをFirebaseにバックアップしてから、テスト操作を行えます。\n終了時にバックアップから復元できます。\n\n開始しますか？')) return;
-    setMaintenanceLoading(true);
-    setMaintenanceMsg(null);
-    const result = await startMaintenanceMode(maintenanceNote);
-    if (result.ok) {
-      setMaintenanceMsg('✅ メンテナンス開始。Firebaseにバックアップ完了。');
-      refreshData();
-    } else {
-      setMaintenanceMsg(`❌ バックアップ失敗: ${result.error}`);
-    }
-    setMaintenanceLoading(false);
-  };
-
-  const handleEndMaintenance = async (restore: boolean) => {
-    const msg = restore
-      ? 'メンテナンスを終了し、開始前のデータに復元しますか？\n（テスト中の変更はすべて削除されます）'
-      : 'メンテナンスを終了します。\nテスト中のデータはそのまま残ります。よろしいですか？';
-    if (!window.confirm(msg)) return;
-    setMaintenanceLoading(true);
-    setMaintenanceMsg(null);
-    const result = await endMaintenanceMode(restore);
-    if (result.ok) {
-      setMaintenanceMsg(restore ? '✅ 復元完了。メンテナンス終了。' : '✅ メンテナンス終了（データ保持）');
-      refreshData();
-    } else {
-      setMaintenanceMsg(`❌ 終了に失敗: ${result.error}`);
-    }
-    setMaintenanceLoading(false);
-  };
-
-  const handleCheckBackupStatus = async () => {
-    setMaintenanceLoading(true);
-    const status = await checkMaintenanceBackupStatus();
-    if (status.ok) {
-      setMaintenanceBackupStatus({ ...status, checked: true });
-    } else {
-      setMaintenanceMsg(`❌ 確認失敗: ${status.error}`);
-    }
-    setMaintenanceLoading(false);
   };
 
   const refreshData = () => {
@@ -177,8 +106,7 @@ const Admin: React.FC = () => {
     setActiveEvent(isEventActive());
     setSyncMeta(getSyncStatus());
     setAutoBackups(getAutoBackups());
-    setUndoStack(getUndoStack());
-    setMaintenanceMeta(getMaintenanceMeta());
+    setRankApps(getPendingRankApplications());
   };
 
   // ──────────────────────────────────────────────────────────
@@ -250,6 +178,29 @@ const Admin: React.FC = () => {
       reactivateUser(id);
       refreshData();
       alert(`${name} を再入班させました。`);
+    }
+  };
+
+  const handleApproveRank = (appId: string) => {
+    approveRankApplication(appId);
+    refreshData();
+  };
+
+  const handleRejectRank = (appId: string) => {
+    const note = rejectNote[appId] || '';
+    rejectRankApplication(appId, note);
+    refreshData();
+  };
+
+  const handlePinChange = () => {
+    if (!pinTargetId) { setPinMsg({ type: 'err', text: '部員を選択してください' }); return; }
+    const result = updateProfilePin(pinTargetId, newPin);
+    if (result.success) {
+      setPinMsg({ type: 'ok', text: `PINを変更しました` });
+      setNewPin('');
+      setTimeout(() => setPinMsg(null), 3000);
+    } else {
+      setPinMsg({ type: 'err', text: result.error || '変更失敗' });
     }
   };
 
@@ -438,183 +389,6 @@ const Admin: React.FC = () => {
             <RefreshCw size={16} className={isSyncing ? 'animate-spin' : ''} />
             {isSyncing ? '同期中...' : '今すぐ同期'}
           </button>
-        </div>
-      </Card>
-    );
-  };
-
-  // ──────────────────────────────────────────────────────────
-  // UNDO PANEL
-  // ──────────────────────────────────────────────────────────
-  const UndoPanel = () => {
-    const top = undoStack[0] ?? null;
-    return (
-      <Card title="操作の取り消し（Undo）" icon={<Undo2 size={18} className="text-orange-400" />}>
-        <div className="space-y-3">
-          <p className="text-xs text-slate-400">
-            直近の対局・出席を1回取り消せます。取り消し後は元に戻せません。
-          </p>
-          {top ? (
-            <div className="bg-slate-800/60 border border-orange-700/30 rounded-xl p-4 space-y-3">
-              <div className="flex items-start gap-3">
-                <div className={`mt-0.5 p-2 rounded-lg ${top.type === 'MATCH' ? 'bg-blue-900/40 text-blue-400' : 'bg-green-900/40 text-green-400'}`}>
-                  {top.type === 'MATCH' ? <Swords size={16} /> : <CheckCircle size={16} />}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="font-bold text-slate-200 text-sm truncate">{top.description}</div>
-                  <div className="text-[10px] text-slate-500 mt-0.5">
-                    {new Date(top.timestamp).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                  </div>
-                </div>
-              </div>
-              <button
-                onClick={handleUndo}
-                disabled={undoInProgress}
-                className="w-full flex items-center justify-center gap-2 bg-orange-600 hover:bg-orange-500 disabled:bg-slate-700 disabled:text-slate-500 text-white py-3 rounded-xl font-bold transition-all active:scale-95"
-              >
-                <Undo2 size={16} className={undoInProgress ? 'animate-spin' : ''} />
-                {undoInProgress ? '取り消し中...' : 'この操作を取り消す'}
-              </button>
-            </div>
-          ) : (
-            <div className="text-center py-6 text-slate-600">
-              <Undo2 size={32} className="mx-auto mb-2 opacity-30" />
-              <p className="text-sm font-bold">取り消せる操作はありません</p>
-            </div>
-          )}
-          {undoStack.length > 1 && (
-            <div className="space-y-1">
-              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">履歴（参照のみ）</p>
-              {undoStack.slice(1, 4).map(e => (
-                <div key={e.id} className="flex items-center gap-2 text-[11px] text-slate-600 px-2">
-                  <span className="shrink-0">{e.type === 'MATCH' ? '♟' : '✓'}</span>
-                  <span className="truncate">{e.description}</span>
-                  <span className="shrink-0 ml-auto">{new Date(e.timestamp).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </Card>
-    );
-  };
-
-  // ──────────────────────────────────────────────────────────
-  // MAINTENANCE MODE PANEL
-  // ──────────────────────────────────────────────────────────
-  const MaintenancePanel = () => {
-    const isActive = maintenanceMeta.active;
-    return (
-      <Card
-        title="メンテナンスモード"
-        icon={<Wrench size={18} className={isActive ? 'text-yellow-400' : 'text-slate-400'} />}
-      >
-        <div className="space-y-4">
-          {/* Status Banner */}
-          <div className={`flex items-center gap-3 p-3 rounded-xl border font-bold text-sm ${
-            isActive
-              ? 'bg-yellow-900/20 border-yellow-700/40 text-yellow-300'
-              : 'bg-slate-800/60 border-slate-700/40 text-slate-400'
-          }`}>
-            {isActive ? <AlertTriangle size={18} className="text-yellow-400 shrink-0" /> : <ShieldCheck size={18} className="text-slate-500 shrink-0" />}
-            <div className="flex-1 min-w-0">
-              <div>{isActive ? '🔧 メンテナンスモード 稼働中' : '通常モード'}</div>
-              {isActive && maintenanceMeta.startedAt && (
-                <div className="text-[10px] font-normal text-yellow-500/70 mt-0.5">
-                  開始: {new Date(maintenanceMeta.startedAt).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                  {maintenanceMeta.note && ` · ${maintenanceMeta.note}`}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <p className="text-xs text-slate-400 leading-relaxed">
-            開始時に全データをFirebaseへバックアップします。新機能テスト後、バックアップから復元するか、そのまま終了するか選べます。
-          </p>
-
-          {/* Message */}
-          {maintenanceMsg && (
-            <div className={`text-xs font-bold p-3 rounded-xl ${
-              maintenanceMsg.startsWith('✅') ? 'bg-green-900/20 text-green-400 border border-green-700/30' : 'bg-red-900/20 text-red-400 border border-red-700/30'
-            }`}>
-              {maintenanceMsg}
-            </div>
-          )}
-
-          {!isActive ? (
-            <div className="space-y-3">
-              <div>
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1.5">メモ（任意）</label>
-                <input
-                  type="text"
-                  value={maintenanceNote}
-                  onChange={e => setMaintenanceNote(e.target.value)}
-                  placeholder="例: ランキング新機能テスト"
-                  className="w-full p-3 bg-slate-900 border border-slate-700 rounded-xl text-sm text-white font-bold outline-none focus:ring-2 focus:ring-yellow-500/50"
-                />
-              </div>
-              <button
-                onClick={handleStartMaintenance}
-                disabled={maintenanceLoading}
-                className="w-full flex items-center justify-center gap-2 bg-yellow-600 hover:bg-yellow-500 disabled:bg-slate-700 disabled:text-slate-500 text-white py-3 rounded-xl font-bold transition-all active:scale-95"
-              >
-                {maintenanceLoading ? <Loader size={16} className="animate-spin" /> : <Wrench size={16} />}
-                {maintenanceLoading ? 'バックアップ中...' : 'メンテナンス開始 & バックアップ'}
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {/* Firebase backup status check */}
-              <div className="bg-slate-900/50 border border-slate-700/50 rounded-xl p-3 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-400">Firebaseバックアップ確認</span>
-                  <button
-                    onClick={handleCheckBackupStatus}
-                    disabled={maintenanceLoading}
-                    className="flex items-center gap-1 text-[10px] font-bold text-blue-400 hover:text-blue-300 bg-blue-900/20 px-2 py-1 rounded-lg border border-blue-700/30"
-                  >
-                    <Cloud size={10} /> 確認
-                  </button>
-                </div>
-                {maintenanceBackupStatus?.checked && (
-                  <div className="text-[11px] space-y-1 text-slate-400">
-                    <div>バックアップ時刻: <span className="text-slate-200 font-bold">
-                      {maintenanceBackupStatus.backupTimestamp
-                        ? new Date(maintenanceBackupStatus.backupTimestamp).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-                        : 'なし'
-                      }
-                    </span></div>
-                    <div className="flex gap-4">
-                      <span>現在: <span className="text-yellow-300 font-bold">{maintenanceBackupStatus.currentUserCount}名</span></span>
-                      <span>バックアップ: <span className="text-green-300 font-bold">{maintenanceBackupStatus.backupUserCount}名</span></span>
-                    </div>
-                    {maintenanceBackupStatus.currentUserCount !== maintenanceBackupStatus.backupUserCount && (
-                      <div className="text-orange-400">⚠ 部員数が変わっています（テストで変更されました）</div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={() => handleEndMaintenance(true)}
-                  disabled={maintenanceLoading}
-                  className="flex flex-col items-center justify-center gap-1.5 bg-green-700 hover:bg-green-600 disabled:bg-slate-700 disabled:text-slate-500 text-white py-4 rounded-xl font-bold transition-all active:scale-95 text-center"
-                >
-                  {maintenanceLoading ? <Loader size={18} className="animate-spin" /> : <RotateCcw size={18} />}
-                  <span className="text-xs leading-tight">終了して<br />バックアップに復元</span>
-                </button>
-                <button
-                  onClick={() => handleEndMaintenance(false)}
-                  disabled={maintenanceLoading}
-                  className="flex flex-col items-center justify-center gap-1.5 bg-slate-700 hover:bg-slate-600 disabled:bg-slate-800 disabled:text-slate-600 text-slate-200 py-4 rounded-xl font-bold transition-all active:scale-95 text-center border border-slate-600"
-                >
-                  {maintenanceLoading ? <Loader size={18} className="animate-spin" /> : <Zap size={18} />}
-                  <span className="text-xs leading-tight">終了して<br />データ保持</span>
-                </button>
-              </div>
-            </div>
-          )}
         </div>
       </Card>
     );
@@ -816,26 +590,6 @@ const Admin: React.FC = () => {
         </div>
       </div>
 
-      {/* Maintenance Mode Banner */}
-      {maintenanceMeta.active && (
-        <div className="flex items-center gap-3 bg-yellow-900/30 border border-yellow-600/40 rounded-2xl px-5 py-4">
-          <Wrench size={20} className="text-yellow-400 shrink-0 animate-pulse" />
-          <div className="flex-1">
-            <div className="font-black text-yellow-300 text-sm">🔧 メンテナンスモード稼働中</div>
-            <div className="text-xs text-yellow-500/80 mt-0.5">
-              テスト中の操作はFirebaseに同期されます。終了時に復元するか選択できます。
-              {maintenanceMeta.note && ` — ${maintenanceMeta.note}`}
-            </div>
-          </div>
-          <button
-            onClick={() => handleEndMaintenance(true)}
-            className="shrink-0 text-xs font-bold text-yellow-300 bg-yellow-900/40 border border-yellow-700/40 px-3 py-2 rounded-xl hover:bg-yellow-800/40"
-          >
-            終了 & 復元
-          </button>
-        </div>
-      )}
-
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
 
         {/* ── 左列 ── */}
@@ -922,6 +676,53 @@ const Admin: React.FC = () => {
 
         {/* ── 右列 ── */}
         <div className="space-y-8">
+          {/* ── ランク申請承認 ── */}
+          <Card title={`段位・級位の申請 ${rankApps.length > 0 ? `(${rankApps.length}件待ち)` : ''}`} icon={<Medal className="text-purple-400" size={18} />}>
+            <div className="space-y-3">
+              {rankApps.length === 0 ? (
+                <p className="text-slate-500 text-sm font-bold py-2">承認待ちの申請はありません。</p>
+              ) : (
+                rankApps.map(app => (
+                  <div key={app.id} className="p-4 bg-slate-800/60 border border-slate-700 rounded-2xl space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="font-black text-white">{app.userName}</div>
+                        <div className="text-sm text-purple-300 font-bold mt-0.5">
+                          {app.source} <span className="text-white">→ {app.rank}</span>
+                        </div>
+                        {app.note && <div className="text-xs text-slate-400 mt-1">💬 {app.note}</div>}
+                        <div className="text-[10px] text-slate-600 mt-1">
+                          {new Date(app.submittedAt).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleApproveRank(app.id)}
+                        className="flex-1 flex items-center justify-center gap-1.5 bg-green-700 hover:bg-green-600 text-white py-2 rounded-xl font-black text-sm transition-all active:scale-[0.97]"
+                      >
+                        <Check size={14} /> 承認
+                      </button>
+                      <button
+                        onClick={() => handleRejectRank(app.id)}
+                        className="flex-1 flex items-center justify-center gap-1.5 bg-red-900/40 hover:bg-red-800/60 text-red-300 border border-red-700/40 py-2 rounded-xl font-black text-sm transition-all active:scale-[0.97]"
+                      >
+                        <X size={14} /> 却下
+                      </button>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="却下理由（任意）"
+                      value={rejectNote[app.id] || ''}
+                      onChange={e => setRejectNote(prev => ({ ...prev, [app.id]: e.target.value }))}
+                      className="w-full p-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-slate-300 font-bold focus:border-red-500 outline-none"
+                    />
+                  </div>
+                ))
+              )}
+            </div>
+          </Card>
+
           {/* Season & Titles */}
           <Card title="シーズン・称号" icon={<Crown className="text-yellow-500" />}>
             <div className="space-y-6">
@@ -938,6 +739,54 @@ const Admin: React.FC = () => {
               </div>
               {settings.lastTitleUpdate && (
                 <div className="text-xs text-slate-600 text-center">最終更新: {new Date(settings.lastTitleUpdate).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
+              )}
+            </div>
+          </Card>
+
+          {/* PIN Management */}
+          <Card title="個人ページPIN管理" icon={<KeyRound className="text-amber-400" size={18} />}>
+            <div className="space-y-4">
+              <p className="text-xs text-slate-400 font-bold leading-relaxed">
+                個人ページは部員ごとのPINで保護されています。<br/>
+                初期PINは <span className="text-white font-black">0000</span> です。
+              </p>
+              {pinMsg && (
+                <div className={`flex items-center gap-2 p-3 rounded-xl border text-sm font-bold ${pinMsg.type === 'ok' ? 'bg-green-900/20 border-green-700/40 text-green-300' : 'bg-red-900/20 border-red-700/40 text-red-300'}`}>
+                  {pinMsg.type === 'ok' ? <Check size={14}/> : <X size={14}/>}
+                  {pinMsg.text}
+                </div>
+              )}
+              <select
+                className="w-full p-3 border border-slate-700 rounded-xl font-bold bg-slate-900 text-white"
+                value={pinTargetId}
+                onChange={e => { setPinTargetId(e.target.value); setNewPin(''); setPinMsg(null); }}
+              >
+                <option value="">部員を選択...</option>
+                {users.map(u => (
+                  <option key={u.id} value={u.id}>{u.name}（現在のPIN: {u.profilePin ?? '0000'}）</option>
+                ))}
+              </select>
+              {pinTargetId && (
+                <>
+                  <div>
+                    <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2">新しいPIN（4桁）</label>
+                    <input
+                      type="text"
+                      value={newPin}
+                      onChange={e => setNewPin(e.target.value.replace(/\D/g,'').slice(0,4))}
+                      placeholder="0000"
+                      maxLength={4}
+                      className="w-full p-3 border border-slate-700 rounded-xl font-mono text-2xl tracking-[0.5em] text-center bg-slate-800 text-white focus:border-amber-500 outline-none"
+                    />
+                  </div>
+                  <button
+                    onClick={handlePinChange}
+                    disabled={newPin.length < 4}
+                    className="w-full bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 disabled:text-slate-500 text-white py-3 rounded-xl font-black transition-all active:scale-[0.98]"
+                  >
+                    PINを変更する
+                  </button>
+                </>
               )}
             </div>
           </Card>
@@ -971,12 +820,6 @@ const Admin: React.FC = () => {
 
           {/* Sync Status */}
           <SyncStatusPanel />
-
-          {/* Undo */}
-          <UndoPanel />
-
-          {/* Maintenance Mode */}
-          <MaintenancePanel />
 
           {/* Auto Backups */}
           <AutoBackupPanel />
@@ -1015,6 +858,9 @@ const Admin: React.FC = () => {
               )}
             </div>
           </Card>
+
+          {/* Maintenance Mode */}
+          <MaintenancePanel onModeChange={setMaintActive} />
         </div>
       </div>
     </div>

@@ -99,6 +99,10 @@ export interface User {
   achievements: string[];
   activeTitle: string | null;
   avatarColor: string;
+  // ★ 承認済み級位・段位
+  ranks: RankEntry[];
+  // ★ 個人ページPIN（初期値 "0000"）
+  profilePin: string;
 }
 
 export interface MatchRecord {
@@ -202,25 +206,56 @@ export interface AutoBackupEntry {
   timestamp: string;
 }
 
-// ── Undo ──────────────────────────────────────────────────────
-export type UndoActionType = 'MATCH' | 'ATTENDANCE';
+// ★ 級位・段位
+export interface RankEntry {
+  id: string;
+  source: string;       // "将棋ウォーズ" など
+  rank: string;         // "3級" "初段" など
+  approvedAt: string;
+}
+
+export interface RankApplication {
+  id: string;
+  userId: string;
+  userName: string;
+  source: string;
+  rank: string;
+  note: string;
+  submittedAt: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  reviewedAt?: string;
+  reviewNote?: string;
+}
+
+// ★ Maintenance mode
+export interface MaintenanceState {
+  active: boolean;
+  startedAt: string | null;
+  startedBy: string;          // 開始した管理者メモ（任意）
+  backupTimestamp: string | null;  // Firebase backup保存日時
+  backupVerified: boolean;    // Firebaseバックアップ確認済みか
+  note: string;               // 作業メモ
+}
+
+// ★ Undo system
+export type UndoActionType =
+  | 'MATCH'
+  | 'ATTENDANCE'
+  | 'POINT_ADJUST'
+  | 'RATE_ADJUST'
+  | 'USER_ADD'
+  | 'USER_DEACTIVATE'
+  | 'USER_REACTIVATE';
 
 export interface UndoEntry {
   id: string;
-  type: UndoActionType;
+  actionType: UndoActionType;
+  description: string;   // 表示用: "対局: 田中 vs 鈴木"
   timestamp: string;
-  description: string;        // 表示用テキスト e.g. "対局: 山田 vs 田中 (山田勝)"
+  // complete snapshots needed to revert
   snapshot: {
     users: User[];
     matches: MatchRecord[];
     logs: ActivityLog[];
   };
-}
-
-// ── Maintenance Mode ──────────────────────────────────────────
-export interface MaintenanceMeta {
-  active: boolean;
-  startedAt: string | null;
-  backupKey: string | null;   // Firebase上のバックアップキー
-  note: string;
 }

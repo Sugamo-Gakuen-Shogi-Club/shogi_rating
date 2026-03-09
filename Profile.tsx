@@ -1,14 +1,14 @@
 
 import React, { useState, useEffect } from 'react';
-import { getUsers, getMatches, ACHIEVEMENTS_DATA, updateUserTitle, getRivalryStats, ICONS_DATA, updateUserIcon, getUserAvatarChar, getLogs, getSettings, isEventActive, getUserIconDef, SYSTEM_TITLES, submitRankApplication, getRankApplications, clearOfficialRank } from './storage';
-import { RankApplication } from './types';
-import { User, MatchRecord, IconDef, ActivityLog, ActivityType, EventType, RivalData } from './types';
+import { getUsers, getMatches, ACHIEVEMENTS_DATA, updateUserTitle, getRivalryStats, ICONS_DATA, updateUserIcon, getUserAvatarChar, getLogs, getSettings, isEventActive, getUserIconDef, SYSTEM_TITLES, submitRankApplication, removeRank, updateProfilePin } from './storage';
+import { User, MatchRecord, IconDef, ActivityLog, ActivityType, EventType, RivalData, RankEntry } from './types';
 import { Card } from './Card';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Award, TrendingUp, Calendar, ArrowLeft, Tag, Star, Crown, Swords, Search, Skull, Smile, Lock, Grid, Shield, List } from 'lucide-react';
+import { Award, TrendingUp, Calendar, ArrowLeft, Tag, Star, Crown, Swords, Search, Skull, Smile, Lock, Grid, Shield, List, Medal, Plus, Check, X as XIcon, Trash2 } from 'lucide-react';
 import { UserSelector } from './UserSelector';
 import { useNavigate } from 'react-router-dom';
 import { ShogiPiece } from './ShogiPiece';
+import { NumPad } from './NumPad';
 
 // Title Collection Modal
 const TitleCollectionModal: React.FC<{ user: User, onClose: () => void }> = ({ user, onClose }) => {
@@ -188,6 +188,9 @@ const ActivityHeatmap: React.FC<{ logs: ActivityLog[], userId: string }> = ({ lo
 const Profile: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [pinInput, setPinInput] = useState('');
+  const [pinError, setPinError] = useState(false);
   const [matches, setMatches] = useState<MatchRecord[]>([]);
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [rivalStats, setRivalStats] = useState<{bestCustomer: RivalData | null, nemeses: RivalData | null}>({bestCustomer: null, nemeses: null});
@@ -197,14 +200,14 @@ const Profile: React.FC = () => {
   const [isRankModalOpen, setIsRankModalOpen] = useState(false);
   const [rankSource, setRankSource] = useState('');
   const [rankValue, setRankValue] = useState('');
-  const [rankApps, setRankApps] = useState<RankApplication[]>([]);
+  const [rankNote, setRankNote] = useState('');
+  const [rankMsg, setRankMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
     setUsers(getUsers());
     setMatches(getMatches());
     setLogs(getLogs());
-    setRankApps(getRankApplications());
   }, []);
 
   useEffect(() => {
@@ -226,17 +229,113 @@ const Profile: React.FC = () => {
       setIsIconModalOpen(false);
   };
 
+  const handleRankSubmit = () => {
+    if (!selectedId) return;
+    const result = submitRankApplication(selectedId, rankSource, rankValue, rankNote);
+    if (result.success) {
+      setRankMsg({ type: 'ok', text: '申請を送信しました。管理者の承認をお待ちください。' });
+      setRankSource(''); setRankValue(''); setRankNote('');
+      setTimeout(() => setRankMsg(null), 4000);
+    } else {
+      setRankMsg({ type: 'err', text: result.error || '送信失敗' });
+    }
+  };
+
+  const handleUserSelect = (id: string) => {
+    setSelectedId(id);
+    setIsAuthenticated(false);
+    setPinInput('');
+    setPinError(false);
+  };
+
+  const handlePinSubmit = () => {
+    const user = users.find(u => u.id === selectedId);
+    if (!user) return;
+    const correct = user.profilePin ?? '0000';
+    if (pinInput === correct) {
+      setIsAuthenticated(true);
+      setPinError(false);
+    } else {
+      setPinError(true);
+      setPinInput('');
+      setTimeout(() => setPinError(false), 2000);
+    }
+  };
+
   // View 1: User Selection
   if (!selectedId) {
     return (
       <div className="space-y-6 animate-in fade-in duration-300">
         <UserSelector 
             users={users}
-            onSelect={(id) => setSelectedId(id)}
+            onSelect={handleUserSelect}
             onClose={() => navigate('/')}
             title="プロフィール閲覧（部員を選択）"
             mode="SIMPLE"
         />
+      </div>
+    );
+  }
+
+  // View 1.5: PIN Authentication
+  const selectedUser = users.find(u => u.id === selectedId);
+  if (!isAuthenticated) {
+    return (
+      <div className="flex items-center justify-center min-h-[70vh] p-4 animate-in fade-in duration-300">
+        <div className="w-full max-w-sm bg-slate-900 border border-white/10 rounded-3xl shadow-2xl overflow-hidden">
+          {/* Header */}
+          <div className="p-8 pb-4 text-center relative">
+            <button
+              onClick={() => setSelectedId(null)}
+              className="absolute top-5 left-5 text-slate-500 hover:text-white transition-colors p-1"
+            >
+              <ArrowLeft size={20} />
+            </button>
+            <div className={`w-20 h-20 rounded-full ${selectedUser?.avatarColor || 'bg-blue-600'} mx-auto mb-4 flex items-center justify-center text-4xl text-white font-serif-jp font-black shadow-xl`}>
+              {selectedUser?.name.charAt(0)}
+            </div>
+            <h2 className="text-xl font-black text-white">{selectedUser?.name}</h2>
+            <p className="text-sm text-slate-400 font-bold mt-1">個人ページ</p>
+          </div>
+
+          {/* PIN input */}
+          <div className="px-8 pb-2">
+            <label className="block text-xs font-black text-slate-500 uppercase tracking-widest text-center mb-3">
+              PINコードを入力
+            </label>
+            <div className={`transition-all duration-300 ${pinError ? 'animate-bounce' : ''}`}>
+              <input
+                type="password"
+                value={pinInput}
+                readOnly
+                placeholder="••••"
+                className={`w-full p-4 border rounded-xl text-center text-3xl tracking-[1em] outline-none bg-slate-800 text-white font-mono transition-colors ${
+                  pinError ? 'border-red-500 bg-red-900/20' : 'border-slate-700'
+                }`}
+              />
+            </div>
+            {pinError && (
+              <p className="text-red-400 text-xs font-black text-center mt-2 animate-in fade-in">
+                PINが正しくありません
+              </p>
+            )}
+          </div>
+
+          <NumPad value={pinInput} onChange={setPinInput} maxLength={4} />
+
+          <div className="px-8 pb-8">
+            <button
+              onClick={handlePinSubmit}
+              disabled={pinInput.length < 4}
+              className="w-full bg-slate-200 disabled:bg-slate-700 disabled:text-slate-500 text-slate-900 py-3 rounded-xl font-black active:scale-95 transition-all shadow-lg"
+            >
+              開く
+            </button>
+            <p className="text-center text-[11px] text-slate-600 font-bold mt-3">
+              初期PINは <span className="text-slate-400">0000</span> です
+            </p>
+          </div>
+        </div>
       </div>
     );
   }
@@ -295,40 +394,6 @@ const Profile: React.FC = () => {
           />
       )}
 
-
-      {isRankModalOpen && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-in fade-in zoom-in duration-200">
-          <div className="bg-slate-900 w-full max-w-md rounded-3xl shadow-2xl overflow-hidden border border-white/10">
-            <div className="p-5 border-b border-white/5 bg-slate-800 flex items-center justify-between">
-              <h3 className="text-lg font-black text-white flex items-center gap-2"><Award className="text-purple-400"/> 段位・級位を申請</h3>
-              <button onClick={() => setIsRankModalOpen(false)} className="p-2 bg-slate-700 text-slate-300 rounded-full hover:bg-slate-600"><ArrowLeft size={20}/></button>
-            </div>
-            <div className="p-6 space-y-4">
-              <p className="text-xs text-slate-400">申請後、管理者が確認・承認するとプロフィールとランキングに表示されます。</p>
-              <div>
-                <label className="block text-xs font-bold text-slate-400 mb-1">出典（将棋ウォーズ / 将棋連盟道場 など）</label>
-                <input type="text" value={rankSource} onChange={e => setRankSource(e.target.value)} placeholder="例: 将棋ウォーズ" className="w-full p-3 bg-slate-800 border border-slate-700 rounded-xl text-white font-bold outline-none focus:ring-2 focus:ring-purple-500"/>
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-400 mb-1">段位・級位</label>
-                <input type="text" value={rankValue} onChange={e => setRankValue(e.target.value)} placeholder="例: 3級 / 初段 / 二段" className="w-full p-3 bg-slate-800 border border-slate-700 rounded-xl text-white font-bold outline-none focus:ring-2 focus:ring-purple-500"/>
-              </div>
-              {(() => { const myApp = rankApps.find(a => a.userId === selectedId && a.status === 'PENDING'); return myApp ? <div className="text-xs text-amber-400 bg-amber-900/20 border border-amber-700/40 rounded-xl p-3 font-bold">申請中: {myApp.source} {myApp.rank}（管理者の確認待ち）</div> : null; })()}
-              {user.officialRank && (
-                <div className="flex items-center justify-between text-xs text-green-400 bg-green-900/20 border border-green-700/40 rounded-xl p-3">
-                  <span className="font-bold">承認済み: {user.officialRank.source} {user.officialRank.rank}</span>
-                  <button onClick={() => { if (window.confirm('登録済みの段位・級位を削除しますか？')) { clearOfficialRank(user.id); setUsers(getUsers()); setIsRankModalOpen(false); } }} className="text-red-400 hover:text-red-300 ml-2">削除</button>
-                </div>
-              )}
-            </div>
-            <div className="p-5 border-t border-white/5 bg-slate-950 flex justify-end gap-3">
-              <button onClick={() => setIsRankModalOpen(false)} className="px-6 py-3 rounded-xl font-bold text-slate-400">キャンセル</button>
-              <button onClick={() => { if (!rankSource.trim() || !rankValue.trim()) { alert('出典と段位・級位を入力してください'); return; } submitRankApplication(user.id, rankSource.trim(), rankValue.trim()); setRankApps(getRankApplications()); setIsRankModalOpen(false); setRankSource(''); setRankValue(''); alert('申請しました。管理者の確認をお待ちください。'); }} className="bg-purple-600 text-white px-8 py-3 rounded-xl font-black">申請する</button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {isIconModalOpen && (
           <IconSelectorModal 
             user={user}
@@ -345,19 +410,27 @@ const Profile: React.FC = () => {
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-4">
             <button 
-                onClick={() => setSelectedId(null)}
+                onClick={() => { setSelectedId(null); setIsAuthenticated(false); }}
                 className="p-2 rounded-full hover:bg-slate-700 transition-colors bg-slate-800 shadow-sm border border-slate-700"
             >
                 <ArrowLeft size={24} className="text-slate-300"/>
             </button>
             <h2 className="text-2xl font-bold text-white">個人詳細データ</h2>
         </div>
-        <button 
-            onClick={() => setIsSelectorOpen(true)}
-            className="flex items-center gap-2 bg-slate-800 px-4 py-2 rounded-lg border border-slate-700 text-sm font-bold text-slate-300 hover:bg-slate-700 transition-colors shadow-sm"
-        >
-            <Search size={16}/> 他の部員を見る
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+              onClick={() => { setIsAuthenticated(false); setPinInput(""); }}
+              className="flex items-center gap-2 bg-slate-800 px-3 py-2 rounded-lg border border-slate-700 text-sm font-bold text-slate-400 hover:bg-slate-700 transition-colors"
+          >
+              <Lock size={15}/> ロック
+          </button>
+          <button 
+              onClick={() => { setSelectedId(null); setIsAuthenticated(false); setIsSelectorOpen(true); }}
+              className="flex items-center gap-2 bg-slate-800 px-4 py-2 rounded-lg border border-slate-700 text-sm font-bold text-slate-300 hover:bg-slate-700 transition-colors shadow-sm"
+          >
+              <Search size={16}/> 他の部員を見る
+          </button>
+        </div>
       </div>
 
       {/* Main Profile Header */}
@@ -469,13 +542,6 @@ const Profile: React.FC = () => {
                     </select>
                 </div>
              </div>
-                {/* Rank application */}
-                <div className="flex items-center justify-center md:justify-start gap-2 bg-slate-800/50 p-2 rounded-lg border border-white/5 mt-2">
-                  <button onClick={() => setIsRankModalOpen(true)} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-black transition-all ${user.officialRank ? 'bg-purple-900/30 text-purple-300 border border-purple-700/40' : 'bg-slate-700 text-slate-400 hover:text-white'}`}>
-                    <Award size={14}/>
-                    {user.officialRank ? `${user.officialRank.source} ${user.officialRank.rank}` : '段位・級位を申請'}
-                  </button>
-                </div>
          </div>
       </div>
       
@@ -513,6 +579,100 @@ const Profile: React.FC = () => {
                     </div>
                 </div>
             </Card>
+
+            {/* ── 級位・段位 ──────────────────────────────── */}
+            <Card title="段位・級位" icon={<Medal size={18} className="text-purple-400" />}>
+              <div className="space-y-4">
+                {/* 承認済みランク一覧 */}
+                {(user.ranks || []).length > 0 ? (
+                  <div className="space-y-2">
+                    {(user.ranks || []).map((r: RankEntry) => (
+                      <div key={r.id} className="flex items-center justify-between p-3 bg-purple-900/10 border border-purple-700/30 rounded-xl gap-3">
+                        <div>
+                          <div className="text-sm font-black text-purple-200">{r.rank}</div>
+                          <div className="text-[10px] text-slate-500 font-bold">{r.source} · {new Date(r.approvedAt).toLocaleDateString('ja-JP')}</div>
+                        </div>
+                        <span className="text-[10px] bg-green-900/40 text-green-400 border border-green-700/40 px-2 py-0.5 rounded font-black">承認済</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-slate-500 text-sm font-bold">まだ登録されたランクはありません。</p>
+                )}
+
+                {/* 申請ボタン */}
+                <button
+                  onClick={() => setIsRankModalOpen(true)}
+                  className="w-full flex items-center justify-center gap-2 bg-purple-900/20 hover:bg-purple-900/40 border border-purple-700/40 text-purple-300 py-3 rounded-xl font-black text-sm transition-all active:scale-[0.98]"
+                >
+                  <Plus size={16} /> ランクを申請する
+                </button>
+              </div>
+            </Card>
+
+            {/* ── 級位申請モーダル ───────────────────────── */}
+            {isRankModalOpen && (
+              <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/90 backdrop-blur-sm p-4">
+                <div className="bg-slate-900 w-full max-w-md rounded-3xl shadow-2xl border border-white/10 overflow-hidden">
+                  <div className="flex items-center justify-between px-6 py-4 bg-slate-800 border-b border-white/5">
+                    <div className="flex items-center gap-3 font-black text-white">
+                      <Medal size={20} className="text-purple-400" /> ランク申請
+                    </div>
+                    <button onClick={() => { setIsRankModalOpen(false); setRankMsg(null); }} className="text-slate-500 hover:text-white p-1">
+                      <XIcon size={18} />
+                    </button>
+                  </div>
+                  <div className="p-6 space-y-4">
+                    {rankMsg && (
+                      <div className={`flex items-center gap-2 p-3 rounded-xl border text-sm font-bold ${rankMsg.type === 'ok' ? 'bg-green-900/20 border-green-700/40 text-green-300' : 'bg-red-900/20 border-red-700/40 text-red-300'}`}>
+                        {rankMsg.type === 'ok' ? <Check size={16} /> : <XIcon size={16} />}
+                        {rankMsg.text}
+                      </div>
+                    )}
+                    <div>
+                      <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">棋力認定元 <span className="text-red-400">*</span></label>
+                      <input
+                        type="text"
+                        value={rankSource}
+                        onChange={e => setRankSource(e.target.value)}
+                        placeholder="例：将棋ウォーズ、将棋連盟道場"
+                        className="w-full p-3 bg-slate-800 border border-slate-700 rounded-xl text-white font-bold text-sm focus:border-purple-500 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">段位・級位 <span className="text-red-400">*</span></label>
+                      <input
+                        type="text"
+                        value={rankValue}
+                        onChange={e => setRankValue(e.target.value)}
+                        placeholder="例：3級、初段、二段"
+                        className="w-full p-3 bg-slate-800 border border-slate-700 rounded-xl text-white font-bold text-sm focus:border-purple-500 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">補足メモ（任意）</label>
+                      <input
+                        type="text"
+                        value={rankNote}
+                        onChange={e => setRankNote(e.target.value)}
+                        placeholder="例：レート1400、昨年取得"
+                        className="w-full p-3 bg-slate-800 border border-slate-700 rounded-xl text-white font-bold text-sm focus:border-purple-500 outline-none"
+                      />
+                    </div>
+                    <p className="text-[11px] text-slate-500 font-bold leading-relaxed">
+                      申請後、管理者が確認・承認するとプロフィールとランキングに表示されます。
+                    </p>
+                    <button
+                      onClick={handleRankSubmit}
+                      disabled={!rankSource.trim() || !rankValue.trim()}
+                      className="w-full bg-purple-600 hover:bg-purple-500 disabled:bg-slate-700 disabled:text-slate-500 text-white py-3 rounded-xl font-black transition-all active:scale-[0.98]"
+                    >
+                      申請を送信
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Rival Analysis Card */}
             {(rivalStats.bestCustomer || rivalStats.nemeses) && (
