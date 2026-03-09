@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { HashRouter, Routes, Route, useLocation, Link } from 'react-router-dom';
-import { Home, Trophy, User as UserIcon, Settings, PlusCircle, BookOpen, Cloud, CloudOff, RefreshCw, Loader, AlertCircle, Wrench } from 'lucide-react';
+import { Home, Trophy, User as UserIcon, Settings, PlusCircle, BookOpen, Cloud, CloudOff, RefreshCw, Loader, AlertCircle, Wrench, Globe, Copy, Check } from 'lucide-react';
 import { seedData, loadFromCloud, getUsers, getSyncStatus, manualSync, LoadResult, getMaintenanceState } from './storage';
+import { initAppCheck } from './appCheck';
 import { SyncMeta } from './types';
 
 import Dashboard  from './Dashboard';
@@ -12,6 +13,7 @@ import Admin      from './Admin';
 import { Guide }  from './Guide';
 import { Screensaver } from './Screensaver';
 import UndoPanel  from './UndoPanel';
+import PublicView from './PublicView';
 
 /** Maintenance mode banner shown across all pages */
 const MaintenanceBanner: React.FC = () => {
@@ -114,6 +116,12 @@ const SyncIndicator: React.FC = () => {
 // ─── Layout ─────────────────────────────────────────────────
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
+
+  // 公開ページはアプリシェルを使わない（独自レイアウト）
+  if (location.pathname === '/view' || location.pathname === '/board') {
+    return <>{children}</>;
+  }
+
   const navItems = [
     { path: '/',         icon: Home,       label: 'ホーム' },
     { path: '/rankings', icon: Trophy,     label: 'ランキング' },
@@ -211,6 +219,9 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const initialize = async () => {
+      // ★ App Check を最初に初期化（Firebase へのリクエスト前）
+      initAppCheck();
+
       setInitMessage('クラウドデータを取得中...');
       const result: LoadResult = await loadFromCloud();
 
@@ -272,6 +283,8 @@ const App: React.FC = () => {
           <Route path="/profile"  element={<Profile />} />
           <Route path="/guide"    element={<Guide />} />
           <Route path="/admin"    element={<Admin />} />
+          <Route path="/view"     element={<PublicView />} />
+          <Route path="/board"    element={<PublicView />} />
         </Routes>
       </Layout>
       {/* 全ページ共通フローティングUndoボタン */}

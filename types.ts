@@ -120,6 +120,7 @@ export interface MatchRecord {
 
 export interface SystemSettings {
   adminPin: string;
+  clubName: string;
   eventName: string | null;
   eventType: EventType;
   eventEndsAt: string | null;

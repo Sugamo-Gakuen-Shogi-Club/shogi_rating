@@ -7,6 +7,7 @@ import {
   MaintenanceState,
   RankEntry, RankApplication
 } from './types';
+import { getAppCheckToken } from './appCheck';
 
 // ============================================================
 // STORAGE KEYS
@@ -33,6 +34,7 @@ const MAINTENANCE_SANDBOX_URL = `${FIREBASE_BASE}/maintenance_sandbox.json`;
 // ============================================================
 const DEFAULT_SETTINGS: SystemSettings = {
   adminPin: '1123',
+  clubName: '将棋部',
   eventName: null,
   eventType: EventType.STANDARD,
   eventEndsAt: null,
@@ -448,9 +450,14 @@ const pushToCloud = async (): Promise<boolean> => {
     const maint = getMaintenanceState();
     const url = maint.active ? MAINTENANCE_SANDBOX_URL : CLOUD_API_URL;
 
+    // ★ App Check トークンをヘッダーに付与（取得失敗時はトークンなしで継続）
+    const appCheckToken = await getAppCheckToken();
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (appCheckToken) headers['X-Firebase-AppCheck'] = appCheckToken;
+
     const res = await fetch(url, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(data),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -506,7 +513,11 @@ export const manualSync = async (): Promise<boolean> => {
 export const loadFromCloud = async (): Promise<LoadResult> => {
   try {
     updateSyncMeta({ status: 'SYNCING' });
-    const res = await fetch(`${CLOUD_API_URL}?nocache=${Date.now()}`);
+    const appCheckToken = await getAppCheckToken();
+    const headers: Record<string, string> = {};
+    if (appCheckToken) headers['X-Firebase-AppCheck'] = appCheckToken;
+
+    const res = await fetch(`${CLOUD_API_URL}?nocache=${Date.now()}`, { headers });
     if (!res.ok) { updateSyncMeta({ status: 'ERROR', lastError: `HTTP ${res.status}` }); return 'FAILED'; }
 
     const data: BackupData | null = await res.json();
