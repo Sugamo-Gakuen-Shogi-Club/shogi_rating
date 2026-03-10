@@ -9,7 +9,7 @@ import {
   deactivateUser, reactivateUser, getInactiveUsers,
   manualSync, getSyncStatus, getAutoBackups, restoreFromAutoBackup,
   getMaintenanceState,
-  getPendingRankApplications, approveRankApplication, rejectRankApplication,
+  getPendingRankApplications, approveRankApplication, rejectRankApplication, removeRank,
   updateProfilePin,
 } from './storage';
 import { User, SystemSettings, Season, EventType, SyncMeta, AutoBackupEntry, MaintenanceState, RankApplication } from './types';
@@ -756,6 +756,42 @@ const Admin: React.FC = () => {
                       onChange={e => setRejectNote(prev => ({ ...prev, [app.id]: e.target.value }))}
                       className="w-full p-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-slate-300 font-bold focus:border-red-500 outline-none"
                     />
+                  </div>
+                ))
+              )}
+            </div>
+          </Card>
+
+          {/* Approved Rank Management */}
+          <Card title="承認済みランクの管理" icon={<Medal className="text-rose-400" size={18} />}>
+            <div className="space-y-3">
+              <p className="text-xs text-slate-500 font-bold">承認済みのランクを誤って通した場合はここで削除できます。削除するとFirebaseにも即座に反映されます。</p>
+              {getUsers(true).filter(u => (u.ranks || []).length > 0).length === 0 ? (
+                <p className="text-slate-500 text-sm font-bold py-2">承認済みのランクはありません。</p>
+              ) : (
+                getUsers(true).filter(u => (u.ranks || []).length > 0).map(u => (
+                  <div key={u.id} className="p-4 bg-slate-800/60 border border-slate-700 rounded-2xl space-y-2">
+                    <div className="font-black text-white text-sm">{u.name}</div>
+                    {(u.ranks || []).map(rank => (
+                      <div key={rank.id} className="flex items-center justify-between gap-3 bg-slate-900 border border-slate-700/50 rounded-xl px-3 py-2">
+                        <div>
+                          <span className="text-purple-300 font-bold text-sm">{rank.source}</span>
+                          <span className="text-white font-black text-sm mx-2">→</span>
+                          <span className="text-white font-bold text-sm">{rank.rank}</span>
+                          <div className="text-[10px] text-slate-600 mt-0.5">承認: {new Date(rank.approvedAt).toLocaleDateString('ja-JP')}</div>
+                        </div>
+                        <button
+                          onClick={() => {
+                            if (!confirm(`${u.name} の「${rank.source} ${rank.rank}」を削除しますか？`)) return;
+                            removeRank(u.id, rank.id);
+                            alert('削除しFirebaseに反映しました。');
+                          }}
+                          className="flex items-center gap-1 bg-red-900/40 hover:bg-red-800/60 text-red-300 border border-red-700/40 px-3 py-1.5 rounded-lg font-black text-xs transition-all active:scale-[0.97] shrink-0"
+                        >
+                          <Trash2 size={12} /> 削除
+                        </button>
+                      </div>
+                    ))}
                   </div>
                 ))
               )}

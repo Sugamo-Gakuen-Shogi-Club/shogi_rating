@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:board": "vite build --config vite.config.board.ts",
     "preview": "vite preview"
   },
   "dependencies": {

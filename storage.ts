@@ -224,7 +224,6 @@ export const saveAutoBackup = (): void => {
       matches: getMatches(),
       settings: getSettings(),
       logs: getLogs(),
-      rankApplications: getRankApplications(),
       timestamp: new Date().toISOString(),
     };
     localStorage.setItem(key, JSON.stringify(data));
@@ -445,7 +444,6 @@ const pushToCloud = async (): Promise<boolean> => {
       matches: getMatches(),
       settings: getSettings(),
       logs: getLogs(),
-      rankApplications: getRankApplications(),
       timestamp,
     };
     // メンテナンスモード中はsandboxに書く
@@ -543,7 +541,6 @@ export const loadFromCloud = async (): Promise<LoadResult> => {
     localStorage.setItem(MATCHES_KEY,  JSON.stringify(data.matches || []));
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(data.settings || DEFAULT_SETTINGS));
     localStorage.setItem(LOGS_KEY,     JSON.stringify(data.logs || []));
-    localStorage.setItem(RANK_APPS_KEY, JSON.stringify(data.rankApplications || []));
 
     const syncedAt = new Date().toISOString();
     updateSyncMeta({ status: 'SYNCED', lastSync: syncedAt, localTimestamp: cloudTime, pendingChanges: 0 });
@@ -1309,7 +1306,6 @@ export const getPendingRankApplications = (): RankApplication[] =>
 const saveRankApplications = (apps: RankApplication[]): void => {
   localStorage.setItem(RANK_APPS_KEY, JSON.stringify(apps));
   window.dispatchEvent(new CustomEvent('rivals-rank-apps-changed', { detail: apps }));
-  syncWithServer();
 };
 
 /**
@@ -1390,6 +1386,7 @@ export const approveRankApplication = (
   app.reviewedAt = new Date().toISOString();
   app.reviewNote = reviewNote;
   saveRankApplications(apps);
+  syncWithServer();
   return true;
 };
 
@@ -1420,6 +1417,7 @@ export const removeRank = (userId: string, rankId: string): void => {
   if (!user) return;
   user.ranks = (user.ranks || []).filter(r => r.id !== rankId);
   saveUsers(all);
+  syncWithServer(); // ローカル削除をFirebaseに即反映
 };
 
 /**

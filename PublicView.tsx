@@ -158,7 +158,6 @@ const PublicRankings: React.FC<{ onSelectProfile: (id: string) => void }> = ({ o
                   const winRate = totalM > 0 ? Math.round((user.wins / totalM) * 100) : 0;
                   const avatarChar = getUserAvatarChar(user);
                   const score   = getScore(user, tab);
-                  const settings = getSettings();
                   const isFW = isEventActive() && settings.eventType === EventType.FACTION_WAR;
 
                   return (
@@ -229,7 +228,7 @@ const PublicRankings: React.FC<{ onSelectProfile: (id: string) => void }> = ({ o
 };
 
 // ─── プロフィールビュー（PIN認証あり） ───────────────────────
-const PublicProfile: React.FC<{ userId: string; onBack: () => void }> = ({ userId, onBack }) => {
+const PublicProfile: React.FC<{ userId: string; onBack: () => void; readOnly?: boolean }> = ({ userId, onBack, readOnly = false }) => {
   const [users, setUsers]         = useState<User[]>(getUsers());
   const [matches]                 = useState<MatchRecord[]>(getMatches());
   const [authenticated, setAuth]  = useState(false);
@@ -382,7 +381,8 @@ const PublicProfile: React.FC<{ userId: string; onBack: () => void }> = ({ userI
                 <div className="text-[10px] text-slate-500 uppercase">活動日</div>
               </div>
             </div>
-            {/* Quick edit buttons */}
+            {/* Quick edit buttons — readOnly モードでは非表示 */}
+            {!readOnly && (
             <div className="flex flex-wrap gap-2 mt-3 justify-center md:justify-start">
               <button onClick={() => setTitleModal(true)}
                 className="flex items-center gap-1.5 bg-slate-800 border border-slate-700 text-slate-300 px-3 py-1.5 rounded-lg text-xs font-black hover:bg-slate-700 transition-all"
@@ -395,6 +395,7 @@ const PublicProfile: React.FC<{ userId: string; onBack: () => void }> = ({ userI
                 <Star size={12} /> アイコンを変更
               </button>
             </div>
+            )}
           </div>
         </div>
       </div>
@@ -483,7 +484,7 @@ const PublicProfile: React.FC<{ userId: string; onBack: () => void }> = ({ userI
           <p className="text-slate-500 text-sm font-bold">まだ登録されたランクはありません。</p>
         )}
         <button onClick={() => setRankModal(true)}
-          className="w-full flex items-center justify-center gap-2 bg-purple-900/20 hover:bg-purple-900/40 border border-purple-700/40 text-purple-300 py-3 rounded-xl font-black text-sm transition-all active:scale-[0.98]"
+          className={`w-full flex items-center justify-center gap-2 bg-purple-900/20 hover:bg-purple-900/40 border border-purple-700/40 text-purple-300 py-3 rounded-xl font-black text-sm transition-all active:scale-[0.98] ${readOnly ? 'hidden' : ''}`}
         >
           <Plus size={14} /> ランクを申請する
         </button>
@@ -663,7 +664,7 @@ const PublicUserSelector: React.FC<{ onSelect: (id: string) => void }> = ({ onSe
 
 
 // ─── メインコンポーネント ─────────────────────────────────────
-const PublicView: React.FC = () => {
+const PublicView: React.FC<{ readOnly?: boolean }> = ({ readOnly = false }) => {
   const [tab, setTab]             = useState<PublicTab>('RANKINGS');
   const [profileId, setProfileId] = useState<string | null>(null);
 
@@ -728,7 +729,7 @@ const PublicView: React.FC = () => {
           <PublicUserSelector onSelect={handleSelectProfile} />
         )}
         {profileId && (
-          <PublicProfile userId={profileId} onBack={handleBackToRankings} />
+          <PublicProfile userId={profileId} onBack={handleBackToRankings} readOnly={readOnly} />
         )}
       </main>
 
