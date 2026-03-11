@@ -158,7 +158,7 @@ const Rankings: React.FC = () => {
                         </td>
                         <td className={`p-5 text-right font-mono font-black text-2xl ${activeTab === 'seasonGrowth' ? 'text-indigo-400' : 'text-slate-500'}`}>
                             <div className="flex flex-col">
-                                <span>+{totalRise}</span>
+                                <span>{totalRise >= 0 ? `+${totalRise}` : totalRise}</span>
                                 <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Score Rise</div>
                             </div>
                         </td>

@@ -18,15 +18,15 @@ const fmtTime = (iso: string) =>
   new Date(iso).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
 const UndoPanel: React.FC = () => {
-  const [stack, setStack]           = useState<UndoEntry[]>([]);
-  const [open, setOpen]             = useState(false);
-  const [undoing, setUndoing]       = useState<string | null>(null);
+  const [stack, setStack]         = useState<UndoEntry[]>([]);
+  const [open, setOpen]           = useState(false);
+  const [undoing, setUndoing]     = useState<string | null>(null);
   const [justUndone, setJustUndone] = useState<string | null>(null);
-  const [pinAuthed, setPinAuthed]   = useState(false);
-  const [showPin, setShowPin]       = useState(false);
-  const [pin, setPin]               = useState('');
-  const [pinErr, setPinErr]         = useState(false);
-  const [pendingId, setPendingId]   = useState<string | undefined>(undefined);
+  const [pinAuthed, setPinAuthed] = useState(false);
+  const [showPin, setShowPin]     = useState(false);
+  const [pin, setPin]             = useState('');
+  const [pinErr, setPinErr]       = useState(false);
+  const [pendingId, setPendingId] = useState<string | undefined>(undefined);
 
   const refresh = () => setStack(getUndoStack());
 
@@ -37,8 +37,7 @@ const UndoPanel: React.FC = () => {
     return () => window.removeEventListener('rivals-undo-changed', h);
   }, []);
 
-  if (stack.length === 0) return null;
-
+  // ─── PIN 認証 ──────────────────────────────────────────────
   const handlePinCheck = (value: string) => {
     if (value.length < 4) return;
     const settings = getSettings();
@@ -54,9 +53,11 @@ const UndoPanel: React.FC = () => {
     }
   };
 
+  // ─── UNDO 実行 ────────────────────────────────────────────
   const executeUndo = async (entryId?: string) => {
-    const id = entryId || stack[0].id;
-    setUndoing(id ?? null);
+    const id = entryId ?? (stack[0]?.id);
+    if (!id) return;
+    setUndoing(id);
     const entry = undoLastAction(id);
     if (entry) {
       setJustUndone(entry.description);
@@ -64,6 +65,7 @@ const UndoPanel: React.FC = () => {
     }
     setUndoing(null);
     setOpen(false);
+    setPinAuthed(false); // 実行後に認証リセット
   };
 
   const handleUndoClick = (entryId?: string) => {
@@ -76,11 +78,17 @@ const UndoPanel: React.FC = () => {
     }
   };
 
-  const latest = stack[0];
-  const meta = ACTION_LABELS[latest.actionType];
+  const handleClose = () => {
+    setOpen(false);
+    setPinAuthed(false); // パネルを閉じたら認証リセット
+  };
+
+  const isEmpty = stack.length === 0;
+  const latest  = stack[0];
 
   return (
     <>
+      {/* PIN 入力モーダル */}
       {showPin && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/90 backdrop-blur-sm p-4">
           <div className="bg-slate-900 w-full max-w-xs rounded-3xl shadow-2xl border border-white/10 overflow-hidden">
@@ -114,13 +122,15 @@ const UndoPanel: React.FC = () => {
       )}
 
       <div className="fixed bottom-24 md:bottom-8 right-4 z-50 flex flex-col items-end gap-2">
+        {/* 取り消し完了トースト */}
         {justUndone && (
           <div className="bg-green-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xl animate-in fade-in slide-in-from-bottom-2">
             ✓ 取り消しました: {justUndone}
           </div>
         )}
 
-        {open && (
+        {/* 履歴パネル */}
+        {open && !isEmpty && (
           <div className="w-80 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-3">
             <div className="flex items-center justify-between px-4 py-3 bg-slate-800 border-b border-white/5">
               <div className="flex items-center gap-2 font-black text-white">
@@ -135,7 +145,7 @@ const UndoPanel: React.FC = () => {
                     <Trash2 size={14} />
                   </button>
                 )}
-                <button onClick={() => { setOpen(false); setPinAuthed(false); }} className="text-slate-500 hover:text-white transition-colors p-1">
+                <button onClick={handleClose} className="text-slate-500 hover:text-white transition-colors p-1">
                   <X size={16} />
                 </button>
               </div>
@@ -176,13 +186,26 @@ const UndoPanel: React.FC = () => {
           </div>
         )}
 
+        {/* メインボタン（常に表示） */}
         <button
-          onClick={() => { if (open) { handleUndoClick(); } else { setPinAuthed(false); setOpen(true); } }}
-          className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 border border-white/10 text-white px-4 py-3 rounded-2xl shadow-xl font-black text-sm transition-all active:scale-95"
+          onClick={() => {
+            if (isEmpty) return;           // スタックが空なら何もしない
+            if (open) {
+              handleClose();
+            } else {
+              setPinAuthed(false);
+              setOpen(true);
+            }
+          }}
+          className={`flex items-center gap-2 border border-white/10 px-4 py-3 rounded-2xl shadow-xl font-black text-sm transition-all active:scale-95 ${
+            isEmpty
+              ? 'bg-slate-900 text-slate-600 cursor-default'   // スタック空: グレーアウト
+              : 'bg-slate-800 hover:bg-slate-700 text-white'   // 通常: 白
+          }`}
         >
-          <RotateCcw size={18} className="text-blue-400" />
-          <span>{open ? `${latest.description.slice(0, 18)}…を取消` : '取り消す'}</span>
-          {!open && !pinAuthed && <Lock size={12} className="text-slate-500" />}
+          <RotateCcw size={18} className={isEmpty ? 'text-slate-700' : 'text-blue-400'} />
+          <span>{isEmpty ? '取り消す履歴なし' : (open ? '閉じる' : '取り消す')}</span>
+          {!isEmpty && !open && <Lock size={12} className="text-slate-500" />}
         </button>
       </div>
     </>

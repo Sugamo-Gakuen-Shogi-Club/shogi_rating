@@ -221,7 +221,7 @@ const MatchEntry: React.FC = () => {
                     </span>
                 </div>
                 <div className="text-center">
-                    <span className="text-4xl font-black text-white drop-shadow-sm">+{rateChange}</span>
+                    <span className="text-4xl font-black text-white drop-shadow-sm">{rateChange >= 0 ? `+${rateChange}` : rateChange}</span>
                 </div>
                 {pointDetail.spamPenalty < 1 && (
                      <div className="text-[10px] text-center text-red-400 font-bold mt-1">連戦補正あり (x{pointDetail.spamPenalty})</div>
@@ -236,7 +236,7 @@ const MatchEntry: React.FC = () => {
                     </span>
                 </div>
                 <div className="text-center mb-2">
-                    <span className="text-4xl font-black text-amber-400 drop-shadow-sm">+{pointTotal}</span>
+                    <span className="text-4xl font-black text-amber-400 drop-shadow-sm">{pointTotal >= 0 ? `+${pointTotal}` : pointTotal}</span>
                 </div>
                 
                 {/* Breakdown */}
