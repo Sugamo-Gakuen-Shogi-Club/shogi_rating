@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { getUsers, getMatches, ACHIEVEMENTS_DATA, updateUserTitle, getRivalryStats, ICONS_DATA, updateUserIcon, getUserAvatarChar, getLogs, getSettings, isEventActive, getUserIconDef, SYSTEM_TITLES, submitRankApplication, removeRank, updateProfilePin } from './storage';
-import { User, MatchRecord, IconDef, ActivityLog, ActivityType, EventType, RivalData, RankEntry } from './types';
+import { getUsers, getMatches, ACHIEVEMENTS_DATA, updateUserTitle, getRivalryStats, ICONS_DATA, updateUserIcon, getUserAvatarChar, getLogs, getSettings, isEventActive, getUserIconDef, SYSTEM_TITLES, submitRankApplication, removeRank, updateProfilePin, getUserSystemTitleHistory } from './storage';
+import { User, MatchRecord, IconDef, ActivityLog, ActivityType, EventType, RivalData, RankEntry, SystemTitleHistoryEntry } from './types';
 import { Card } from './Card';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Award, TrendingUp, Calendar, ArrowLeft, Tag, Star, Crown, Swords, Search, Skull, Smile, Lock, Grid, Shield, List, Medal, Plus, Check, X as XIcon, Trash2 } from 'lucide-react';
@@ -188,9 +188,10 @@ const ActivityHeatmap: React.FC<{ logs: ActivityLog[], userId: string }> = ({ lo
 const Profile: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [showPinModal, setShowPinModal] = useState(false);  // PIN確認モーダル（変更時のみ）
   const [pinInput, setPinInput] = useState('');
   const [pinError, setPinError] = useState(false);
+  const [pinCallback, setPinCallback] = useState<(() => void) | null>(null); // PIN認証後に実行
   const [matches, setMatches] = useState<MatchRecord[]>([]);
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [rivalStats, setRivalStats] = useState<{bestCustomer: RivalData | null, nemeses: RivalData | null}>({bestCustomer: null, nemeses: null});
@@ -248,17 +249,27 @@ const Profile: React.FC = () => {
     setPinError(false);
   };
 
+  // PIN確認してからコールバック実行
+  const requirePin = (callback: () => void) => {
+    setPinCallback(() => callback);
+    setPinInput('');
+    setPinError(false);
+    setShowPinModal(true);
+  };
+
   const handlePinSubmit = () => {
     const user = users.find(u => u.id === selectedId);
     if (!user) return;
     const correct = user.profilePin ?? '0000';
     if (pinInput === correct) {
-      setIsAuthenticated(true);
+      setShowPinModal(false);
       setPinError(false);
+      setPinInput('');
+      if (pinCallback) { pinCallback(); setPinCallback(null); }
     } else {
       setPinError(true);
       setPinInput('');
-      setTimeout(() => setPinError(false), 2000);
+      setTimeout(() => setPinError(false), 1500);
     }
   };
 
@@ -277,70 +288,7 @@ const Profile: React.FC = () => {
     );
   }
 
-  // View 1.5: PIN Authentication
-  const selectedUser = users.find(u => u.id === selectedId);
-  if (!isAuthenticated) {
-    return (
-      <div className="flex items-center justify-center min-h-[70vh] p-4 animate-in fade-in duration-300">
-        <div className="w-full max-w-sm bg-slate-900 border border-white/10 rounded-3xl shadow-2xl overflow-hidden">
-          {/* Header */}
-          <div className="p-8 pb-4 text-center relative">
-            <button
-              onClick={() => setSelectedId(null)}
-              className="absolute top-5 left-5 text-slate-500 hover:text-white transition-colors p-1"
-            >
-              <ArrowLeft size={20} />
-            </button>
-            <div className={`w-20 h-20 rounded-full ${selectedUser?.avatarColor || 'bg-blue-600'} mx-auto mb-4 flex items-center justify-center text-4xl text-white font-serif-jp font-black shadow-xl`}>
-              {selectedUser?.name.charAt(0)}
-            </div>
-            <h2 className="text-xl font-black text-white">{selectedUser?.name}</h2>
-            <p className="text-sm text-slate-400 font-bold mt-1">個人ページ</p>
-          </div>
-
-          {/* PIN input */}
-          <div className="px-8 pb-2">
-            <label className="block text-xs font-black text-slate-500 uppercase tracking-widest text-center mb-3">
-              PINコードを入力
-            </label>
-            <div className={`transition-all duration-300 ${pinError ? 'animate-bounce' : ''}`}>
-              <input
-                type="password"
-                value={pinInput}
-                readOnly
-                placeholder="••••"
-                className={`w-full p-4 border rounded-xl text-center text-3xl tracking-[1em] outline-none bg-slate-800 text-white font-mono transition-colors ${
-                  pinError ? 'border-red-500 bg-red-900/20' : 'border-slate-700'
-                }`}
-              />
-            </div>
-            {pinError && (
-              <p className="text-red-400 text-xs font-black text-center mt-2 animate-in fade-in">
-                PINが正しくありません
-              </p>
-            )}
-          </div>
-
-          <NumPad value={pinInput} onChange={setPinInput} maxLength={4} />
-
-          <div className="px-8 pb-8">
-            <button
-              onClick={handlePinSubmit}
-              disabled={pinInput.length < 4}
-              className="w-full bg-slate-200 disabled:bg-slate-700 disabled:text-slate-500 text-slate-900 py-3 rounded-xl font-black active:scale-95 transition-all shadow-lg"
-            >
-              開く
-            </button>
-            <p className="text-center text-[11px] text-slate-600 font-bold mt-3">
-              初期PINは <span className="text-slate-400">0000</span> です
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // View 2: Detailed Profile
+  // View 2: Detailed Profile (閲覧はPINなし・変更時のみPINモーダル)
   const user = users.find(u => u.id === selectedId);
   if (!user) return <div>User not found</div>;
 
@@ -379,9 +327,47 @@ const Profile: React.FC = () => {
   const getBarWidth = (val: number) => `${(val / maxPoint) * 100}%`;
 
 
+
+  // ── PIN確認モーダル（変更時のみ表示）──────────────────────
+  const PinModal = () => (
+    <div className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-950/90 backdrop-blur-sm p-4">
+      <div className="w-full max-w-sm bg-slate-900 border border-white/10 rounded-3xl shadow-2xl overflow-hidden">
+        <div className="p-6 pb-2 text-center">
+          <Lock size={28} className="mx-auto text-blue-400 mb-2" />
+          <h3 className="text-lg font-black text-white">PIN確認</h3>
+          <p className="text-xs text-slate-400 mt-1">変更にはPINコードが必要です</p>
+        </div>
+        <div className="px-6 pb-2">
+          <div className={`flex justify-center gap-3 py-3 transition-all ${pinError ? 'animate-bounce' : ''}`}>
+            {[0,1,2,3].map(i => (
+              <div key={i} className={`w-4 h-4 rounded-full border-2 ${
+                i < pinInput.length
+                  ? pinError ? 'bg-red-500 border-red-500' : 'bg-blue-500 border-blue-500'
+                  : 'border-slate-600 bg-transparent'
+              }`} />
+            ))}
+          </div>
+          {pinError && <p className="text-red-400 text-xs font-bold text-center">PINが違います</p>}
+        </div>
+        <NumPad value={pinInput} onChange={(v) => { setPinInput(v); if (v.length === 4) { setTimeout(handlePinSubmit, 0); } }} maxLength={4} />
+        <div className="px-6 pb-6 pt-2">
+          <button onClick={() => { setShowPinModal(false); setPinInput(''); setPinError(false); }}
+            className="w-full text-slate-500 hover:text-white text-sm font-bold py-2 transition-colors">
+            キャンセル
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  // 四天王歴
+  const titleHistory = getUserSystemTitleHistory(user.id);
+
   return (
     <div className="space-y-6 animate-in slide-in-from-right duration-300 pb-20">
       
+      {showPinModal && <PinModal />}
+
       {isSelectorOpen && (
           <UserSelector 
             users={users}
@@ -448,7 +434,7 @@ const Profile: React.FC = () => {
          <div className="relative z-10 p-6 md:p-8 flex flex-col md:flex-row items-center gap-12">
              
              {/* Avatar Section */}
-             <div className="relative group cursor-pointer shrink-0" onClick={() => setIsIconModalOpen(true)}>
+             <div className="relative group cursor-pointer shrink-0" onClick={() => requirePin(() => setIsIconModalOpen(true))}>
                 {iconDef.category === 'SHOGI' ? (
                      <div className="transform transition-transform group-hover:scale-105 group-hover:rotate-3 drop-shadow-2xl">
                         <ShogiPiece char={iconDef.char} scale={1.2} />
@@ -602,7 +588,7 @@ const Profile: React.FC = () => {
 
                 {/* 申請ボタン */}
                 <button
-                  onClick={() => setIsRankModalOpen(true)}
+                  onClick={() => requirePin(() => setIsRankModalOpen(true))}
                   className="w-full flex items-center justify-center gap-2 bg-purple-900/20 hover:bg-purple-900/40 border border-purple-700/40 text-purple-300 py-3 rounded-xl font-black text-sm transition-all active:scale-[0.98]"
                 >
                   <Plus size={16} /> ランクを申請する
@@ -672,6 +658,36 @@ const Profile: React.FC = () => {
                   </div>
                 </div>
               </div>
+            )}
+
+            {/* 四天王歴カード */}
+            {titleHistory.length > 0 && (
+              <Card title="四天王の歴代記録" icon={<Crown size={18} className="text-yellow-400" />}>
+                <div className="space-y-2">
+                  {titleHistory.map((h) => {
+                    const sysTitle = SYSTEM_TITLES.find(t => t.id === h.titleId);
+                    const isActive = !h.revokedAt;
+                    const days = h.revokedAt
+                      ? Math.ceil((new Date(h.revokedAt).getTime() - new Date(h.awardedAt).getTime()) / 86400000)
+                      : Math.ceil((Date.now() - new Date(h.awardedAt).getTime()) / 86400000);
+                    return (
+                      <div key={h.id} className={`p-3 rounded-xl border flex items-center gap-3 ${isActive ? 'bg-yellow-900/20 border-yellow-500/30' : 'bg-slate-800/60 border-slate-700/50'}`}>
+                        <div className="text-2xl">{isActive ? '👑' : '🏆'}</div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-black text-yellow-300 text-sm">第{h.generation}代 {sysTitle?.japanese || h.titleId}</span>
+                            {isActive && <span className="text-[10px] bg-yellow-500/20 text-yellow-300 border border-yellow-500/30 px-2 py-0.5 rounded-full font-black">現役</span>}
+                          </div>
+                          <div className="text-[11px] text-slate-400 mt-0.5">
+                            {new Date(h.awardedAt).toLocaleDateString('ja-JP')} 〜 {h.revokedAt ? new Date(h.revokedAt).toLocaleDateString('ja-JP') : '現在'}
+                            <span className="ml-2 text-slate-500">({days}日間)</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </Card>
             )}
 
             {/* Rival Analysis Card */}
@@ -808,7 +824,7 @@ const Profile: React.FC = () => {
                             </div>
                         )}
                     </div>
-                    <button onClick={() => setIsTitleModalOpen(true)} className="w-full mt-2 bg-slate-800 text-slate-300 py-2 rounded-lg text-xs font-bold hover:bg-slate-700 transition-colors flex items-center justify-center gap-2">
+                    <button onClick={() => requirePin(() => setIsTitleModalOpen(true))} className="w-full mt-2 bg-slate-800 text-slate-300 py-2 rounded-lg text-xs font-bold hover:bg-slate-700 transition-colors flex items-center justify-center gap-2">
                         <List size={14} /> 全称号リストを確認する (コレクション)
                     </button>
                 </div>

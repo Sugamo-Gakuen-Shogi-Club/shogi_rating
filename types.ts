@@ -24,6 +24,7 @@ export interface IconDef {
   type: 'DEFAULT' | 'RATE' | 'WINS' | 'STREAK' | 'SPECIAL' | 'MATCHES' | 'DAYS';
   category: 'DEFAULT' | 'SHOGI' | 'CHESS' | 'SPECIAL' | 'RANK';
   threshold?: number;
+  isLimited?: boolean;
 }
 
 export interface RateHistoryPoint {
@@ -103,6 +104,23 @@ export interface User {
   ranks: RankEntry[];
   // ★ 個人ページPIN（初期値 "0000"）
   profilePin: string;
+  grade?: number;           // 学年（1〜6など）
+}
+
+
+export interface SystemTitleHistoryEntry {
+  id: string;
+  titleId: string;           // 'MASTER' | 'RISING_STAR' | 'GRINDER' | 'GIANT_KILLER'
+  userId: string;
+  userName: string;
+  generation: number;        // 第何代
+  awardedAt: string;         // ISO日時
+  revokedAt?: string;        // 外れた日時（nullなら現役）
+}
+
+export interface SystemTitleSnapshot {
+  entries: SystemTitleHistoryEntry[];
+  nextGeneration: Record<string, number>; // titleId -> 次の代数
 }
 
 export interface MatchRecord {

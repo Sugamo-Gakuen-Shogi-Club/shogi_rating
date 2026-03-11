@@ -71,6 +71,7 @@ const Admin: React.FC = () => {
   // Add user
   const [newName, setNewName] = useState('');
   const [newReading, setNewReading] = useState('');
+  const [newGrade, setNewGrade] = useState<number | undefined>(undefined);
 
   // CSV
   const [csvPreview, setCsvPreview] = useState<Partial<User>[] | null>(null);
@@ -129,10 +130,36 @@ const Admin: React.FC = () => {
   };
 
   const handleUpdateTitles = () => {
-    if (window.confirm('称号を現在の成績に基づいて再計算しますか？')) {
-      awardSystemTitles(); // ★ Fix: was no-op
+    // 候補者を事前計算して確認ダイアログに表示
+    const allU = getUsers(true);
+    if (allU.length === 0) { alert('部員がいません。'); return; }
+    const upsetCount: Record<string, number> = {};
+    allU.forEach(u => { upsetCount[u.id] = 0; });
+    const masterC  = [...allU].sort((a,b)=>(b.rate-b.seasonStartRate)-(a.rate-a.seasonStartRate));
+    const risingC  = [...allU].sort((a,b)=>(b.totalPoints-b.seasonStartPoints)-(a.totalPoints-a.seasonStartPoints));
+    const grinderC = [...allU].sort((a,b)=>b.activityDays-a.activityDays);
+    const killerC  = [...allU].sort((a,b)=>(upsetCount[b.id]||0)-(upsetCount[a.id]||0));
+    const topScore = (list: any[], val: (u:any)=>number) => { const s = val(list[0]); return list.filter(u=>val(u)===s); };
+    const masters  = masterC.length  ? topScore(masterC,  u=>u.rate-u.seasonStartRate) : [];
+    const risings  = risingC.length  ? topScore(risingC,  u=>u.totalPoints-u.seasonStartPoints) : [];
+    const grinders = grinderC.length ? topScore(grinderC, u=>u.activityDays) : [];
+    const killers  = killerC.length  ? topScore(killerC,  u=>upsetCount[u.id]||0) : [];
+    const fmt = (list: any[]) => list.map(u=>u.name).join('・') || '（対象なし）';
+    const msg = [
+      '【四天王の更新確認】',
+      '',
+      `⚔️ 覇者（今期レート上昇）: ${fmt(masters)}`,
+      `🌟 新星（今期ポイント上昇）: ${fmt(risings)}`,
+      `🛡️ 鉄人（出席日数）: ${fmt(grinders)}`,
+      `💀 巨人キラー（格上撃破）: ${fmt(killers)}`,
+      '',
+      '※ 同スコアの場合は全員が選出されます。',
+      'この内容で更新しますか？',
+    ].join('\n');
+    if (window.confirm(msg)) {
+      awardSystemTitles();
       refreshData();
-      alert('称号を更新しました！');
+      alert('四天王を更新しました！');
     }
   };
 
@@ -141,9 +168,10 @@ const Admin: React.FC = () => {
   // ──────────────────────────────────────────────────────────
   const handleAddUser = () => {
     if (!newName.trim()) return;
-    bulkAddUsers([{ name: newName.trim(), reading: newReading.trim(), isNewMember: true }]);
+    bulkAddUsers([{ name: newName.trim(), reading: newReading.trim(), isNewMember: true, grade: newGrade }]);
     setNewName('');
     setNewReading('');
+    setNewGrade(undefined);
     refreshData();
   };
 
@@ -606,6 +634,10 @@ const Admin: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-3">
                   <input type="text" value={newName} onChange={e => setNewName(e.target.value)} placeholder="名前（例：秀村 紘嗣）" className="w-full p-3 border border-slate-700 rounded-xl bg-slate-800 text-white font-bold focus:ring-2 focus:ring-blue-500 outline-none" />
                   <input type="text" value={newReading} onChange={e => setNewReading(e.target.value)} placeholder="読み（例：ひでむら ひろし）" className="w-full p-3 border border-slate-700 rounded-xl bg-slate-800 text-white font-bold focus:ring-2 focus:ring-blue-500 outline-none" />
+                  <select value={newGrade ?? ''} onChange={e => setNewGrade(e.target.value ? Number(e.target.value) : undefined)} className="w-full p-3 border border-slate-700 rounded-xl bg-slate-800 text-white font-bold focus:ring-2 focus:ring-blue-500 outline-none">
+                    <option value="">学年（任意）</option>
+                    {[1,2,3,4,5,6].map(g => <option key={g} value={g}>{g}年</option>)}
+                  </select>
                   <button onClick={handleAddUser} className="bg-blue-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg hover:bg-blue-500 flex items-center justify-center gap-2 md:col-span-1">
                     <Plus size={20} /> 追加
                   </button>

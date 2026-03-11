@@ -5,7 +5,8 @@ import {
   SyncStatus, SyncMeta, AutoBackupEntry,
   UndoEntry, UndoActionType,
   MaintenanceState,
-  RankEntry, RankApplication
+  RankEntry, RankApplication,
+  SystemTitleHistoryEntry, SystemTitleSnapshot
 } from './types';
 import { getAppCheckToken } from './appCheck';
 
@@ -108,6 +109,19 @@ export const ICONS_DATA: IconDef[] = [
   { id: 'CHESS_ROOK',      char: '♜',   name: 'ルーク',  conditionDescription: 'レート1450到達',     type: 'RATE',     threshold: 1450, category: 'CHESS' },
   { id: 'CHESS_QUEEN',     char: '♛',   name: 'クイーン',conditionDescription: 'レート1700到達',     type: 'RATE',     threshold: 1700, category: 'CHESS' },
   { id: 'CHESS_KING',      char: '♚',   name: 'キング',  conditionDescription: 'レート2000到達',     type: 'RATE',     threshold: 2000, category: 'CHESS' },
+  // ── 期間限定アイコン ───────────────────────────────────────
+  { id: 'SPECIAL_SAKURA',  char: '🌸',  name: '桜',      conditionDescription: '春季限定（4〜5月）',   type: 'SPECIAL',  category: 'SPECIAL', isLimited: true },
+  { id: 'SPECIAL_HIMAWARI',char: '🌻',  name: 'ひまわり', conditionDescription: '夏季限定（7〜8月）',  type: 'SPECIAL',  category: 'SPECIAL', isLimited: true },
+  { id: 'SPECIAL_MOMIJI',  char: '🍁',  name: '紅葉',     conditionDescription: '秋季限定（10〜11月）', type: 'SPECIAL',  category: 'SPECIAL', isLimited: true },
+  { id: 'SPECIAL_YUKI',    char: '❄️',  name: '雪',      conditionDescription: '冬季限定（12〜1月）',  type: 'SPECIAL',  category: 'SPECIAL', isLimited: true },
+  { id: 'SPECIAL_TANUKI',  char: '🦝',  name: 'たぬき',   conditionDescription: '出席50日達成',         type: 'DAYS',     threshold: 50, category: 'SPECIAL' },
+  { id: 'SPECIAL_KITSUNE', char: '🦊',  name: 'きつね',   conditionDescription: '連勝5以上',            type: 'STREAK',   threshold: 5,  category: 'SPECIAL' },
+  { id: 'SPECIAL_DRAGON',  char: '🐉',  name: '龍',       conditionDescription: '勝利数100回',          type: 'WINS',     threshold: 100, category: 'SPECIAL' },
+  { id: 'SPECIAL_ONI',     char: '👹',  name: '鬼',       conditionDescription: '格上に10勝',           type: 'SPECIAL',  category: 'SPECIAL' },
+  { id: 'SPECIAL_STAR',    char: '⭐',  name: '星',       conditionDescription: '四天王に選出',         type: 'SPECIAL',  category: 'SPECIAL' },
+  { id: 'SPECIAL_CROWN',   char: '👑',  name: '王冠',     conditionDescription: '四天王に2回以上選出',  type: 'SPECIAL',  category: 'SPECIAL' },
+  { id: 'SPECIAL_FIRE',    char: '🔥',  name: '炎',       conditionDescription: '10連勝達成',           type: 'STREAK',   threshold: 10, category: 'SPECIAL' },
+  { id: 'SPECIAL_ZEN',     char: '☯️',  name: '禅',       conditionDescription: '引き分け20回',         type: 'SPECIAL',  category: 'SPECIAL' },
 ];
 
 // ============================================================
@@ -600,6 +614,7 @@ const normalizeUser = (user: any): User => ({
   faction:        user.faction        ?? 'WHITE',
   isGeneral:      user.isGeneral      ?? false,
   isNewMember:    user.isNewMember    ?? false,
+  grade:          user.grade,
   activeTitle:    user.activeTitle    ?? null,
   lastAttendance: user.lastAttendance ?? null,
   avatarColor:    user.avatarColor    || 'bg-blue-500',
@@ -1042,16 +1057,104 @@ export const awardSystemTitles = (): void => {
     .sort((a, b) => (upsetCount[b.id] || 0) - (upsetCount[a.id] || 0));
   const killer = byUpsets[0] ?? null;
 
-  // Assign
-  if (master)  { const u = all.find(x => x.id === master.id);  if (u) u.systemTitle = 'MASTER'; }
-  if (rising)  { const u = all.find(x => x.id === rising.id);  if (u) u.systemTitle = 'RISING_STAR'; }
-  if (grinder) { const u = all.find(x => x.id === grinder.id); if (u) u.systemTitle = 'GRINDER'; }
-  if (killer)  { const u = all.find(x => x.id === killer.id);  if (u) u.systemTitle = 'GIANT_KILLER'; }
+  // 同率タイ検出：各軸でトップと同スコアの全員を選出
+  const masterScore   = master   ? (master.rate - master.seasonStartRate)                         : null;
+  const risingScore   = rising   ? (rising.totalPoints - rising.seasonStartPoints)                 : null;
+  const grinderScore  = grinder  ? grinder.activityDays                                             : null;
+  const killerScore   = killer   ? (upsetCount[killer.id] || 0)                                    : null;
+
+  const masterHolders  = masterScore  !== null ? active.filter(u => (u.rate - u.seasonStartRate) === masterScore)                     : [];
+  const risingHolders  = risingScore  !== null ? active.filter(u => (u.totalPoints - u.seasonStartPoints) === risingScore)            : [];
+  const grinderHolders = grinderScore !== null ? active.filter(u => u.activityDays === grinderScore)                                  : [];
+  const killerHolders  = killerScore  !== null ? active.filter(u => (upsetCount[u.id] || 0) === killerScore && killerScore > 0)       : [];
+
+  // Assign（全員に付与）
+  masterHolders.forEach(u  => { const x = all.find(a => a.id === u.id);  if (x) x.systemTitle = 'MASTER'; });
+  risingHolders.forEach(u  => { const x = all.find(a => a.id === u.id);  if (x) x.systemTitle = 'RISING_STAR'; });
+  grinderHolders.forEach(u => { const x = all.find(a => a.id === u.id);  if (x) x.systemTitle = 'GRINDER'; });
+  killerHolders.forEach(u  => { const x = all.find(a => a.id === u.id);  if (x) x.systemTitle = 'GIANT_KILLER'; });
+
+  // 履歴記録
+  recordSystemTitleChange('MASTER',       masterHolders.map(u => u.id));
+  recordSystemTitleChange('RISING_STAR',  risingHolders.map(u => u.id));
+  recordSystemTitleChange('GRINDER',      grinderHolders.map(u => u.id));
+  recordSystemTitleChange('GIANT_KILLER', killerHolders.map(u => u.id));
+
+  // 特別アイコン解放（四天王選出者）
+  [...masterHolders, ...risingHolders, ...grinderHolders, ...killerHolders].forEach(u => {
+    const x = all.find(a => a.id === u.id);
+    if (!x) return;
+    if (!x.unlockedIcons.includes('SPECIAL_STAR'))  x.unlockedIcons.push('SPECIAL_STAR');
+    // 2回以上選出歴があれば王冠アイコン解放
+    const hist = getSystemTitleHistory().entries.filter(e => e.userId === u.id);
+    if (hist.length >= 2 && !x.unlockedIcons.includes('SPECIAL_CROWN')) x.unlockedIcons.push('SPECIAL_CROWN');
+  });
 
   const settings = getSettings();
   saveSettings({ ...settings, lastTitleUpdate: new Date().toISOString() });
   saveUsers(all);
 };
+
+
+// ============================================================
+// 四天王 履歴システム
+// ============================================================
+const SYSTEM_TITLE_HISTORY_KEY = 'club_rivals_system_title_history';
+
+export const getSystemTitleHistory = (): SystemTitleSnapshot => {
+  try {
+    const raw = localStorage.getItem(SYSTEM_TITLE_HISTORY_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return { entries: [], nextGeneration: { MASTER: 1, RISING_STAR: 1, GRINDER: 1, GIANT_KILLER: 1 } };
+};
+
+const saveSystemTitleHistory = (snap: SystemTitleSnapshot): void => {
+  localStorage.setItem(SYSTEM_TITLE_HISTORY_KEY, JSON.stringify(snap));
+};
+
+/** 四天王を更新し、履歴を記録する */
+export const recordSystemTitleChange = (
+  titleId: string,
+  newHolderIds: string[]
+): void => {
+  const snap = getSystemTitleHistory();
+  const now = new Date().toISOString();
+  const users = getRawUsers();
+
+  // 現役エントリを終了
+  snap.entries.forEach(e => {
+    if (e.titleId === titleId && !e.revokedAt) {
+      if (!newHolderIds.includes(e.userId)) {
+        e.revokedAt = now;
+      }
+    }
+  });
+
+  // 新しいホルダーのうち、まだ現役でないものを追加
+  newHolderIds.forEach(uid => {
+    const already = snap.entries.find(e => e.titleId === titleId && e.userId === uid && !e.revokedAt);
+    if (!already) {
+      const gen = snap.nextGeneration[titleId] || 1;
+      const u = users.find(x => x.id === uid);
+      snap.entries.push({
+        id: Math.random().toString(36).slice(2),
+        titleId,
+        userId: uid,
+        userName: u?.name || '不明',
+        generation: gen,
+        awardedAt: now,
+      });
+      snap.nextGeneration[titleId] = gen + 1;
+    }
+  });
+
+  saveSystemTitleHistory(snap);
+};
+
+/** ユーザーの四天王歴を返す */
+export const getUserSystemTitleHistory = (userId: string): SystemTitleHistoryEntry[] =>
+  getSystemTitleHistory().entries.filter(e => e.userId === userId);
 
 // ============================================================
 // SOFT DELETE / REACTIVATION  (← NEW)
@@ -1147,12 +1250,13 @@ export const parseUserCSV = (csv: string): Partial<User>[] =>
       return { name: name || '名称未設定', reading: reading || '', isNewMember: isNew === '1' };
     });
 
-const newUserBase = (name: string, reading?: string, isNewMember = false): User => ({
+const newUserBase = (name: string, reading?: string, isNewMember = false, grade?: number): User => ({
   id:               randomId(),
   name,
   reading,
   isActive:         true,
   isNewMember,
+  grade,
   rate:             INITIAL_RATE,
   seasonStartRate:  INITIAL_RATE,
   seasonStartPoints: 0,
@@ -1269,22 +1373,7 @@ export const importData = (json: string): boolean => {
 // SEEDING
 // ============================================================
 export const seedData = async (): Promise<void> => {
-  if (getUsers().length > 0) return;
-  const initial = [
-    { name: '熱田 望',   reading: 'あつた のぞむ' },
-    { name: '池田 大翔', reading: 'いけだ ひろと' },
-    { name: '岩間 悠希', reading: 'いわま ゆうき' },
-    { name: '辻井 琥基', reading: 'つじい こうき' },
-    { name: '白石 怜大', reading: 'しらいし れお' },
-    { name: '高椋 煌生', reading: 'たかむく こうき' },
-    { name: '布施 皓己', reading: 'ふせ こうき' },
-    { name: '吉井 千智', reading: 'よしい ちさと' },
-  ];
-  saveUsers(initial.map((m, i) => ({
-    ...newUserBase(m.name, m.reading, i < 4),
-    id:      `u${100 + i}`,
-    faction: (i % 2 === 0 ? 'RED' : 'WHITE') as 'RED' | 'WHITE',
-  })));
+  // 初期データなし。管理者画面から部員を追加してください。
 };
 
 // ============================================================
