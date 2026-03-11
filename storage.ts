@@ -53,10 +53,10 @@ const DEFAULT_UNLOCKED_ICONS = ['DEFAULT_INITIAL', 'DEFAULT_SMILE', 'DEFAULT_CAT
 // STATIC DATA
 // ============================================================
 export const SYSTEM_TITLES: TitleDef[] = [
-  { id: 'MASTER',       name: '名人',   english: 'The Master',    description: '現在のレート最強',          color: 'text-yellow-400' },
-  { id: 'RISING_STAR',  name: '新星',   english: 'Rising Star',   description: '今シーズンの成長幅No.1',    color: 'text-blue-400' },
-  { id: 'GRINDER',      name: '活動家', english: 'The Grinder',   description: '対局数＋出席数No.1',        color: 'text-green-400' },
-  { id: 'GIANT_KILLER', name: '下克上', english: 'Giant Killer',  description: '格上撃破数No.1',            color: 'text-red-400' },
+  { id: 'MASTER',       name: '覇者',       english: 'The Master',    description: '今期レート上昇1位',      color: 'text-yellow-400' },
+  { id: 'RISING_STAR',  name: '新星',       english: 'Rising Star',   description: '今期ポイント上昇1位',    color: 'text-blue-400' },
+  { id: 'GRINDER',      name: '鉄人',       english: 'The Grinder',   description: '出席日数1位',            color: 'text-green-400' },
+  { id: 'GIANT_KILLER', name: '巨人キラー', english: 'Giant Killer',  description: '格上撃破数No.1',         color: 'text-red-400' },
 ];
 
 export const ACHIEVEMENTS_DATA: AchievementDef[] = [
@@ -1003,27 +1003,25 @@ export const awardSystemTitles = (): void => {
   // Reset all
   all.forEach(u => { u.systemTitle = null; });
 
-  // MASTER: highest current rate
-  const byRate = [...active].sort((a, b) => b.rate - a.rate);
-  const master = byRate[0];
+  // MASTER: 今期レート上昇1位（PDFに合わせた）
+  const byRateGrowth = [...active].sort((a, b) =>
+    (b.rate - b.seasonStartRate) - (a.rate - a.seasonStartRate)
+  );
+  const master = byRateGrowth[0];
 
-  // RISING_STAR: highest (rate + points) growth this season, excluding MASTER
-  const byGrowth = [...active]
+  // RISING_STAR: 今期ポイント上昇1位（MASTER除く）
+  const byPointsGrowth = [...active]
     .filter(u => u.id !== master?.id)
     .sort((a, b) =>
-      ((b.rate - b.seasonStartRate) + (b.totalPoints - b.seasonStartPoints)) -
-      ((a.rate - a.seasonStartRate) + (a.totalPoints - a.seasonStartPoints))
+      (b.totalPoints - b.seasonStartPoints) - (a.totalPoints - a.seasonStartPoints)
     );
-  const rising = byGrowth[0] ?? null;
+  const rising = byPointsGrowth[0] ?? null;
 
-  // GRINDER: highest (total_matches + activityDays), excluding above
+  // GRINDER: 出席日数1位（上記除く）
   const taken1 = new Set([master?.id, rising?.id].filter(Boolean));
   const byActivity = [...active]
     .filter(u => !taken1.has(u.id))
-    .sort((a, b) =>
-      ((b.wins + b.losses + b.draws) + b.activityDays) -
-      ((a.wins + a.losses + a.draws) + a.activityDays)
-    );
+    .sort((a, b) => b.activityDays - a.activityDays);
   const grinder = byActivity[0] ?? null;
 
   // GIANT_KILLER: most wins against higher-rated opponents (from match records)
@@ -1418,6 +1416,69 @@ export const removeRank = (userId: string, rankId: string): void => {
   user.ranks = (user.ranks || []).filter(r => r.id !== rankId);
   saveUsers(all);
   syncWithServer(); // ローカル削除をFirebaseに即反映
+};
+
+// ============================================================
+// ACHIEVEMENT MANAGEMENT (管理者用)
+// ============================================================
+
+/**
+ * 管理者が部員の称号を剥奪する
+ * activeTitle が剥奪対象なら同時にリセット
+ */
+export const removeAchievement = (userId: string, achievementId: string): void => {
+  const all = getRawUsers();
+  const user = all.find(u => u.id === userId);
+  if (!user) return;
+  user.achievements = (user.achievements || []).filter(id => id !== achievementId);
+  if (user.activeTitle === achievementId) user.activeTitle = null;
+  saveUsers(all);
+  syncWithServer();
+};
+
+// ============================================================
+// ATTENDANCE DELETION (管理者用)
+// ============================================================
+
+/**
+ * 管理者が出席ログを削除する
+ * 関連するポイント・activityDays を正確に巻き戻す
+ */
+export const deleteAttendanceLog = (logId: string): { success: boolean; message: string } => {
+  const logs = getLogs();
+  const log = logs.find(l => l.id === logId && l.type === 'ATTENDANCE');
+  if (!log) return { success: false, message: '出席ログが見つかりません' };
+
+  const all = getRawUsers();
+  const user = all.find(u => u.id === log.userId);
+  if (!user) return { success: false, message: 'ユーザーが見つかりません' };
+
+  const pts = log.points;
+
+  // ポイントを巻き戻す
+  user.totalPoints      = Math.max(0, (user.totalPoints || 0) - pts);
+  user.monthlyPoints    = Math.max(0, (user.monthlyPoints || 0) - pts);
+  user.pointsAttendance = Math.max(0, (user.pointsAttendance || 0) - pts);
+  user.activityDays     = Math.max(0, (user.activityDays || 0) - 1);
+
+  // イベントポイントも巻き戻す（イベント中に記録されたログか確認は省略し安全に減算）
+  if (user.eventPoints && user.eventPoints > 0) {
+    user.eventPoints = Math.max(0, user.eventPoints - pts);
+  }
+
+  // ログを削除
+  const newLogs = logs.filter(l => l.id !== logId);
+  localStorage.setItem('club_rivals_logs', JSON.stringify(newLogs));
+
+  // lastAttendance を残ったログから再計算
+  const remainingAttendances = newLogs
+    .filter(l => l.userId === log.userId && l.type === 'ATTENDANCE')
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  user.lastAttendance = remainingAttendances[0]?.date ?? undefined;
+
+  saveUsers(all);
+  syncWithServer();
+  return { success: true, message: `${user.name} の出席を削除しました` };
 };
 
 /**

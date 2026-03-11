@@ -10,9 +10,10 @@ import {
   manualSync, getSyncStatus, getAutoBackups, restoreFromAutoBackup,
   getMaintenanceState,
   getPendingRankApplications, approveRankApplication, rejectRankApplication, removeRank,
+  removeAchievement, deleteAttendanceLog, getLogs, ACHIEVEMENTS_DATA,
   updateProfilePin,
 } from './storage';
-import { User, SystemSettings, Season, EventType, SyncMeta, AutoBackupEntry, MaintenanceState, RankApplication } from './types';
+import { User, SystemSettings, Season, EventType, SyncMeta, AutoBackupEntry, MaintenanceState, RankApplication, ActivityLog, ActivityType } from './types';
 import { Card } from './Card';
 import { NumPad } from './NumPad';
 import {
@@ -20,7 +21,7 @@ import {
   CheckCircle, Shuffle, Users, Crown, ChevronRight, X,
   RefreshCw, Languages, FileUp, Upload, Swords, Cloud,
   CloudOff, AlertCircle, Loader, UserCheck, UserX, RotateCcw,
-  Wrench, Medal, Check, KeyRound, Globe, Copy
+  Wrench, Medal, Check, KeyRound, Globe, Copy, Star
 } from 'lucide-react';
 import { UserSelector } from './UserSelector';
 import MaintenancePanel from './MaintenancePanel';
@@ -794,6 +795,87 @@ const Admin: React.FC = () => {
                     ))}
                   </div>
                 ))
+              )}
+            </div>
+          </Card>
+
+          {/* Attendance Deletion */}
+          <Card title="出席記録の削除" icon={<Calendar className="text-green-400" size={18} />}>
+            <div className="space-y-3">
+              <p className="text-xs text-slate-500 font-bold">誤った出席記録を削除します。ポイントとactivityDaysが巻き戻ります。</p>
+              {(() => {
+                const attendanceLogs = getLogs()
+                  .filter(l => l.type === ActivityType.ATTENDANCE)
+                  .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                  .slice(0, 20);
+                if (attendanceLogs.length === 0) {
+                  return <p className="text-slate-500 text-sm font-bold py-2">出席記録がありません。</p>;
+                }
+                return attendanceLogs.map(log => {
+                  const u = getUsers(true).find(u => u.id === log.userId);
+                  return (
+                    <div key={log.id} className="flex items-center justify-between gap-3 bg-slate-800/60 border border-slate-700/50 rounded-xl px-3 py-2">
+                      <div>
+                        <span className="text-green-300 font-bold text-sm">{u?.name ?? '不明'}</span>
+                        <span className="text-slate-400 text-xs ml-2">+{log.points}pt</span>
+                        <div className="text-[10px] text-slate-600 mt-0.5">
+                          {new Date(log.date).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => {
+                          if (!confirm(`${u?.name ?? '不明'} の出席記録を削除しますか？`)) return;
+                          const res = deleteAttendanceLog(log.id);
+                          alert(res.message);
+                          refreshData();
+                        }}
+                        className="flex items-center gap-1 bg-red-900/40 hover:bg-red-800/60 text-red-300 border border-red-700/40 px-3 py-1.5 rounded-lg font-black text-xs transition-all active:scale-[0.97] shrink-0"
+                      >
+                        <Trash2 size={12} /> 削除
+                      </button>
+                    </div>
+                  );
+                });
+              })()}
+            </div>
+          </Card>
+
+          {/* Achievement Deletion */}
+          <Card title="称号の削除" icon={<Star className="text-yellow-400" size={18} />}>
+            <div className="space-y-3">
+              <p className="text-xs text-slate-500 font-bold">誤って付与された称号を剥奪します。表示中の称号だった場合は自動でリセットされます。</p>
+              {getUsers(true).filter(u => (u.achievements || []).length > 0).length === 0 ? (
+                <p className="text-slate-500 text-sm font-bold py-2">称号を持つ部員がいません。</p>
+              ) : (
+                <div className="space-y-3">
+                  {getUsers(true).filter(u => (u.achievements || []).length > 0).map(u => (
+                    <div key={u.id} className="p-4 bg-slate-800/60 border border-slate-700 rounded-2xl space-y-2">
+                      <div className="font-black text-white text-sm">{u.name}</div>
+                      <div className="flex flex-wrap gap-2">
+                        {(u.achievements || []).map(achId => {
+                          const ach = ACHIEVEMENTS_DATA.find(a => a.id === achId);
+                          if (!ach) return null;
+                          return (
+                            <div key={achId} className="flex items-center gap-1 bg-slate-900 border border-slate-700/50 rounded-lg px-2 py-1">
+                              <span className="text-yellow-300 text-xs font-bold">{ach.name}</span>
+                              <button
+                                onClick={() => {
+                                  if (!confirm(`${u.name} の「${ach.name}」を削除しますか？`)) return;
+                                  removeAchievement(u.id, achId);
+                                  alert('削除しました');
+                                  refreshData();
+                                }}
+                                className="text-slate-600 hover:text-red-400 transition-colors ml-1"
+                              >
+                                <X size={11} />
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           </Card>
