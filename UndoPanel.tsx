@@ -39,12 +39,10 @@ const UndoPanel: React.FC = () => {
 
   if (stack.length === 0) return null;
 
-  const handlePinInput = (digit: string) => {
-    const next = pin + digit;
-    setPin(next);
-    if (next.length < 4) return;
+  const handlePinCheck = (value: string) => {
+    if (value.length < 4) return;
     const settings = getSettings();
-    if (next === settings.adminPin) {
+    if (value === settings.adminPin) {
       setPinAuthed(true);
       setShowPin(false);
       setPin('');
@@ -108,7 +106,7 @@ const UndoPanel: React.FC = () => {
                   }`} />
                 ))}
               </div>
-              <NumPad onInput={handlePinInput} onDelete={() => setPin(p => p.slice(0, -1))} />
+              <NumPad value={pin} onChange={(v) => { setPin(v); handlePinCheck(v); }} maxLength={4} />
               {pinErr && <p className="text-red-400 text-xs font-bold text-center">PINが違います</p>}
             </div>
           </div>
