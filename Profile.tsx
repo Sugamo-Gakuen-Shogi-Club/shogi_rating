@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { getUsers, getMatches, ACHIEVEMENTS_DATA, updateUserTitle, getRivalryStats, ICONS_DATA, updateUserIcon, getUserAvatarChar, getLogs, getSettings, isEventActive, getUserIconDef, SYSTEM_TITLES, submitRankApplication, removeRank, updateProfilePin, getUserSystemTitleHistory } from './storage';
+import { getUsers, getMatches, ACHIEVEMENTS_DATA, updateUserTitle, getRivalryStats, ICONS_DATA, FRAMES_DATA, updateUserIcon, updateUserFrame, getUserAvatarChar, getLogs, getSettings, isEventActive, getUserIconDef, getUserFrameDef, SYSTEM_TITLES, submitRankApplication, removeRank, updateProfilePin, getUserSystemTitleHistory } from './storage';
 import { User, MatchRecord, IconDef, ActivityLog, ActivityType, EventType, RivalData, RankEntry, SystemTitleHistoryEntry } from './types';
 import { Card } from './Card';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -62,13 +62,15 @@ const IconSelectorModal: React.FC<{
         { key: 'SHOGI', label: '将棋の駒', icon: <Grid size={16}/> },
         { key: 'CHESS', label: 'チェス駒', icon: <Shield size={16}/> },
         { key: 'SPECIAL', label: 'スペシャル', icon: <Star size={16}/> },
+        { key: 'ELITE', label: '⚔️四天王限定', icon: <Crown size={16} className="text-yellow-400"/> },
     ];
     const [activeCategory, setActiveCategory] = useState('DEFAULT');
 
     const displayedIcons = ICONS_DATA.filter(i => {
         if (activeCategory === 'SPECIAL') {
-            return i.category === 'SPECIAL' || i.category === 'RANK'; 
+            return i.category === 'SPECIAL' || i.category === 'RANK';
         }
+        if (activeCategory === 'ELITE') return i.category === 'ELITE';
         return i.category === activeCategory;
     });
 
@@ -145,6 +147,52 @@ const IconSelectorModal: React.FC<{
     );
 };
 
+// Frame Selector Modal
+const FrameSelectorModal: React.FC<{
+    user: User;
+    onClose: () => void;
+    onSelect: (frameId: string) => void;
+}> = ({ user, onClose, onSelect }) => {
+    const unlockedFrames = user.unlockedFrames || ['FRAME_NONE'];
+    const displayFrames = FRAMES_DATA.filter(f => unlockedFrames.includes(f.id) || !f.isEliteOnly);
+    return (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-in fade-in zoom-in duration-200">
+            <div className="bg-slate-900 w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden border border-white/10 flex flex-col max-h-[80vh]">
+                <div className="p-4 border-b border-white/5 bg-slate-800 flex items-center justify-between shrink-0">
+                    <h3 className="text-lg font-black text-white flex items-center gap-2">
+                        <Crown className="text-yellow-500" /> フレーム選択
+                    </h3>
+                    <button onClick={onClose} className="p-2 bg-slate-700 text-slate-300 rounded-full hover:bg-slate-600 transition-colors">
+                        <ArrowLeft size={20} />
+                    </button>
+                </div>
+                <div className="p-4 grid grid-cols-2 sm:grid-cols-3 gap-4 overflow-y-auto">
+                    {FRAMES_DATA.map(frame => {
+                        const isUnlocked = unlockedFrames.includes(frame.id);
+                        const isActive = (user.activeFrameId || 'FRAME_NONE') === frame.id;
+                        return (
+                            <button
+                                key={frame.id}
+                                disabled={!isUnlocked}
+                                onClick={() => onSelect(frame.id)}
+                                className={`relative rounded-2xl border-2 p-4 flex flex-col items-center gap-2 transition-all
+                                    ${isActive ? 'border-yellow-400 bg-yellow-900/20' : isUnlocked ? 'border-slate-700 bg-slate-800 hover:border-yellow-400/50' : 'border-slate-800 bg-slate-950 opacity-40 cursor-not-allowed'}`}
+                            >
+                                <div className={`w-12 h-12 rounded-full bg-slate-700 ${frame.ringClass} ${frame.glowClass || ''} flex items-center justify-center text-white font-black`}>枠</div>
+                                <span className={`text-xs font-black ${isActive ? 'text-yellow-300' : isUnlocked ? 'text-slate-300' : 'text-slate-600'}`}>{frame.name}</span>
+                                {frame.isEliteOnly && !isUnlocked && (
+                                    <span className="text-[8px] text-yellow-700 font-bold">四天王限定</span>
+                                )}
+                                {isActive && <span className="text-[9px] text-yellow-400 font-black">使用中</span>}
+                            </button>
+                        );
+                    })}
+                </div>
+            </div>
+        </div>
+    );
+};
+
 // Activity Heatmap Component
 const ActivityHeatmap: React.FC<{ logs: ActivityLog[], userId: string }> = ({ logs, userId }) => {
     // Generate last 90 days
@@ -203,6 +251,8 @@ const Profile: React.FC = () => {
   const [rankValue, setRankValue] = useState('');
   const [rankNote, setRankNote] = useState('');
   const [rankMsg, setRankMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isFrameModalOpen, setIsFrameModalOpen] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -228,6 +278,13 @@ const Profile: React.FC = () => {
       updateUserIcon(selectedId, iconId);
       setUsers(getUsers());
       setIsIconModalOpen(false);
+  };
+
+  const handleFrameChange = (frameId: string) => {
+      if (!selectedId) return;
+      updateUserFrame(selectedId, frameId);
+      setUsers(getUsers());
+      setIsFrameModalOpen(false);
   };
 
   const handleRankSubmit = () => {
@@ -296,6 +353,7 @@ const Profile: React.FC = () => {
   const isFactionWar = isEventActive() && settings.eventType === EventType.FACTION_WAR;
   const iconDef = getUserIconDef(user.activeIconId);
   const avatarChar = getUserAvatarChar(user);
+  const frameDef = getUserFrameDef(user.activeFrameId);
   const isRed = user.faction === 'RED';
   
   // System Title Lookups
@@ -388,6 +446,14 @@ const Profile: React.FC = () => {
           />
       )}
 
+      {isFrameModalOpen && (
+          <FrameSelectorModal
+            user={user}
+            onClose={() => setIsFrameModalOpen(false)}
+            onSelect={handleFrameChange}
+          />
+      )}
+
       {isTitleModalOpen && (
           <TitleCollectionModal user={user} onClose={() => setIsTitleModalOpen(false)} />
       )}
@@ -434,13 +500,14 @@ const Profile: React.FC = () => {
          <div className="relative z-10 p-6 md:p-8 flex flex-col md:flex-row items-center gap-12">
              
              {/* Avatar Section */}
-             <div className="relative group cursor-pointer shrink-0" onClick={() => requirePin(() => setIsIconModalOpen(true))}>
+             <div className="relative group shrink-0">
+                <div className="cursor-pointer" onClick={() => requirePin(() => setIsIconModalOpen(true))}>
                 {iconDef.category === 'SHOGI' ? (
-                     <div className="transform transition-transform group-hover:scale-105 group-hover:rotate-3 drop-shadow-2xl">
+                     <div className={`transform transition-transform group-hover:scale-105 group-hover:rotate-3 drop-shadow-2xl ${frameDef.glowClass || ''}`}>
                         <ShogiPiece char={iconDef.char} scale={1.2} />
                      </div>
                 ) : (
-                    <div className={`w-32 h-32 md:w-40 md:h-40 rounded-full ${user.avatarColor} p-1 shadow-2xl ring-4 ring-slate-800 relative`}>
+                    <div className={`w-32 h-32 md:w-40 md:h-40 rounded-full ${user.avatarColor} p-1 shadow-2xl ring-4 ring-slate-800 relative ${frameDef.ringClass} ${frameDef.glowClass || ''} ${systemTitleDef ? '!ring-[4px] !ring-yellow-400 shadow-[0_0_24px_rgba(251,191,36,0.8)]' : ''}`}>
                         <div className="w-full h-full rounded-full bg-slate-900/50 backdrop-blur-sm flex items-center justify-center text-7xl shadow-inner relative overflow-hidden text-white font-serif-jp">
                             <span className="drop-shadow-md transform group-hover:scale-110 transition-transform duration-300 select-none">
                                 {avatarChar}
@@ -448,7 +515,8 @@ const Profile: React.FC = () => {
                         </div>
                     </div>
                 )}
-                
+                </div>
+
                 {isFactionWar && user.isGeneral && (
                     <div className="absolute -top-6 left-1/2 -translate-x-1/2 z-20 animate-bounce">
                         <Crown size={48} className="text-yellow-400 fill-yellow-400 drop-shadow-lg" />
@@ -463,8 +531,13 @@ const Profile: React.FC = () => {
                     </div>
                 )}
                 
-                <div className="absolute -bottom-2 -right-2 bg-slate-800 text-white p-2 rounded-full shadow-lg border-2 border-slate-700 group-hover:bg-blue-600 transition-colors z-20">
-                    <Smile size={16} />
+                <div className="flex gap-2 justify-center mt-3">
+                  <button onClick={() => requirePin(() => setIsIconModalOpen(true))} className="text-[10px] font-black bg-slate-800 hover:bg-blue-700 text-slate-400 hover:text-white px-3 py-1.5 rounded-lg border border-slate-700 transition-all flex items-center gap-1">
+                    <Smile size={11}/> アイコン
+                  </button>
+                  <button onClick={() => requirePin(() => setIsFrameModalOpen(true))} className="text-[10px] font-black bg-slate-800 hover:bg-yellow-700/60 text-slate-400 hover:text-yellow-300 px-3 py-1.5 rounded-lg border border-slate-700 transition-all flex items-center gap-1">
+                    <Crown size={11}/> フレーム
+                  </button>
                 </div>
              </div>
              
@@ -670,18 +743,21 @@ const Profile: React.FC = () => {
                     const days = h.revokedAt
                       ? Math.ceil((new Date(h.revokedAt).getTime() - new Date(h.awardedAt).getTime()) / 86400000)
                       : Math.ceil((Date.now() - new Date(h.awardedAt).getTime()) / 86400000);
+                    const awardedStr = new Date(h.awardedAt).toLocaleDateString('ja-JP', {year:'numeric',month:'numeric',day:'numeric'});
+                    const revokedStr = h.revokedAt ? new Date(h.revokedAt).toLocaleDateString('ja-JP', {year:'numeric',month:'numeric',day:'numeric'}) : '現在';
+                    const icons: Record<string,string> = { MASTER:'⚔️', RISING_STAR:'🌟', GRINDER:'🛡️', GIANT_KILLER:'💀' };
                     return (
-                      <div key={h.id} className={`p-3 rounded-xl border flex items-center gap-3 ${isActive ? 'bg-yellow-900/20 border-yellow-500/30' : 'bg-slate-800/60 border-slate-700/50'}`}>
-                        <div className="text-2xl">{isActive ? '👑' : '🏆'}</div>
+                      <div key={h.id} className={`p-4 rounded-2xl border flex items-start gap-3 ${isActive ? 'bg-gradient-to-r from-yellow-900/30 to-amber-900/20 border-yellow-500/40 shadow-[0_0_12px_rgba(251,191,36,0.2)]' : 'bg-slate-800/60 border-slate-700/50'}`}>
+                        <div className="text-2xl">{icons[h.titleId] || '🏆'}</div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-black text-yellow-300 text-sm">第{h.generation}代 {sysTitle?.japanese || h.titleId}</span>
-                            {isActive && <span className="text-[10px] bg-yellow-500/20 text-yellow-300 border border-yellow-500/30 px-2 py-0.5 rounded-full font-black">現役</span>}
+                            <span className="font-black text-yellow-300 text-sm">第{h.generation}代 {sysTitle?.name || h.titleId}</span>
+                            {isActive && <span className="text-[9px] bg-yellow-500/20 text-yellow-300 border border-yellow-500/30 px-2 py-0.5 rounded-full font-black animate-pulse">現役</span>}
                           </div>
-                          <div className="text-[11px] text-slate-400 mt-0.5">
-                            {new Date(h.awardedAt).toLocaleDateString('ja-JP')} 〜 {h.revokedAt ? new Date(h.revokedAt).toLocaleDateString('ja-JP') : '現在'}
-                            <span className="ml-2 text-slate-500">({days}日間)</span>
+                          <div className="text-xs font-bold text-slate-300 mt-0.5">
+                            {awardedStr} 〜 {revokedStr}
                           </div>
+                          <div className="text-[10px] text-slate-500 mt-0.5">通算 {days}日間</div>
                         </div>
                       </div>
                     );

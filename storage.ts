@@ -1,7 +1,7 @@
 import {
   User, MatchRecord, SystemSettings, ActivityLog, ActivityType,
   AchievementDef, AttendanceResult, BackupData, PointBreakdown,
-  EventType, Season, IconDef, RivalData, SystemTitle, TitleDef,
+  EventType, Season, IconDef, FrameDef, RivalData, SystemTitle, TitleDef,
   SyncStatus, SyncMeta, AutoBackupEntry,
   UndoEntry, UndoActionType,
   MaintenanceState,
@@ -122,6 +122,54 @@ export const ICONS_DATA: IconDef[] = [
   { id: 'SPECIAL_CROWN',   char: '👑',  name: '王冠',     conditionDescription: '四天王に2回以上選出',  type: 'SPECIAL',  category: 'SPECIAL' },
   { id: 'SPECIAL_FIRE',    char: '🔥',  name: '炎',       conditionDescription: '10連勝達成',           type: 'STREAK',   threshold: 10, category: 'SPECIAL' },
   { id: 'SPECIAL_ZEN',     char: '☯️',  name: '禅',       conditionDescription: '引き分け20回',         type: 'SPECIAL',  category: 'SPECIAL' },
+
+  // ── 四天王限定アイコン（タイトル保持中のみ使用可）─────────────
+  // 覇者（MASTER）専用
+  { id: 'ELITE_MASTER_SWORD',   char: '⚔️',  name: '覇者の剣',     conditionDescription: '覇者に選出中のみ',   type: 'SPECIAL', category: 'ELITE', requiredTitle: 'MASTER', isLimited: true },
+  { id: 'ELITE_MASTER_SHIELD',  char: '🛡',   name: '覇者の盾',     conditionDescription: '覇者に選出中のみ',   type: 'SPECIAL', category: 'ELITE', requiredTitle: 'MASTER', isLimited: true },
+  { id: 'ELITE_MASTER_CROWN',   char: '👑',  name: '覇者の冠',     conditionDescription: '覇者に選出中のみ',   type: 'SPECIAL', category: 'ELITE', requiredTitle: 'MASTER', isLimited: true },
+  { id: 'ELITE_MASTER_GOLD',    char: '🏆',  name: '金杯',         conditionDescription: '覇者に選出中のみ',   type: 'SPECIAL', category: 'ELITE', requiredTitle: 'MASTER', isLimited: true },
+  { id: 'ELITE_MASTER_LION',    char: '🦁',  name: '百獣の王',     conditionDescription: '覇者に選出中のみ',   type: 'SPECIAL', category: 'ELITE', requiredTitle: 'MASTER', isLimited: true },
+  // 新星（RISING_STAR）専用
+  { id: 'ELITE_RISING_STAR',    char: '🌟',  name: '金の星',       conditionDescription: '新星に選出中のみ',   type: 'SPECIAL', category: 'ELITE', requiredTitle: 'RISING_STAR', isLimited: true },
+  { id: 'ELITE_RISING_METEOR',  char: '☄️',  name: '流星',         conditionDescription: '新星に選出中のみ',   type: 'SPECIAL', category: 'ELITE', requiredTitle: 'RISING_STAR', isLimited: true },
+  { id: 'ELITE_RISING_ROCKET',  char: '🚀',  name: '急上昇',       conditionDescription: '新星に選出中のみ',   type: 'SPECIAL', category: 'ELITE', requiredTitle: 'RISING_STAR', isLimited: true },
+  { id: 'ELITE_RISING_COMET',   char: '💫',  name: '彗星',         conditionDescription: '新星に選出中のみ',   type: 'SPECIAL', category: 'ELITE', requiredTitle: 'RISING_STAR', isLimited: true },
+  { id: 'ELITE_RISING_ANGEL',   char: '😇',  name: '新星の翼',     conditionDescription: '新星に選出中のみ',   type: 'SPECIAL', category: 'ELITE', requiredTitle: 'RISING_STAR', isLimited: true },
+  // 鉄人（GRINDER）専用
+  { id: 'ELITE_GRINDER_IRON',   char: '⚙️',  name: '鉄の歯車',    conditionDescription: '鉄人に選出中のみ',   type: 'SPECIAL', category: 'ELITE', requiredTitle: 'GRINDER', isLimited: true },
+  { id: 'ELITE_GRINDER_MUSCLE', char: '💪',  name: '鉄腕',         conditionDescription: '鉄人に選出中のみ',   type: 'SPECIAL', category: 'ELITE', requiredTitle: 'GRINDER', isLimited: true },
+  { id: 'ELITE_GRINDER_ANVIL',  char: '🔩',  name: '鉄のボルト',   conditionDescription: '鉄人に選出中のみ',   type: 'SPECIAL', category: 'ELITE', requiredTitle: 'GRINDER', isLimited: true },
+  { id: 'ELITE_GRINDER_ROBOT',  char: '🤖',  name: '鉄人ロボ',     conditionDescription: '鉄人に選出中のみ',   type: 'SPECIAL', category: 'ELITE', requiredTitle: 'GRINDER', isLimited: true },
+  { id: 'ELITE_GRINDER_BULL',   char: '🐂',  name: '鉄牛',         conditionDescription: '鉄人に選出中のみ',   type: 'SPECIAL', category: 'ELITE', requiredTitle: 'GRINDER', isLimited: true },
+  // 巨人キラー（GIANT_KILLER）専用
+  { id: 'ELITE_KILLER_SKULL',   char: '💀',  name: '骸骨',         conditionDescription: '巨人キラーに選出中のみ', type: 'SPECIAL', category: 'ELITE', requiredTitle: 'GIANT_KILLER', isLimited: true },
+  { id: 'ELITE_KILLER_AXE',     char: '🪓',  name: '斧',           conditionDescription: '巨人キラーに選出中のみ', type: 'SPECIAL', category: 'ELITE', requiredTitle: 'GIANT_KILLER', isLimited: true },
+  { id: 'ELITE_KILLER_NINJA',   char: '🥷',  name: '忍者',         conditionDescription: '巨人キラーに選出中のみ', type: 'SPECIAL', category: 'ELITE', requiredTitle: 'GIANT_KILLER', isLimited: true },
+  { id: 'ELITE_KILLER_WOLF',    char: '🐺',  name: '一匹狼',       conditionDescription: '巨人キラーに選出中のみ', type: 'SPECIAL', category: 'ELITE', requiredTitle: 'GIANT_KILLER', isLimited: true },
+  { id: 'ELITE_KILLER_VIPER',   char: '🐍',  name: '毒蛇',         conditionDescription: '巨人キラーに選出中のみ', type: 'SPECIAL', category: 'ELITE', requiredTitle: 'GIANT_KILLER', isLimited: true },
+  // 四天王共通（どのタイトルでも使用可）
+  { id: 'ELITE_COMMON_GEM',     char: '💎',  name: '宝石',         conditionDescription: '四天王に選出中のみ',  type: 'SPECIAL', category: 'ELITE', isLimited: true },
+  { id: 'ELITE_COMMON_THUNDER', char: '⚡',  name: '雷帝',         conditionDescription: '四天王に選出中のみ',  type: 'SPECIAL', category: 'ELITE', isLimited: true },
+  { id: 'ELITE_COMMON_DRAGON',  char: '🐲',  name: '神龍',         conditionDescription: '四天王に選出中のみ',  type: 'SPECIAL', category: 'ELITE', isLimited: true },
+  { id: 'ELITE_COMMON_SAMURAI', char: '⛩️',  name: '武者',         conditionDescription: '四天王に選出中のみ',  type: 'SPECIAL', category: 'ELITE', isLimited: true },
+  { id: 'ELITE_COMMON_FLAME',   char: '🔥',  name: '業火',         conditionDescription: '四天王に選出中のみ',  type: 'SPECIAL', category: 'ELITE', isLimited: true },
+];
+
+// ── フレーム（枠）データ ─────────────────────────────────────────
+export const FRAMES_DATA: FrameDef[] = [
+  { id: 'FRAME_NONE',       name: 'なし',         description: 'フレームなし',         ringClass: '',                                        glowClass: '', isEliteOnly: false },
+  { id: 'FRAME_DEFAULT',    name: '標準',         description: 'デフォルトフレーム',   ringClass: 'ring-2 ring-white/20',                    glowClass: '', isEliteOnly: false },
+  { id: 'FRAME_BLUE',       name: 'ブルー',       description: '対局数10回以上',       ringClass: 'ring-2 ring-blue-500',                    glowClass: 'shadow-[0_0_8px_rgba(59,130,246,0.6)]',  isEliteOnly: false },
+  { id: 'FRAME_GREEN',      name: 'グリーン',     description: '出席30日以上',         ringClass: 'ring-2 ring-green-500',                   glowClass: 'shadow-[0_0_8px_rgba(34,197,94,0.6)]',  isEliteOnly: false },
+  // 四天王共通フレーム
+  { id: 'FRAME_GOLD',       name: '黄金',         description: '四天王に選出中のみ',   ringClass: 'ring-[3px] ring-yellow-400',              glowClass: 'shadow-[0_0_16px_rgba(251,191,36,0.9)]', isEliteOnly: true },
+  { id: 'FRAME_GOLD_PULSE', name: '黄金（光）',   description: '四天王に選出中のみ',   ringClass: 'ring-[3px] ring-yellow-300 animate-pulse',glowClass: 'shadow-[0_0_20px_rgba(251,191,36,1)]',   isEliteOnly: true },
+  // タイトル専用フレーム
+  { id: 'FRAME_MASTER',     name: '覇者の枠',     description: '覇者に選出中のみ',     ringClass: 'ring-[3px] ring-amber-400',               glowClass: 'shadow-[0_0_18px_rgba(251,191,36,0.9)]', isEliteOnly: true, requiredTitle: 'MASTER',       gradientStyle: 'linear-gradient(135deg,#f59e0b,#d97706,#fbbf24)' },
+  { id: 'FRAME_RISING',     name: '新星の枠',     description: '新星に選出中のみ',     ringClass: 'ring-[3px] ring-sky-400',                 glowClass: 'shadow-[0_0_18px_rgba(56,189,248,0.9)]', isEliteOnly: true, requiredTitle: 'RISING_STAR',  gradientStyle: 'linear-gradient(135deg,#38bdf8,#0284c7,#7dd3fc)' },
+  { id: 'FRAME_GRINDER',    name: '鉄人の枠',     description: '鉄人に選出中のみ',     ringClass: 'ring-[3px] ring-emerald-400',             glowClass: 'shadow-[0_0_18px_rgba(52,211,153,0.9)]', isEliteOnly: true, requiredTitle: 'GRINDER',      gradientStyle: 'linear-gradient(135deg,#34d399,#059669,#6ee7b7)' },
+  { id: 'FRAME_KILLER',     name: 'キラーの枠',   description: '巨人キラーに選出中のみ', ringClass: 'ring-[3px] ring-rose-400',              glowClass: 'shadow-[0_0_18px_rgba(251,113,133,0.9)]',isEliteOnly: true, requiredTitle: 'GIANT_KILLER', gradientStyle: 'linear-gradient(135deg,#fb7185,#e11d48,#fda4af)' },
 ];
 
 // ============================================================
@@ -614,7 +662,6 @@ const normalizeUser = (user: any): User => ({
   faction:        user.faction        ?? 'WHITE',
   isGeneral:      user.isGeneral      ?? false,
   isNewMember:    user.isNewMember    ?? false,
-  grade:          user.grade,
   activeTitle:    user.activeTitle    ?? null,
   lastAttendance: user.lastAttendance ?? null,
   avatarColor:    user.avatarColor    || 'bg-blue-500',
@@ -622,6 +669,8 @@ const normalizeUser = (user: any): User => ({
     : [{ date: new Date().toISOString(), rate: user.rate ?? INITIAL_RATE }],
   ranks:          Array.isArray(user.ranks) ? user.ranks : [],
   profilePin:     user.profilePin ?? '0000',
+  activeFrameId:  user.activeFrameId ?? 'FRAME_NONE',
+  unlockedFrames: Array.isArray(user.unlockedFrames) ? user.unlockedFrames : ['FRAME_NONE', 'FRAME_DEFAULT'],
 });
 
 /** All users including inactive (internal use / admin) */
@@ -1081,14 +1130,34 @@ export const awardSystemTitles = (): void => {
   recordSystemTitleChange('GIANT_KILLER', killerHolders.map(u => u.id));
 
   // 特別アイコン解放（四天王選出者）
-  [...masterHolders, ...risingHolders, ...grinderHolders, ...killerHolders].forEach(u => {
-    const x = all.find(a => a.id === u.id);
-    if (!x) return;
-    if (!x.unlockedIcons.includes('SPECIAL_STAR'))  x.unlockedIcons.push('SPECIAL_STAR');
-    // 2回以上選出歴があれば王冠アイコン解放
-    const hist = getSystemTitleHistory().entries.filter(e => e.userId === u.id);
-    if (hist.length >= 2 && !x.unlockedIcons.includes('SPECIAL_CROWN')) x.unlockedIcons.push('SPECIAL_CROWN');
-  });
+  const unlockEliteForTitle = (holders: User[], titleId: string) => {
+    holders.forEach(u => {
+      const x = all.find(a => a.id === u.id);
+      if (!x) return;
+      if (!x.unlockedIcons.includes('SPECIAL_STAR'))  x.unlockedIcons.push('SPECIAL_STAR');
+      if (!x.unlockedFrames) x.unlockedFrames = ['FRAME_NONE', 'FRAME_DEFAULT'];
+      // 共通エリートフレーム
+      if (!x.unlockedFrames.includes('FRAME_GOLD'))       x.unlockedFrames.push('FRAME_GOLD');
+      if (!x.unlockedFrames.includes('FRAME_GOLD_PULSE')) x.unlockedFrames.push('FRAME_GOLD_PULSE');
+      // タイトル固有フレーム・アイコン
+      const titleFrameMap: Record<string, string> = {
+        MASTER: 'FRAME_MASTER', RISING_STAR: 'FRAME_RISING',
+        GRINDER: 'FRAME_GRINDER', GIANT_KILLER: 'FRAME_KILLER',
+      };
+      const tFrame = titleFrameMap[titleId];
+      if (tFrame && !x.unlockedFrames.includes(tFrame)) x.unlockedFrames.push(tFrame);
+      // タイトル専用アイコンを一括解放
+      ICONS_DATA.filter(i => i.category === 'ELITE' && (!i.requiredTitle || i.requiredTitle === titleId))
+        .forEach(i => { if (!x.unlockedIcons.includes(i.id)) x.unlockedIcons.push(i.id); });
+      // 2回以上選出歴があれば王冠アイコン解放
+      const hist = getSystemTitleHistory().entries.filter(e => e.userId === u.id);
+      if (hist.length >= 2 && !x.unlockedIcons.includes('SPECIAL_CROWN')) x.unlockedIcons.push('SPECIAL_CROWN');
+    });
+  };
+  unlockEliteForTitle(masterHolders,  'MASTER');
+  unlockEliteForTitle(risingHolders,  'RISING_STAR');
+  unlockEliteForTitle(grinderHolders, 'GRINDER');
+  unlockEliteForTitle(killerHolders,  'GIANT_KILLER');
 
   const settings = getSettings();
   saveSettings({ ...settings, lastTitleUpdate: new Date().toISOString() });
@@ -1250,13 +1319,12 @@ export const parseUserCSV = (csv: string): Partial<User>[] =>
       return { name: name || '名称未設定', reading: reading || '', isNewMember: isNew === '1' };
     });
 
-const newUserBase = (name: string, reading?: string, isNewMember = false, grade?: number): User => ({
+const newUserBase = (name: string, reading?: string, isNewMember = false): User => ({
   id:               randomId(),
   name,
   reading,
   isActive:         true,
   isNewMember,
-  grade,
   rate:             INITIAL_RATE,
   seasonStartRate:  INITIAL_RATE,
   seasonStartPoints: 0,
@@ -1284,6 +1352,8 @@ const newUserBase = (name: string, reading?: string, isNewMember = false, grade?
   unlockedIcons:    [...DEFAULT_UNLOCKED_ICONS],
   ranks:            [],
   profilePin:       '0000',
+  activeFrameId:    'FRAME_NONE',
+  unlockedFrames:   ['FRAME_NONE', 'FRAME_DEFAULT'],
 });
 
 export const bulkAddUsers = (stubs: Partial<User>[]): void => {
@@ -1594,6 +1664,15 @@ export const getUserAvatarChar = (u: User): string =>
 
 export const getUserIconDef = (id: string): IconDef =>
   ICONS_DATA.find(i => i.id === id) || ICONS_DATA[0];
+
+export const getUserFrameDef = (id?: string): FrameDef =>
+  FRAMES_DATA.find(f => f.id === id) || FRAMES_DATA[0];
+
+export const updateUserFrame = (id: string, frameId: string): void => {
+  const all = getRawUsers();
+  const u = all.find(x => x.id === id);
+  if (u) { u.activeFrameId = frameId; saveUsers(all); }
+};
 
 export const playSound  = (_type: any): void => {};
 export const vibrate    = (_p: any): void => {};

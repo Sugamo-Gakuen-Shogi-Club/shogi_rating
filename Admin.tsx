@@ -71,7 +71,11 @@ const Admin: React.FC = () => {
   // Add user
   const [newName, setNewName] = useState('');
   const [newReading, setNewReading] = useState('');
-  const [newGrade, setNewGrade] = useState<number | undefined>(undefined);
+
+  // Four Kings confirmation modal
+  const [kingsConfirm, setKingsConfirm] = useState<{
+    masters: string[], risings: string[], grinders: string[], killers: string[]
+  } | null>(null);
 
   // CSV
   const [csvPreview, setCsvPreview] = useState<Partial<User>[] | null>(null);
@@ -144,23 +148,12 @@ const Admin: React.FC = () => {
     const risings  = risingC.length  ? topScore(risingC,  u=>u.totalPoints-u.seasonStartPoints) : [];
     const grinders = grinderC.length ? topScore(grinderC, u=>u.activityDays) : [];
     const killers  = killerC.length  ? topScore(killerC,  u=>upsetCount[u.id]||0) : [];
-    const fmt = (list: any[]) => list.map(u=>u.name).join('・') || '（対象なし）';
-    const msg = [
-      '【四天王の更新確認】',
-      '',
-      `⚔️ 覇者（今期レート上昇）: ${fmt(masters)}`,
-      `🌟 新星（今期ポイント上昇）: ${fmt(risings)}`,
-      `🛡️ 鉄人（出席日数）: ${fmt(grinders)}`,
-      `💀 巨人キラー（格上撃破）: ${fmt(killers)}`,
-      '',
-      '※ 同スコアの場合は全員が選出されます。',
-      'この内容で更新しますか？',
-    ].join('\n');
-    if (window.confirm(msg)) {
-      awardSystemTitles();
-      refreshData();
-      alert('四天王を更新しました！');
-    }
+    setKingsConfirm({
+      masters:  masters.map((u:any) => u.name),
+      risings:  risings.map((u:any) => u.name),
+      grinders: grinders.map((u:any) => u.name),
+      killers:  killers.map((u:any) => u.name),
+    });
   };
 
   // ──────────────────────────────────────────────────────────
@@ -168,10 +161,9 @@ const Admin: React.FC = () => {
   // ──────────────────────────────────────────────────────────
   const handleAddUser = () => {
     if (!newName.trim()) return;
-    bulkAddUsers([{ name: newName.trim(), reading: newReading.trim(), isNewMember: true, grade: newGrade }]);
+    bulkAddUsers([{ name: newName.trim(), reading: newReading.trim(), isNewMember: true }]);
     setNewName('');
     setNewReading('');
-    setNewGrade(undefined);
     refreshData();
   };
 
@@ -488,6 +480,44 @@ const Admin: React.FC = () => {
   return (
     <div className="space-y-8 pb-12 animate-in fade-in duration-500">
 
+      {/* ── 四天王更新確認モーダル ───────────────────────────── */}
+      {kingsConfirm && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/95 backdrop-blur-md p-4">
+          <div className="bg-slate-900 w-full max-w-lg rounded-3xl shadow-2xl border border-yellow-500/30 overflow-hidden">
+            <div className="bg-gradient-to-r from-yellow-900/60 to-amber-900/40 p-6 border-b border-yellow-500/20">
+              <h3 className="text-xl font-black text-yellow-300 flex items-center gap-2"><Crown size={22}/> 四天王 更新確認</h3>
+              <p className="text-xs text-yellow-700 mt-1 font-bold">以下の内容で四天王称号を更新します。同スコアは全員選出されます。</p>
+            </div>
+            <div className="p-6 space-y-3">
+              {[
+                { icon: '⚔️', label: '覇者（今期レート上昇）', names: kingsConfirm.masters },
+                { icon: '🌟', label: '新星（今期ポイント上昇）', names: kingsConfirm.risings },
+                { icon: '🛡️', label: '鉄人（出席日数）',         names: kingsConfirm.grinders },
+                { icon: '💀', label: '巨人キラー（格上撃破）',   names: kingsConfirm.killers },
+              ].map(row => (
+                <div key={row.label} className="flex items-start gap-3 p-3 bg-slate-800/60 rounded-xl border border-slate-700">
+                  <span className="text-xl shrink-0">{row.icon}</span>
+                  <div>
+                    <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{row.label}</div>
+                    <div className="text-sm font-black text-white mt-0.5">
+                      {row.names.length > 0 ? row.names.join(' ・ ') : <span className="text-slate-500">対象なし</span>}
+                    </div>
+                    {row.names.length > 1 && <div className="text-[9px] text-yellow-500 font-bold mt-0.5">⚠ 同スコア: {row.names.length}名全員選出</div>}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-3 px-6 pb-6">
+              <button onClick={() => setKingsConfirm(null)} className="flex-1 py-3 rounded-xl bg-slate-700 hover:bg-slate-600 text-white font-black transition-all">キャンセル</button>
+              <button onClick={() => { awardSystemTitles(); refreshData(); setKingsConfirm(null); }}
+                className="flex-1 py-3 rounded-xl bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-400 hover:to-amber-400 text-slate-900 font-black shadow-lg transition-all">
+                ✓ この内容で更新
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* CSV Preview Modal */}
       {csvPreview && (
         <div className="fixed inset-0 z-[160] flex items-center justify-center bg-slate-950/95 backdrop-blur-md p-4">
@@ -634,10 +664,6 @@ const Admin: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-3">
                   <input type="text" value={newName} onChange={e => setNewName(e.target.value)} placeholder="名前（例：秀村 紘嗣）" className="w-full p-3 border border-slate-700 rounded-xl bg-slate-800 text-white font-bold focus:ring-2 focus:ring-blue-500 outline-none" />
                   <input type="text" value={newReading} onChange={e => setNewReading(e.target.value)} placeholder="読み（例：ひでむら ひろし）" className="w-full p-3 border border-slate-700 rounded-xl bg-slate-800 text-white font-bold focus:ring-2 focus:ring-blue-500 outline-none" />
-                  <select value={newGrade ?? ''} onChange={e => setNewGrade(e.target.value ? Number(e.target.value) : undefined)} className="w-full p-3 border border-slate-700 rounded-xl bg-slate-800 text-white font-bold focus:ring-2 focus:ring-blue-500 outline-none">
-                    <option value="">学年（任意）</option>
-                    {[1,2,3,4,5,6].map(g => <option key={g} value={g}>{g}年</option>)}
-                  </select>
                   <button onClick={handleAddUser} className="bg-blue-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg hover:bg-blue-500 flex items-center justify-center gap-2 md:col-span-1">
                     <Plus size={20} /> 追加
                   </button>

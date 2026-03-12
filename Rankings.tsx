@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { getUsers, ACHIEVEMENTS_DATA, getUserAvatarChar, SYSTEM_TITLES, getSystemTitleHistory, ICONS_DATA } from './storage';
+import { getUsers, ACHIEVEMENTS_DATA, getUserAvatarChar, SYSTEM_TITLES, getSystemTitleHistory, ICONS_DATA, FRAMES_DATA, getUserFrameDef } from './storage';
 import { Card } from './Card';
 import { TrendingUp, Award, Crown, History } from 'lucide-react';
 import { RankEntry, User } from './types';
@@ -11,7 +11,7 @@ const RankBadge: React.FC<{ ranks: RankEntry[] }> = ({ ranks }) => {
   return (
     <div className="flex flex-wrap gap-1 mt-1">
       {ranks.map(r => (
-        <span key={r.id} className="text-[9px] px-1.5 py-0.5 bg-purple-900/30 text-purple-300 border border-purple-700/40 rounded font-black tracking-tight">
+        <span key={r.id} title={`${r.source} ${r.rank}`} className="text-[9px] px-1.5 py-0.5 bg-purple-900/30 text-purple-300 border border-purple-700/40 rounded font-black tracking-tight">
           {r.source} {r.rank}
         </span>
       ))}
@@ -40,16 +40,24 @@ const UserAvatar: React.FC<{ user: User }> = ({ user }) => {
   const iconDef = ICONS_DATA.find(i => i.id === user.activeIconId);
   const isShogi = iconDef?.category === 'SHOGI';
   const isPromoted = !!(iconDef?.char && (iconDef.char.startsWith('と') || iconDef.char.startsWith('成') || iconDef.char.startsWith('龍')));
+  const frameDef = getUserFrameDef(user.activeFrameId);
+  const avatarChar = getUserAvatarChar(user);
+  const isElite = !!user.systemTitle;
+
   if (isShogi && iconDef) {
     return (
-      <div className="w-14 h-14 flex items-center justify-center shrink-0">
+      <div className={`w-14 h-14 flex items-center justify-center shrink-0 relative ${frameDef.glowClass || ''}`}>
+        {frameDef.id !== 'FRAME_NONE' && (
+          <div className={`absolute inset-0 rounded-xl pointer-events-none ${frameDef.ringClass}`}
+            style={frameDef.gradientStyle ? { outline: `3px solid transparent`, boxShadow: `0 0 0 3px`, backgroundImage: frameDef.gradientStyle } : undefined}
+          />
+        )}
         <ShogiPiece char={iconDef.char} isPromoted={isPromoted} scale={0.55} />
       </div>
     );
   }
-  const avatarChar = getUserAvatarChar(user);
   return (
-    <div className={`w-14 h-14 rounded-full ${user.avatarColor} p-0.5 shadow-xl shrink-0`}>
+    <div className={`w-14 h-14 rounded-full ${user.avatarColor} p-0.5 shadow-xl shrink-0 ${frameDef.ringClass} ${frameDef.glowClass || ''} ${isElite ? 'ring-[3px] ring-yellow-400 shadow-[0_0_14px_rgba(251,191,36,0.8)]' : ''}`}>
       <div className="w-full h-full rounded-full bg-slate-900/80 flex items-center justify-center text-2xl text-white font-serif-jp">{avatarChar}</div>
     </div>
   );
@@ -228,7 +236,7 @@ const Rankings: React.FC = () => {
                     const rise = rateDelta+ptDelta;
                     const activeTitle = ACHIEVEMENTS_DATA.find(a=>a.id===user.activeTitle);
                     return (
-                      <tr key={user.id} className="hover:bg-white/5 transition-all group duration-300">
+                      <tr key={user.id} className={`transition-all group duration-300 ${user.systemTitle ? 'bg-yellow-900/10 hover:bg-yellow-900/20 border-l-2 border-yellow-500/50' : 'hover:bg-white/5'}`}>
                         <td className="p-4 text-center font-black text-xl">
                           <span className={dispRank===1?'text-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.5)]':'text-slate-500'}>
                             {getRankIcon(dispRank)}
@@ -242,7 +250,6 @@ const Rankings: React.FC = () => {
                             <div className="min-w-0">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <span className="font-black text-slate-200 text-base group-hover:text-blue-400 transition-colors truncate max-w-[110px]">{user.name}</span>
-                                {user.grade && <span className="text-[10px] text-slate-500 font-bold shrink-0">{user.grade}年</span>}
                                 {user.systemTitle && <FourKingsBadge titleId={user.systemTitle}/>}
                               </div>
                               {activeTitle && <div className="text-[10px] text-slate-400 font-bold mt-0.5">「{activeTitle.name}」</div>}

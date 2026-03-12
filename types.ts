@@ -22,9 +22,21 @@ export interface IconDef {
   name: string;
   conditionDescription: string;
   type: 'DEFAULT' | 'RATE' | 'WINS' | 'STREAK' | 'SPECIAL' | 'MATCHES' | 'DAYS';
-  category: 'DEFAULT' | 'SHOGI' | 'CHESS' | 'SPECIAL' | 'RANK';
+  category: 'DEFAULT' | 'SHOGI' | 'CHESS' | 'SPECIAL' | 'RANK' | 'ELITE';
   threshold?: number;
   isLimited?: boolean;
+  requiredTitle?: string; // SystemTitle ID — 四天王保持中のみ使用可
+}
+
+export interface FrameDef {
+  id: string;
+  name: string;
+  description: string;
+  ringClass: string;      // Tailwind ring/border CSS
+  gradientStyle?: string; // inline CSS gradient border
+  glowClass?: string;
+  isEliteOnly: boolean;
+  requiredTitle?: string;
 }
 
 export interface RateHistoryPoint {
@@ -104,7 +116,9 @@ export interface User {
   ranks: RankEntry[];
   // ★ 個人ページPIN（初期値 "0000"）
   profilePin: string;
-  grade?: number;           // 学年（1〜6など）
+  // ★ アイコンフレーム
+  activeFrameId?: string;
+  unlockedFrames?: string[];
 }
 
 

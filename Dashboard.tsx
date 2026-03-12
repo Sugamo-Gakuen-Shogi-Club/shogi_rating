@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { getUsers, recordAttendance, getSettings, isEventActive, getLogs, getUserAvatarChar, playSound, vibrate, SYSTEM_TITLES, getLocalDateString, getMatches } from './storage';
+import { getUsers, recordAttendance, getSettings, isEventActive, getLogs, getUserAvatarChar, playSound, vibrate, SYSTEM_TITLES, getLocalDateString, getMatches, ICONS_DATA, getUserFrameDef } from './storage';
 import { User, MatchRecord, ActivityType, EventType, AchievementDef, IconDef, SystemTitle } from './types';
 import { Card } from './Card';
 import { Trophy, Users, Calendar, ArrowRight, Zap, Crown, Flame, Snowflake, Search, Activity, Swords, X } from 'lucide-react';
@@ -145,11 +145,25 @@ const Dashboard: React.FC = () => {
                                 <div className="absolute -top-6 left-1/2 -translate-x-1/2 text-yellow-400 animate-bounce">
                                     <Crown size={20} fill="currentColor" />
                                 </div>
-                                <div className={`w-14 h-14 rounded-full ${user.avatarColor} p-0.5 shadow-lg border-2 border-yellow-400`}>
-                                    <div className="w-full h-full rounded-full bg-slate-900 flex items-center justify-center text-2xl font-black text-white font-serif-jp">
+                                {(() => {
+                                  const iconDef = ICONS_DATA.find(i => i.id === user.activeIconId);
+                                  const isShogi = iconDef?.category === 'SHOGI';
+                                  const frameDef = getUserFrameDef(user.activeFrameId);
+                                  if (isShogi && iconDef) {
+                                    return (
+                                      <div className={`w-14 h-14 flex items-center justify-center border-2 border-yellow-400 rounded-lg ${frameDef.glowClass || ''}`}>
+                                        <ShogiPiece char={iconDef.char} scale={0.55} />
+                                      </div>
+                                    );
+                                  }
+                                  return (
+                                    <div className={`w-14 h-14 rounded-full ${user.avatarColor} p-0.5 shadow-lg border-2 border-yellow-400 ${frameDef.glowClass || ''}`}>
+                                      <div className="w-full h-full rounded-full bg-slate-900 flex items-center justify-center text-2xl font-black text-white font-serif-jp">
                                         {getUserAvatarChar(user)}
+                                      </div>
                                     </div>
-                                </div>
+                                  );
+                                })()}
                            </div>
                       ) : (
                           <div className="w-14 h-14 rounded-full bg-slate-800 flex items-center justify-center border border-white/10 grayscale opacity-50">
