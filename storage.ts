@@ -692,6 +692,7 @@ export const getUsers = (includeInactive = false): User[] => {
 
 export const saveUsers = (users: User[]): void => {
   localStorage.setItem(USERS_KEY, JSON.stringify(users));
+  window.dispatchEvent(new CustomEvent('rivals-users-changed'));
   syncWithServer();
 };
 
@@ -1064,8 +1065,26 @@ export const awardSystemTitles = (): void => {
   const active   = all.filter(u => u.isActive !== false);
   if (active.length === 0) return;
 
-  // Reset all
+  // Reset all titles
   all.forEach(u => { u.systemTitle = null; });
+
+  // ★ 退任処理：タイトルを失うユーザーの限定アイコン・フレームを強制リセット
+  const eliteIconIds = new Set(ICONS_DATA.filter(i => i.category === 'ELITE').map(i => i.id));
+  const eliteFrameIds = new Set(FRAMES_DATA.filter(f => f.isEliteOnly).map(f => f.id));
+  all.forEach(u => {
+    // 使用中アイコンがELITEなら初期アイコンに戻す
+    if (u.activeIconId && eliteIconIds.has(u.activeIconId)) {
+      u.activeIconId = 'DEFAULT_INITIAL';
+    }
+    // 使用中フレームがエリート限定なら「なし」に戻す
+    if (u.activeFrameId && eliteFrameIds.has(u.activeFrameId)) {
+      u.activeFrameId = 'FRAME_NONE';
+    }
+    // unlockedIconsからELITEアイコンを剥奪（再選出時に再付与される）
+    u.unlockedIcons = u.unlockedIcons.filter(id => !eliteIconIds.has(id));
+    // unlockedFramesからエリートフレームを剥奪
+    u.unlockedFrames = (u.unlockedFrames || []).filter(id => !eliteFrameIds.has(id));
+  });
 
   // MASTER: 今期レート上昇1位（PDFに合わせた）
   const byRateGrowth = [...active].sort((a, b) =>

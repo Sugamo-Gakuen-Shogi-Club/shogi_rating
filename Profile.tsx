@@ -56,7 +56,9 @@ const IconSelectorModal: React.FC<{
     user: User;
     onClose: () => void;
     onSelect: (iconId: string) => void;
-}> = ({ user, onClose, onSelect }) => {
+}> = ({ user: userProp, onClose, onSelect }) => {
+    // ★ 常にstorageから最新を読む（Admin画面での四天王更新直後も正しく反映）
+    const user = getUsers().find(u => u.id === userProp.id) ?? userProp;
     const isEliteUser = !!user.systemTitle;
     const categories: {key: string, label: string, icon: React.ReactNode}[] = [
         { key: 'DEFAULT', label: '基本', icon: <Smile size={16}/> },
@@ -163,7 +165,8 @@ const FrameSelectorModal: React.FC<{
     user: User;
     onClose: () => void;
     onSelect: (frameId: string) => void;
-}> = ({ user, onClose, onSelect }) => {
+}> = ({ user: userProp, onClose, onSelect }) => {
+    const user = getUsers().find(u => u.id === userProp.id) ?? userProp;
     const unlockedFrames = user.unlockedFrames || ['FRAME_NONE'];
     const displayFrames = FRAMES_DATA.filter(f => unlockedFrames.includes(f.id) || !f.isEliteOnly);
     return (
@@ -270,6 +273,21 @@ const Profile: React.FC = () => {
     setUsers(getUsers());
     setMatches(getMatches());
     setLogs(getLogs());
+  }, []);
+
+  // ★ Admin画面での四天王更新など外部変更をリッスンして即反映
+  useEffect(() => {
+    const refresh = () => {
+      setUsers(getUsers());
+      setMatches(getMatches());
+      setLogs(getLogs());
+    };
+    window.addEventListener('rivals-sync-changed', refresh);
+    window.addEventListener('rivals-users-changed', refresh);
+    return () => {
+      window.removeEventListener('rivals-sync-changed', refresh);
+      window.removeEventListener('rivals-users-changed', refresh);
+    };
   }, []);
 
   useEffect(() => {

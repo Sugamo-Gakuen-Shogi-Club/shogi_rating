@@ -134,25 +134,44 @@ const Admin: React.FC = () => {
   };
 
   const handleUpdateTitles = () => {
-    // 候補者を事前計算して確認ダイアログに表示
-    const allU = getUsers(true);
+    const allU = getUsers(); // ★ activeのみ（退部者除外）
     if (allU.length === 0) { alert('部員がいません。'); return; }
+
+    // ★ upsetCountをマッチレコードから正しく計算
+    const rateMap = Object.fromEntries(allU.map(u => [u.id, u.rate]));
     const upsetCount: Record<string, number> = {};
-    allU.forEach(u => { upsetCount[u.id] = 0; });
-    const masterC  = [...allU].sort((a,b)=>(b.rate-b.seasonStartRate)-(a.rate-a.seasonStartRate));
-    const risingC  = [...allU].sort((a,b)=>(b.totalPoints-b.seasonStartPoints)-(a.totalPoints-a.seasonStartPoints));
-    const grinderC = [...allU].sort((a,b)=>b.activityDays-a.activityDays);
-    const killerC  = [...allU].sort((a,b)=>(upsetCount[b.id]||0)-(upsetCount[a.id]||0));
-    const topScore = (list: any[], val: (u:any)=>number) => { const s = val(list[0]); return list.filter(u=>val(u)===s); };
-    const masters  = masterC.length  ? topScore(masterC,  u=>u.rate-u.seasonStartRate) : [];
-    const risings  = risingC.length  ? topScore(risingC,  u=>u.totalPoints-u.seasonStartPoints) : [];
-    const grinders = grinderC.length ? topScore(grinderC, u=>u.activityDays) : [];
-    const killers  = killerC.length  ? topScore(killerC,  u=>upsetCount[u.id]||0) : [];
+    getMatches().forEach(m => {
+      const p1Rate = rateMap[m.player1Id] ?? 0;
+      const p2Rate = rateMap[m.player2Id] ?? 0;
+      if (m.result === 'PLAYER1_WIN' && p2Rate > p1Rate)
+        upsetCount[m.player1Id] = (upsetCount[m.player1Id] || 0) + 1;
+      else if (m.result === 'PLAYER2_WIN' && p1Rate > p2Rate)
+        upsetCount[m.player2Id] = (upsetCount[m.player2Id] || 0) + 1;
+    });
+
+    const topScore = (list: any[], val: (u: any) => number) => {
+      if (!list.length) return [];
+      const s = val(list[0]);
+      return list.filter(u => val(u) === s);
+    };
+
+    const masterC  = [...allU].sort((a, b) => (b.rate - b.seasonStartRate) - (a.rate - a.seasonStartRate));
+    const risingC  = [...allU].sort((a, b) => (b.totalPoints - b.seasonStartPoints) - (a.totalPoints - a.seasonStartPoints));
+    const grinderC = [...allU].sort((a, b) => b.activityDays - a.activityDays);
+    const killerC  = [...allU].sort((a, b) => (upsetCount[b.id] || 0) - (upsetCount[a.id] || 0));
+
+    const masters  = topScore(masterC,  u => u.rate - u.seasonStartRate);
+    const risings  = topScore(risingC,  u => u.totalPoints - u.seasonStartPoints);
+    const grinders = topScore(grinderC, u => u.activityDays);
+    // ★ killerは格上撃破0件の場合は「対象なし」
+    const killerTop = topScore(killerC, u => upsetCount[u.id] || 0);
+    const killers = killerTop.filter(u => (upsetCount[u.id] || 0) > 0);
+
     setKingsConfirm({
-      masters:  masters.map((u:any) => u.name),
-      risings:  risings.map((u:any) => u.name),
-      grinders: grinders.map((u:any) => u.name),
-      killers:  killers.map((u:any) => u.name),
+      masters:  masters.map((u: any) => u.name),
+      risings:  risings.map((u: any) => u.name),
+      grinders: grinders.map((u: any) => u.name),
+      killers:  killers.map((u: any) => u.name),
     });
   };
 
