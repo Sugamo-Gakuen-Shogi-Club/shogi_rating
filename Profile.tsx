@@ -57,12 +57,13 @@ const IconSelectorModal: React.FC<{
     onClose: () => void;
     onSelect: (iconId: string) => void;
 }> = ({ user, onClose, onSelect }) => {
+    const isEliteUser = !!user.systemTitle;
     const categories: {key: string, label: string, icon: React.ReactNode}[] = [
         { key: 'DEFAULT', label: '基本', icon: <Smile size={16}/> },
         { key: 'SHOGI', label: '将棋の駒', icon: <Grid size={16}/> },
         { key: 'CHESS', label: 'チェス駒', icon: <Shield size={16}/> },
         { key: 'SPECIAL', label: 'スペシャル', icon: <Star size={16}/> },
-        { key: 'ELITE', label: '⚔️四天王限定', icon: <Crown size={16} className="text-yellow-400"/> },
+        ...(isEliteUser ? [{ key: 'ELITE', label: '⚔️四天王限定', icon: <Crown size={16} className="text-yellow-400"/> }] : []),
     ];
     const [activeCategory, setActiveCategory] = useState('DEFAULT');
 
@@ -73,6 +74,16 @@ const IconSelectorModal: React.FC<{
         if (activeCategory === 'ELITE') return i.category === 'ELITE';
         return i.category === activeCategory;
     });
+
+    // ELITEアイコンはunlockedIconsに入っていればOK、かつrequiredTitleがある場合は現在のsystemTitleと一致が必要
+    const isIconAvailable = (icon: typeof ICONS_DATA[0]) => {
+        if (icon.category === 'ELITE') {
+            if (!isEliteUser) return false;
+            if (icon.requiredTitle && icon.requiredTitle !== user.systemTitle) return false;
+            return user.unlockedIcons.includes(icon.id);
+        }
+        return user.unlockedIcons.includes(icon.id);
+    };
 
     return (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-in fade-in zoom-in duration-200">
@@ -101,7 +112,7 @@ const IconSelectorModal: React.FC<{
                 
                 <div className="p-6 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-6 overflow-y-auto bg-slate-900">
                     {displayedIcons.map(icon => {
-                        const isUnlocked = user.unlockedIcons.includes(icon.id);
+                        const isUnlocked = isIconAvailable(icon);
                         const isActive = user.activeIconId === icon.id;
                         
                         return (
@@ -593,7 +604,10 @@ const Profile: React.FC = () => {
                     <select 
                         className="p-1 text-sm bg-transparent font-bold text-slate-200 outline-none cursor-pointer"
                         value={user.activeTitle || 'NONE'}
-                        onChange={(e) => handleTitleChange(user.id, e.target.value)}
+                        onChange={(e) => {
+                            const val = e.target.value;
+                            requirePin(() => handleTitleChange(user.id, val));
+                        }}
                     >
                         <option value="NONE" className="bg-slate-800">設定なし</option>
                         {unlockedAchievements.map(ach => (
