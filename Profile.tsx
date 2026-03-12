@@ -314,11 +314,12 @@ const Profile: React.FC = () => {
     setShowPinModal(true);
   };
 
-  const handlePinSubmit = () => {
+  const handlePinSubmit = (inputValue?: string) => {
     const user = users.find(u => u.id === selectedId);
     if (!user) return;
     const correct = user.profilePin ?? '0000';
-    if (pinInput === correct) {
+    const value = inputValue ?? pinInput;   // ← stale closure回避
+    if (value === correct) {
       setShowPinModal(false);
       setPinError(false);
       setPinInput('');
@@ -407,7 +408,7 @@ const Profile: React.FC = () => {
           </div>
           {pinError && <p className="text-red-400 text-xs font-bold text-center">PINが違います</p>}
         </div>
-        <NumPad value={pinInput} onChange={(v) => { setPinInput(v); if (v.length === 4) { setTimeout(handlePinSubmit, 0); } }} maxLength={4} />
+        <NumPad value={pinInput} onChange={(v) => { setPinInput(v); if (v.length === 4) { setTimeout(() => handlePinSubmit(v), 0); } }} maxLength={4} />
         <div className="px-6 pb-6 pt-2">
           <button onClick={() => { setShowPinModal(false); setPinInput(''); setPinError(false); }}
             className="w-full text-slate-500 hover:text-white text-sm font-bold py-2 transition-colors">
