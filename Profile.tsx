@@ -754,26 +754,28 @@ const Profile: React.FC = () => {
             {/* 四天王歴カード */}
             {titleHistory.length > 0 && (
               <Card title="四天王の歴代記録" icon={<Crown size={18} className="text-yellow-400" />}>
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {titleHistory.map((h) => {
                     const sysTitle = SYSTEM_TITLES.find(t => t.id === h.titleId);
                     const isActive = !h.revokedAt;
                     const days = h.revokedAt
                       ? Math.ceil((new Date(h.revokedAt).getTime() - new Date(h.awardedAt).getTime()) / 86400000)
                       : Math.ceil((Date.now() - new Date(h.awardedAt).getTime()) / 86400000);
-                    const awardedStr = new Date(h.awardedAt).toLocaleDateString('ja-JP', {year:'numeric',month:'numeric',day:'numeric'});
-                    const revokedStr = h.revokedAt ? new Date(h.revokedAt).toLocaleDateString('ja-JP', {year:'numeric',month:'numeric',day:'numeric'}) : '現在';
+                    const fmt = (d: string) => new Date(d).toLocaleDateString('ja-JP', {year:'numeric',month:'numeric',day:'numeric'});
                     const icons: Record<string,string> = { MASTER:'⚔️', RISING_STAR:'🌟', GRINDER:'🛡️', GIANT_KILLER:'💀' };
                     return (
                       <div key={h.id} className={`p-4 rounded-2xl border flex items-start gap-3 ${isActive ? 'bg-gradient-to-r from-yellow-900/30 to-amber-900/20 border-yellow-500/40 shadow-[0_0_12px_rgba(251,191,36,0.2)]' : 'bg-slate-800/60 border-slate-700/50'}`}>
-                        <div className="text-2xl">{icons[h.titleId] || '🏆'}</div>
+                        <div className="text-2xl shrink-0">{icons[h.titleId] || '🏆'}</div>
                         <div className="flex-1 min-w-0">
+                          {/* ← 要望通りの形式: 第〇代 [称号名]（選出日〜退任日） */}
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-black text-yellow-300 text-sm">第{h.generation}代 {sysTitle?.name || h.titleId}</span>
+                            <span className="font-black text-yellow-300 text-base">
+                              第{h.generation}代 {sysTitle?.name || h.titleId}
+                            </span>
                             {isActive && <span className="text-[9px] bg-yellow-500/20 text-yellow-300 border border-yellow-500/30 px-2 py-0.5 rounded-full font-black animate-pulse">現役</span>}
                           </div>
-                          <div className="text-xs font-bold text-slate-300 mt-0.5">
-                            {awardedStr} 〜 {revokedStr}
+                          <div className="text-xs font-bold text-slate-400 mt-1">
+                            （{fmt(h.awardedAt)} 〜 {h.revokedAt ? fmt(h.revokedAt) : '現在'}）
                           </div>
                           <div className="text-[10px] text-slate-500 mt-0.5">通算 {days}日間</div>
                         </div>

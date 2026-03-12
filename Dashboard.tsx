@@ -118,78 +118,73 @@ const Dashboard: React.FC = () => {
   }, [users, matches]);
 
   const titleHolders = useMemo(() => {
-      const holders: Record<SystemTitle, User | undefined> = {
-          MASTER: users.find(u => u.systemTitle === 'MASTER'),
-          RISING_STAR: users.find(u => u.systemTitle === 'RISING_STAR'),
-          GRINDER: users.find(u => u.systemTitle === 'GRINDER'),
-          GIANT_KILLER: users.find(u => u.systemTitle === 'GIANT_KILLER')
+      // 複数同時選出に対応：各タイトルのホルダーを全員取得
+      const holders: Record<string, User[]> = {
+          MASTER:       users.filter(u => u.systemTitle === 'MASTER'),
+          RISING_STAR:  users.filter(u => u.systemTitle === 'RISING_STAR'),
+          GRINDER:      users.filter(u => u.systemTitle === 'GRINDER'),
+          GIANT_KILLER: users.filter(u => u.systemTitle === 'GIANT_KILLER'),
       };
       return holders;
   }, [users]);
 
   // --- COMPONENTS ---
 
-  const TitleHolderCard = ({ type, user }: { type: SystemTitle, user?: User }) => {
+  const TitleHolderCard = ({ type, users: holders }: { type: SystemTitle, users: User[] }) => {
       const def = SYSTEM_TITLES.find(t => t.id === type);
       if (!def) return null;
+      const hasHolders = holders.length > 0;
 
       return (
-          <div className="relative group">
-              <div className={`absolute inset-0 bg-gradient-to-br ${user ? 'from-yellow-500/20 to-amber-600/5' : 'from-slate-800/50 to-slate-900/50'} rounded-2xl blur-sm transition-all group-hover:blur-md`}></div>
-              <div className={`relative p-4 rounded-2xl border ${user ? 'border-yellow-500/30 bg-slate-900/80' : 'border-white/5 bg-slate-900/50'} backdrop-blur-sm h-full flex flex-col items-center text-center transition-transform group-hover:-translate-y-1`}>
-                  
-                  {/* Icon / Crown */}
-                  <div className="mb-3 relative">
-                      {user ? (
-                           <div className="relative">
-                                <div className="absolute -top-6 left-1/2 -translate-x-1/2 text-yellow-400 animate-bounce">
-                                    <Crown size={20} fill="currentColor" />
-                                </div>
-                                {(() => {
-                                  const iconDef = ICONS_DATA.find(i => i.id === user.activeIconId);
-                                  const isShogi = iconDef?.category === 'SHOGI';
-                                  const frameDef = getUserFrameDef(user.activeFrameId);
-                                  if (isShogi && iconDef) {
-                                    return (
-                                      <div className={`w-14 h-14 flex items-center justify-center border-2 border-yellow-400 rounded-lg ${frameDef.glowClass || ''}`}>
-                                        <ShogiPiece char={iconDef.char} scale={0.55} />
-                                      </div>
-                                    );
-                                  }
-                                  return (
-                                    <div className={`w-14 h-14 rounded-full ${user.avatarColor} p-0.5 shadow-lg border-2 border-yellow-400 ${frameDef.glowClass || ''}`}>
-                                      <div className="w-full h-full rounded-full bg-slate-900 flex items-center justify-center text-2xl font-black text-white font-serif-jp">
-                                        {getUserAvatarChar(user)}
-                                      </div>
-                                    </div>
-                                  );
-                                })()}
-                           </div>
-                      ) : (
-                          <div className="w-14 h-14 rounded-full bg-slate-800 flex items-center justify-center border border-white/10 grayscale opacity-50">
-                              <Crown size={24} className="text-slate-500" />
-                          </div>
-                      )}
+          <div className="relative group flex flex-col gap-2">
+              {/* タイトルヘッダー */}
+              <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border ${hasHolders ? 'border-yellow-500/30 bg-gradient-to-r from-yellow-900/30 to-amber-900/10' : 'border-white/5 bg-slate-900/50'}`}>
+                  <span className="text-base">{type === 'MASTER' ? '⚔️' : type === 'RISING_STAR' ? '🌟' : type === 'GRINDER' ? '🛡️' : '💀'}</span>
+                  <div className="min-w-0">
+                      <div className={`text-[10px] font-black uppercase tracking-widest ${def.color}`}>{def.english}</div>
+                      <div className="font-serif-jp font-bold text-xs text-slate-300">{def.name}</div>
                   </div>
-
-                  {/* Title Name */}
-                  <div className={`text-xs font-black uppercase tracking-widest mb-1 ${def.color}`}>
-                      {def.english}
-                  </div>
-                  <div className="font-serif-jp font-bold text-sm text-slate-300 mb-1">
-                      {def.name}
-                  </div>
-
-                  {/* User Name */}
-                  <div className={`text-sm font-black truncate w-full ${user ? 'text-white' : 'text-slate-600'}`}>
-                      {user ? user.name : '---'}
-                  </div>
-                  
-                  {/* Tooltip Description (Hover) */}
-                  <div className="absolute inset-0 bg-slate-950/90 rounded-2xl flex items-center justify-center p-4 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                      <p className="text-xs text-slate-300 font-medium">{def.description}</p>
-                  </div>
+                  {holders.length > 1 && (
+                      <span className="ml-auto text-[9px] bg-yellow-500/20 text-yellow-300 border border-yellow-500/30 px-1.5 py-0.5 rounded-full font-black shrink-0">×{holders.length}</span>
+                  )}
               </div>
+
+              {/* ホルダー一覧（全員） */}
+              {hasHolders ? holders.map(user => (
+                  <div key={user.id} className={`relative p-3 rounded-2xl border border-yellow-500/30 bg-slate-900/80 backdrop-blur-sm flex items-center gap-3 shadow-[0_0_12px_rgba(251,191,36,0.15)] transition-transform hover:-translate-y-0.5`}>
+                      <div className="absolute -top-2 left-1/2 -translate-x-1/2 text-yellow-400 animate-bounce">
+                          <Crown size={14} fill="currentColor" />
+                      </div>
+                      {(() => {
+                        const iconDef = ICONS_DATA.find(i => i.id === user.activeIconId);
+                        const isShogi = iconDef?.category === 'SHOGI';
+                        const frameDef = getUserFrameDef(user.activeFrameId);
+                        if (isShogi && iconDef) {
+                          return (
+                            <div className={`w-10 h-10 flex items-center justify-center border-2 border-yellow-400 rounded-lg shrink-0 ${frameDef.glowClass || ''}`}>
+                              <ShogiPiece char={iconDef.char} scale={0.38} />
+                            </div>
+                          );
+                        }
+                        return (
+                          <div className={`w-10 h-10 rounded-full ${user.avatarColor} p-0.5 shadow-lg border-2 border-yellow-400 shrink-0 ${frameDef.glowClass || ''}`}>
+                            <div className="w-full h-full rounded-full bg-slate-900 flex items-center justify-center text-base font-black text-white font-serif-jp">
+                              {getUserAvatarChar(user)}
+                            </div>
+                          </div>
+                        );
+                      })()}
+                      <div className="min-w-0">
+                          <div className="text-sm font-black text-white truncate">{user.name}</div>
+                          <div className="text-[10px] text-slate-400">{def.description}</div>
+                      </div>
+                  </div>
+              )) : (
+                  <div className="p-3 rounded-2xl border border-white/5 bg-slate-900/50 flex items-center justify-center gap-2 text-slate-600">
+                      <Crown size={16} />
+                      <span className="text-xs font-bold">未選出</span>
+                  </div>
+              )}
           </div>
       );
   }
@@ -401,10 +396,10 @@ const Dashboard: React.FC = () => {
               <h2 className="text-xl font-black text-white uppercase tracking-wider">Current Title Holders</h2>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <TitleHolderCard type="MASTER" user={titleHolders.MASTER} />
-              <TitleHolderCard type="RISING_STAR" user={titleHolders.RISING_STAR} />
-              <TitleHolderCard type="GRINDER" user={titleHolders.GRINDER} />
-              <TitleHolderCard type="GIANT_KILLER" user={titleHolders.GIANT_KILLER} />
+              <TitleHolderCard type="MASTER"       users={titleHolders.MASTER} />
+              <TitleHolderCard type="RISING_STAR"  users={titleHolders.RISING_STAR} />
+              <TitleHolderCard type="GRINDER"      users={titleHolders.GRINDER} />
+              <TitleHolderCard type="GIANT_KILLER" users={titleHolders.GIANT_KILLER} />
           </div>
       </section>
 
