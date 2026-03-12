@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { getUsers, getMatches, ACHIEVEMENTS_DATA, updateUserTitle, getRivalryStats, ICONS_DATA, FRAMES_DATA, updateUserIcon, updateUserFrame, getUserAvatarChar, getLogs, getSettings, isEventActive, getUserIconDef, getUserFrameDef, SYSTEM_TITLES, submitRankApplication, removeRank, updateProfilePin, getUserSystemTitleHistory } from './storage';
 import { User, MatchRecord, IconDef, ActivityLog, ActivityType, EventType, RivalData, RankEntry, SystemTitleHistoryEntry } from './types';
 import { Card } from './Card';
@@ -250,7 +250,7 @@ const Profile: React.FC = () => {
   const [showPinModal, setShowPinModal] = useState(false);  // PIN確認モーダル（変更時のみ）
   const [pinInput, setPinInput] = useState('');
   const [pinError, setPinError] = useState(false);
-  const [pinCallback, setPinCallback] = useState<(() => void) | null>(null); // PIN認証後に実行
+  const pinCallbackRef = useRef<(() => void) | null>(null); // refで管理→stale closure回避
   const [matches, setMatches] = useState<MatchRecord[]>([]);
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [rivalStats, setRivalStats] = useState<{bestCustomer: RivalData | null, nemeses: RivalData | null}>({bestCustomer: null, nemeses: null});
@@ -319,22 +319,25 @@ const Profile: React.FC = () => {
 
   // PIN確認してからコールバック実行
   const requirePin = (callback: () => void) => {
-    setPinCallback(() => callback);
+    pinCallbackRef.current = callback;  // refに保存→常に最新値
     setPinInput('');
     setPinError(false);
     setShowPinModal(true);
   };
 
   const handlePinSubmit = (inputValue?: string) => {
-    const user = users.find(u => u.id === selectedId);
+    const allUsers = getUsers();  // stateではなくstorageから直接読む→常に最新
+    const user = allUsers.find(u => u.id === selectedId);
     if (!user) return;
     const correct = user.profilePin ?? '0000';
-    const value = inputValue ?? pinInput;   // ← stale closure回避
+    const value = inputValue ?? pinInput;
     if (value === correct) {
       setShowPinModal(false);
       setPinError(false);
       setPinInput('');
-      if (pinCallback) { pinCallback(); setPinCallback(null); }
+      const cb = pinCallbackRef.current;
+      pinCallbackRef.current = null;
+      if (cb) cb();
     } else {
       setPinError(true);
       setPinInput('');
