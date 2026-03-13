@@ -11,7 +11,7 @@ import {
   getMaintenanceState,
   getPendingRankApplications, approveRankApplication, rejectRankApplication, removeRank,
   removeAchievement, deleteAttendanceLog, getLogs, ACHIEVEMENTS_DATA,
-  updateProfilePin,
+  updateProfilePin, clearSystemTitleHistory,
 } from './storage';
 import { User, SystemSettings, Season, EventType, SyncMeta, AutoBackupEntry, MaintenanceState, RankApplication, ActivityLog, ActivityType } from './types';
 import { Card } from './Card';
@@ -63,6 +63,7 @@ const Admin: React.FC = () => {
   const [wName, setWName] = useState('');
   const [wDuration, setWDuration] = useState(7);
   const [wType, setWType] = useState<EventType>(EventType.STANDARD);
+  const [wMultiplier, setWMultiplier] = useState<number>(2);
   const [wRedGeneral, setWRedGeneral] = useState<string | null>(null);
   const [wWhiteGeneral, setWWhiteGeneral] = useState<string | null>(null);
   const [wSelectingTarget, setWSelectingTarget] = useState<'RED' | 'WHITE' | null>(null);
@@ -265,6 +266,7 @@ const Admin: React.FC = () => {
     setWName(settings.eventName || '');
     setWType(EventType.STANDARD);
     setWDuration(7);
+    setWMultiplier(2);
     setWRedGeneral(null);
     setWWhiteGeneral(null);
     setWSimData(null);
@@ -287,7 +289,7 @@ const Admin: React.FC = () => {
     }
     const endsAt = new Date();
     endsAt.setDate(endsAt.getDate() + wDuration);
-    saveSettings({ ...settings, eventName: wName, eventEndsAt: endsAt.toISOString(), eventType: wType });
+    saveSettings({ ...settings, eventName: wName, eventEndsAt: endsAt.toISOString(), eventType: wType, eventMultiplier: wMultiplier });
     resetEventPoints();
     refreshData();
     setIsEventWizardOpen(false);
@@ -596,6 +598,15 @@ const Admin: React.FC = () => {
                   </div>
                   <div><label className="block text-sm font-bold text-slate-400 mb-2">期間(日)</label>
                     <input type="number" value={wDuration} onChange={e => setWDuration(Number(e.target.value))} className="w-24 p-3 border border-slate-700 rounded-xl bg-slate-800 text-white font-bold text-center" /></div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-400 mb-2">ポイント倍率</label>
+                    <div className="flex items-center gap-3 flex-wrap">
+                      {[1.5, 2, 3].map(v => (
+                        <button key={v} onClick={() => setWMultiplier(v)} className={`px-5 py-2 rounded-xl font-bold border transition-all ${wMultiplier === v ? 'border-yellow-500 bg-yellow-900/20 text-yellow-400' : 'border-slate-700 text-slate-400 hover:bg-white/5'}`}>×{v}</button>
+                      ))}
+                      <input type="number" value={wMultiplier} onChange={e => setWMultiplier(Math.max(1, Number(e.target.value)))} className="w-20 p-3 border border-slate-700 rounded-xl bg-slate-800 text-white font-bold text-center" step="0.5" min="1" />
+                    </div>
+                  </div>
                 </>
               )}
               {wizardStep === 2 && (
@@ -988,7 +999,28 @@ const Admin: React.FC = () => {
               </div>
               <div className="pt-4 border-t border-white/5">
                 <p className="text-sm text-slate-400 mb-4">成長度・対局数に基づき四天王称号を再計算します。</p>
-                <button onClick={handleUpdateTitles} className="w-full bg-gradient-to-r from-amber-600 to-yellow-600 text-white py-3 rounded-xl font-black shadow-lg active:scale-[0.98]">称号を更新する</button>
+                {maintActive ? (
+                  <div className="w-full py-3 rounded-xl bg-slate-700/50 border border-orange-500/30 text-center text-orange-400 text-sm font-bold">
+                    ⚠ メンテナンスモード中は更新できません
+                  </div>
+                ) : (
+                  <button onClick={handleUpdateTitles} className="w-full bg-gradient-to-r from-amber-600 to-yellow-600 text-white py-3 rounded-xl font-black shadow-lg active:scale-[0.98]">称号を更新する</button>
+                )}
+              </div>
+              {/* 四天王履歴クリア */}
+              <div className="pt-3 border-t border-red-900/30">
+                <p className="text-xs text-slate-600 mb-2">⚠ テスト・誤操作時のリセット専用。全履歴と永続称号が消えます。</p>
+                <button
+                  onClick={() => {
+                    if (window.confirm('四天王の全履歴と永続称号をリセットします。この操作は取り消せません。本当に実行しますか？')) {
+                      clearSystemTitleHistory();
+                      refreshData();
+                    }
+                  }}
+                  className="w-full py-2 rounded-xl bg-red-900/30 hover:bg-red-900/50 text-red-400 text-xs font-black border border-red-900/40 transition-all"
+                >
+                  🗑 四天王履歴をすべて削除
+                </button>
               </div>
               {settings.lastTitleUpdate && (
                 <div className="text-xs text-slate-600 text-center">最終更新: {new Date(settings.lastTitleUpdate).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>

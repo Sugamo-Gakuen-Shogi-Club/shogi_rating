@@ -658,7 +658,7 @@ const normalizeUser = (user: any): User => ({
   eventPoints:    user.eventPoints    ?? 0,
   seasonStartRate:   user.seasonStartRate   ?? user.rate ?? INITIAL_RATE,
   seasonStartPoints: user.seasonStartPoints ?? user.totalPoints ?? 0,
-  systemTitle:    user.systemTitle    ?? null,
+  systemTitle:    Array.isArray(user.systemTitle) ? user.systemTitle : (user.systemTitle ? [user.systemTitle] : []),
   faction:        user.faction        ?? 'WHITE',
   isGeneral:      user.isGeneral      ?? false,
   isNewMember:    user.isNewMember    ?? false,
@@ -671,6 +671,7 @@ const normalizeUser = (user: any): User => ({
   profilePin:     user.profilePin ?? '0000',
   activeFrameId:  user.activeFrameId ?? 'FRAME_NONE',
   unlockedFrames: Array.isArray(user.unlockedFrames) ? user.unlockedFrames : ['FRAME_NONE', 'FRAME_DEFAULT'],
+  earnedHonors:   Array.isArray(user.earnedHonors) ? user.earnedHonors : [],
 });
 
 /** All users including inactive (internal use / admin) */
@@ -1061,54 +1062,41 @@ export const snapshotSeasonBaseline = (): void => {
 // AWARD SYSTEM TITLES  (← FIX: was no-op stub)
 // ============================================================
 export const awardSystemTitles = (): void => {
+  // ★ メンテナンスモード中は実行不可
+  if (getMaintenanceState().active) {
+    console.warn('awardSystemTitles: メンテナンスモード中は実行できません');
+    return;
+  }
+
   const all      = getRawUsers();
   const active   = all.filter(u => u.isActive !== false);
   if (active.length === 0) return;
 
-  // Reset all titles
-  all.forEach(u => { u.systemTitle = null; });
+  // 全員のタイトルをリセット（配列を空に）、前回タイトルを記録
+  const prevTitleMap: Record<string, SystemTitle[]> = {};
+  all.forEach(u => { prevTitleMap[u.id] = [...u.systemTitle]; u.systemTitle = []; });
 
-  // ★ 退任処理：タイトルを失うユーザーの限定アイコン・フレームを強制リセット
+  // ★ 退任処理用：ELITEアイコン・フレームのIDセット
   const eliteIconIds = new Set(ICONS_DATA.filter(i => i.category === 'ELITE').map(i => i.id));
   const eliteFrameIds = new Set(FRAMES_DATA.filter(f => f.isEliteOnly).map(f => f.id));
-  all.forEach(u => {
-    // 使用中アイコンがELITEなら初期アイコンに戻す
-    if (u.activeIconId && eliteIconIds.has(u.activeIconId)) {
-      u.activeIconId = 'DEFAULT_INITIAL';
-    }
-    // 使用中フレームがエリート限定なら「なし」に戻す
-    if (u.activeFrameId && eliteFrameIds.has(u.activeFrameId)) {
-      u.activeFrameId = 'FRAME_NONE';
-    }
-    // unlockedIconsからELITEアイコンを剥奪（再選出時に再付与される）
-    u.unlockedIcons = u.unlockedIcons.filter(id => !eliteIconIds.has(id));
-    // unlockedFramesからエリートフレームを剥奪
-    u.unlockedFrames = (u.unlockedFrames || []).filter(id => !eliteFrameIds.has(id));
-  });
 
-  // MASTER: 今期レート上昇1位（PDFに合わせた）
+  // MASTER: 今期レート上昇1位（兼任可・除外なし）
   const byRateGrowth = [...active].sort((a, b) =>
     (b.rate - b.seasonStartRate) - (a.rate - a.seasonStartRate)
   );
   const master = byRateGrowth[0];
 
-  // RISING_STAR: 今期ポイント上昇1位（MASTER除く）
-  const byPointsGrowth = [...active]
-    .filter(u => u.id !== master?.id)
-    .sort((a, b) =>
-      (b.totalPoints - b.seasonStartPoints) - (a.totalPoints - a.seasonStartPoints)
-    );
+  // RISING_STAR: 今期ポイント上昇1位（兼任可・除外なし）
+  const byPointsGrowth = [...active].sort((a, b) =>
+    (b.totalPoints - b.seasonStartPoints) - (a.totalPoints - a.seasonStartPoints)
+  );
   const rising = byPointsGrowth[0] ?? null;
 
-  // GRINDER: 出席日数1位（上記除く）
-  const taken1 = new Set([master?.id, rising?.id].filter(Boolean));
-  const byActivity = [...active]
-    .filter(u => !taken1.has(u.id))
-    .sort((a, b) => b.activityDays - a.activityDays);
+  // GRINDER: 出席日数1位（兼任可・除外なし）
+  const byActivity = [...active].sort((a, b) => b.activityDays - a.activityDays);
   const grinder = byActivity[0] ?? null;
 
-  // GIANT_KILLER: most wins against higher-rated opponents (from match records)
-  const taken2 = new Set([master?.id, rising?.id, grinder?.id].filter(Boolean));
+  // GIANT_KILLER: 格上撃破数1位（兼任可・除外なし）
   const rateMap = Object.fromEntries(active.map(u => [u.id, u.rate]));
   const upsetCount: Record<string, number> = {};
   getMatches().forEach(m => {
@@ -1120,27 +1108,29 @@ export const awardSystemTitles = (): void => {
       upsetCount[m.player2Id] = (upsetCount[m.player2Id] || 0) + 1;
     }
   });
-  const byUpsets = [...active]
-    .filter(u => !taken2.has(u.id))
-    .sort((a, b) => (upsetCount[b.id] || 0) - (upsetCount[a.id] || 0));
+  const byUpsets = [...active].sort((a, b) => (upsetCount[b.id] || 0) - (upsetCount[a.id] || 0));
   const killer = byUpsets[0] ?? null;
 
-  // 同率タイ検出：各軸でトップと同スコアの全員を選出
-  const masterScore   = master   ? (master.rate - master.seasonStartRate)                         : null;
-  const risingScore   = rising   ? (rising.totalPoints - rising.seasonStartPoints)                 : null;
-  const grinderScore  = grinder  ? grinder.activityDays                                             : null;
-  const killerScore   = killer   ? (upsetCount[killer.id] || 0)                                    : null;
+  // 同率タイ検出（除外なし・全員対象）
+  const masterScore  = master  ? (master.rate - master.seasonStartRate)          : null;
+  const risingScore  = rising  ? (rising.totalPoints - rising.seasonStartPoints) : null;
+  const grinderScore = grinder ? grinder.activityDays                            : null;
+  const killerScore  = killer  ? (upsetCount[killer.id] || 0)                    : null;
 
-  const masterHolders  = masterScore  !== null ? active.filter(u => (u.rate - u.seasonStartRate) === masterScore)                     : [];
-  const risingHolders  = risingScore  !== null ? active.filter(u => (u.totalPoints - u.seasonStartPoints) === risingScore)            : [];
-  const grinderHolders = grinderScore !== null ? active.filter(u => u.activityDays === grinderScore)                                  : [];
-  const killerHolders  = killerScore  !== null ? active.filter(u => (upsetCount[u.id] || 0) === killerScore && killerScore > 0)       : [];
+  const masterHolders  = masterScore  !== null ? active.filter(u => (u.rate - u.seasonStartRate) === masterScore)               : [];
+  const risingHolders  = risingScore  !== null ? active.filter(u => (u.totalPoints - u.seasonStartPoints) === risingScore)      : [];
+  const grinderHolders = grinderScore !== null ? active.filter(u => u.activityDays === grinderScore)                            : [];
+  const killerHolders  = killerScore  !== null ? active.filter(u => (upsetCount[u.id] || 0) === killerScore && killerScore > 0) : [];
 
-  // Assign（全員に付与）
-  masterHolders.forEach(u  => { const x = all.find(a => a.id === u.id);  if (x) x.systemTitle = 'MASTER'; });
-  risingHolders.forEach(u  => { const x = all.find(a => a.id === u.id);  if (x) x.systemTitle = 'RISING_STAR'; });
-  grinderHolders.forEach(u => { const x = all.find(a => a.id === u.id);  if (x) x.systemTitle = 'GRINDER'; });
-  killerHolders.forEach(u  => { const x = all.find(a => a.id === u.id);  if (x) x.systemTitle = 'GIANT_KILLER'; });
+  // Assign（兼任可：配列にpush、重複なし）
+  const addTitle = (userId: string, title: SystemTitle) => {
+    const x = all.find(a => a.id === userId);
+    if (x && !x.systemTitle.includes(title)) x.systemTitle.push(title);
+  };
+  masterHolders.forEach(u  => addTitle(u.id, 'MASTER'));
+  risingHolders.forEach(u  => addTitle(u.id, 'RISING_STAR'));
+  grinderHolders.forEach(u => addTitle(u.id, 'GRINDER'));
+  killerHolders.forEach(u  => addTitle(u.id, 'GIANT_KILLER'));
 
   // 履歴記録
   recordSystemTitleChange('MASTER',       masterHolders.map(u => u.id));
@@ -1178,6 +1168,40 @@ export const awardSystemTitles = (): void => {
   unlockEliteForTitle(grinderHolders, 'GRINDER');
   unlockEliteForTitle(killerHolders,  'GIANT_KILLER');
 
+  // ★ 退任確定後：全タイトルを失ったユーザーのみELITEアイコン・フレームを剥奪
+  all.forEach(u => {
+    const hadAny = (prevTitleMap[u.id] ?? []).length > 0;
+    const hasAny = u.systemTitle.length > 0;
+    if (hadAny && !hasAny) {
+      if (u.activeIconId && eliteIconIds.has(u.activeIconId)) u.activeIconId = 'DEFAULT_INITIAL';
+      if (u.activeFrameId && eliteFrameIds.has(u.activeFrameId)) u.activeFrameId = 'FRAME_NONE';
+      u.unlockedIcons = u.unlockedIcons.filter(id => !eliteIconIds.has(id));
+      u.unlockedFrames = (u.unlockedFrames || []).filter(id => !eliteFrameIds.has(id));
+    }
+  });
+
+  // ★ 永続称号「第n代 [称号名]」を earnedHonors に付与（退任後も残る）
+  const snap = getSystemTitleHistory();
+  const TITLE_NAME: Record<string, string> = {
+    MASTER: '覇者', RISING_STAR: '新星', GRINDER: '鉄人', GIANT_KILLER: '巨人キラー',
+  };
+  const allHolders: { titleId: string; holders: typeof masterHolders }[] = [
+    { titleId: 'MASTER',       holders: masterHolders },
+    { titleId: 'RISING_STAR',  holders: risingHolders },
+    { titleId: 'GRINDER',      holders: grinderHolders },
+    { titleId: 'GIANT_KILLER', holders: killerHolders },
+  ];
+  allHolders.forEach(({ titleId, holders }) => {
+    const gen = (snap.nextGeneration[titleId] ?? 1);
+    holders.forEach(u => {
+      const x = all.find(a => a.id === u.id);
+      if (!x) return;
+      if (!x.earnedHonors) x.earnedHonors = [];
+      const honor = `第${gen}代 ${TITLE_NAME[titleId]}`;
+      if (!x.earnedHonors.includes(honor)) x.earnedHonors.push(honor);
+    });
+  });
+
   const settings = getSettings();
   saveSettings({ ...settings, lastTitleUpdate: new Date().toISOString() });
   saveUsers(all);
@@ -1199,6 +1223,15 @@ export const getSystemTitleHistory = (): SystemTitleSnapshot => {
 
 const saveSystemTitleHistory = (snap: SystemTitleSnapshot): void => {
   localStorage.setItem(SYSTEM_TITLE_HISTORY_KEY, JSON.stringify(snap));
+};
+
+/** 管理者用：四天王の全履歴をリセット（テスト・誤操作訂正用） */
+export const clearSystemTitleHistory = (): void => {
+  localStorage.removeItem(SYSTEM_TITLE_HISTORY_KEY);
+  // ユーザーの earnedHonors もリセット
+  const all = getRawUsers();
+  all.forEach(u => { u.earnedHonors = []; });
+  saveUsers(all);
 };
 
 /** 四天王を更新し、履歴を記録する */
@@ -1349,7 +1382,7 @@ const newUserBase = (name: string, reading?: string, isNewMember = false): User 
   seasonStartPoints: 0,
   faction:          'WHITE',
   isGeneral:        false,
-  systemTitle:      null,
+  systemTitle:      [],
   totalPoints:      0,
   pointsMatch:      0,
   pointsAttendance: 0,
@@ -1373,6 +1406,7 @@ const newUserBase = (name: string, reading?: string, isNewMember = false): User 
   profilePin:       '0000',
   activeFrameId:    'FRAME_NONE',
   unlockedFrames:   ['FRAME_NONE', 'FRAME_DEFAULT'],
+  earnedHonors:     [],
 });
 
 export const bulkAddUsers = (stubs: Partial<User>[]): void => {
@@ -1389,12 +1423,22 @@ export const getFactionBalanceSimulation = (users: User[]) => {
     .filter(u => u.isActive !== false)
     .map(u => ({ ...u, _score: u.rate * 0.3 + (u.activityDays || 0) * 300 }))
     .sort((a, b) => b._score - a._score);
+
+  const total = scored.length;
+  const redTarget = Math.ceil(total / 2);   // 奇数のとき紅が1人多い
+  const whiteTarget = total - redTarget;
+
+  // スネークドラフト方式: 強い順に交互に割り振り、人数上限に達したら残りは相手チームへ
   const red: User[] = [], white: User[] = [];
-  let rScore = 0, wScore = 0;
-  scored.forEach(u => {
-    if (rScore <= wScore) { red.push(u);   rScore += u._score; }
-    else                  { white.push(u); wScore += u._score; }
+  scored.forEach((u, i) => {
+    const redFull   = red.length   >= redTarget;
+    const whiteFull = white.length >= whiteTarget;
+    if      (redFull)   { white.push(u); }
+    else if (whiteFull) { red.push(u);   }
+    else if (i % 2 === 0) { red.push(u);   }   // 1位, 4位, 5位, 8位, 9位 ... → 紅
+    else                  { white.push(u); }    // 2位, 3位, 6位, 7位, 10位 ... → 白
   });
+
   const stats = (team: User[]) => ({
     count:      team.length,
     avgRate:    team.length ? Math.round(team.reduce((a, b) => a + b.rate, 0) / team.length) : 0,
