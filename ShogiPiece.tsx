@@ -74,7 +74,7 @@ export const ShogiPiece: React.FC<ShogiPieceProps> = ({
                   Bottom Right: 92, 105
                 */}
                 <path 
-                    d="M 50 2 L 80 28 L 92 105 L 8 105 L 20 28 Z" 
+                    d="M 50 15 L 80 28 L 92 105 L 8 105 L 20 28 Z" 
                     fill="url(#woodGradient)" 
                     stroke={borderColor} 
                     strokeWidth="1"
@@ -83,7 +83,7 @@ export const ShogiPiece: React.FC<ShogiPieceProps> = ({
                 
                 {/* 3D Bevel/Highlight */}
                 <path 
-                    d="M 50 2 L 80 28 L 92 105 L 8 105 L 20 28 Z" 
+                    d="M 50 15 L 80 28 L 92 105 L 8 105 L 20 28 Z" 
                     fill="url(#woodGradient)"
                     filter="url(#bevel)"
                     opacity="0.6"
@@ -92,7 +92,7 @@ export const ShogiPiece: React.FC<ShogiPieceProps> = ({
 
                 {/* 木目テクスチャのオーバーレイ */}
                 <path 
-                    d="M 50 2 L 80 28 L 92 105 L 8 105 L 20 28 Z" 
+                    d="M 50 15 L 80 28 L 92 105 L 8 105 L 20 28 Z" 
                     fill="black"
                     fillOpacity="0.08"
                     filter="url(#woodGrain)"
@@ -101,7 +101,7 @@ export const ShogiPiece: React.FC<ShogiPieceProps> = ({
 
                 {/* 内側の彫りライン */}
                 <path 
-                    d="M 50 8 L 75 30 L 85 100 L 15 100 L 25 30 Z" 
+                    d="M 50 15 L 75 30 L 85 100 L 15 100 L 25 30 Z" 
                     fill="none" 
                     stroke={borderColor} 
                     strokeWidth="0.5" 
