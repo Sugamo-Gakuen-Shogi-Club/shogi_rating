@@ -2,10 +2,10 @@
 
 
 import React, { useState, useEffect } from 'react';
-import { getUsers, processMatch, getSettings, getUserAvatarChar, playSound, vibrate, isEventActive } from './storage';
+import { getUsers, processMatch, getSettings, getUserAvatarChar, playSound, vibrate, isEventActive, isDeviceApproved } from './storage';
 import { User, MatchProcessResult, AchievementDef, PointBreakdown, IconDef, EventType } from './types';
 import { NumPad } from './NumPad';
-import { Trophy, Minus, TrendingUp, Star, Search, User as UserIcon, Crown, Flame, Snowflake, Swords } from 'lucide-react';
+import { Trophy, Minus, TrendingUp, Star, Search, User as UserIcon, Crown, Flame, Snowflake, Swords, Lock } from 'lucide-react';
 import { AchievementPopup } from './AchievementPopup';
 import { UserSelector } from './UserSelector';
 
@@ -23,6 +23,7 @@ const MatchEntry: React.FC = () => {
   const [p2, setP2] = useState('');
   const [result, setResult] = useState<'PLAYER1_WIN' | 'PLAYER2_WIN' | 'DRAW' | null>(null);
   const [pin, setPin] = useState('');
+  const [deviceBlocked, setDeviceBlocked] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successData, setSuccessData] = useState<{p1Name: string, p2Name: string, record: MatchProcessResult, p1Faction?: string, p2Faction?: string} | null>(null);
   const [newAchievements, setNewAchievements] = useState<AchievementItem[]>([]);
@@ -60,6 +61,11 @@ const MatchEntry: React.FC = () => {
   }
 
   const handleSubmit = () => {
+    // ★ デバイス承認チェック
+    if (!isDeviceApproved()) {
+      setDeviceBlocked(true);
+      return;
+    }
     playSound('CLICK');
     vibrate(10);
     const settings = getSettings();
@@ -404,6 +410,36 @@ const MatchEntry: React.FC = () => {
 
   return (
     <div className="max-w-4xl mx-auto pb-20">
+
+      {/* デバイス未承認モーダル */}
+      {deviceBlocked && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-950/90 backdrop-blur-sm p-4">
+          <div className="bg-slate-900 w-full max-w-sm rounded-3xl border border-red-500/40 shadow-2xl overflow-hidden">
+            <div className="bg-red-900/30 px-6 py-5 border-b border-red-500/20 flex items-center gap-3">
+              <Lock size={24} className="text-red-400" />
+              <div>
+                <div className="font-black text-white text-base">このデバイスは未承認です</div>
+                <div className="text-xs text-red-300 font-bold mt-0.5">Device Not Approved</div>
+              </div>
+            </div>
+            <div className="px-6 py-5 space-y-3">
+              <p className="text-sm text-slate-300 font-bold leading-relaxed">
+                対局記録は<span className="text-yellow-400">部室の承認済みデバイス</span>からのみ操作できます。
+              </p>
+              <p className="text-xs text-slate-500">
+                管理者に連絡して、このデバイスを管理画面から承認してもらってください。
+              </p>
+            </div>
+            <div className="px-6 pb-6">
+              <button onClick={() => setDeviceBlocked(false)}
+                className="w-full py-3 rounded-xl bg-slate-700 hover:bg-slate-600 text-white font-black transition-all">
+                閉じる
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {modalTarget && (
           <UserSelector 
             users={users}

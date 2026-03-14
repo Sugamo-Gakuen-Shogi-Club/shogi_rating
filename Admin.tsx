@@ -12,6 +12,7 @@ import {
   getPendingRankApplications, approveRankApplication, rejectRankApplication, removeRank,
   removeAchievement, deleteAttendanceLog, getLogs, ACHIEVEMENTS_DATA,
   updateProfilePin, clearSystemTitleHistory,
+  getApprovedDevices, approveThisDevice, revokeDevice, getOrCreateDeviceToken,
 } from './storage';
 import { User, SystemSettings, Season, EventType, SyncMeta, AutoBackupEntry, MaintenanceState, RankApplication, ActivityLog, ActivityType } from './types';
 import { Card } from './Card';
@@ -21,7 +22,7 @@ import {
   CheckCircle, Shuffle, Users, Crown, ChevronRight, X,
   RefreshCw, Languages, FileUp, Upload, Swords, Cloud,
   CloudOff, AlertCircle, Loader, UserCheck, UserX, RotateCcw,
-  Wrench, Medal, Check, KeyRound, Globe, Copy, Star
+  Wrench, Medal, Check, KeyRound, Globe, Copy, Star, Lock
 } from 'lucide-react';
 import { UserSelector } from './UserSelector';
 import MaintenancePanel from './MaintenancePanel';
@@ -31,6 +32,8 @@ const Admin: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [settings, setSettings] = useState<SystemSettings>(getSettings());
   const [users, setUsers] = useState<User[]>([]);
+  const [approvedDevices, setApprovedDevices] = useState<{token: string; label: string; approvedAt: string}[]>([]);
+  const [newDeviceLabel, setNewDeviceLabel] = useState('部室iPad');
   const [inactiveUsers, setInactiveUsers] = useState<User[]>([]);
   const [activeEvent, setActiveEvent] = useState(false);
 
@@ -63,7 +66,6 @@ const Admin: React.FC = () => {
   const [wName, setWName] = useState('');
   const [wDuration, setWDuration] = useState(7);
   const [wType, setWType] = useState<EventType>(EventType.STANDARD);
-  const [wMultiplier, setWMultiplier] = useState<number>(2);
   const [wRedGeneral, setWRedGeneral] = useState<string | null>(null);
   const [wWhiteGeneral, setWWhiteGeneral] = useState<string | null>(null);
   const [wSelectingTarget, setWSelectingTarget] = useState<'RED' | 'WHITE' | null>(null);
@@ -117,6 +119,7 @@ const Admin: React.FC = () => {
     setSyncMeta(getSyncStatus());
     setAutoBackups(getAutoBackups());
     setRankApps(getPendingRankApplications());
+    setApprovedDevices(getApprovedDevices());
   };
 
   // ──────────────────────────────────────────────────────────
@@ -266,7 +269,6 @@ const Admin: React.FC = () => {
     setWName(settings.eventName || '');
     setWType(EventType.STANDARD);
     setWDuration(7);
-    setWMultiplier(2);
     setWRedGeneral(null);
     setWWhiteGeneral(null);
     setWSimData(null);
@@ -289,7 +291,7 @@ const Admin: React.FC = () => {
     }
     const endsAt = new Date();
     endsAt.setDate(endsAt.getDate() + wDuration);
-    saveSettings({ ...settings, eventName: wName, eventEndsAt: endsAt.toISOString(), eventType: wType, eventMultiplier: wMultiplier });
+    saveSettings({ ...settings, eventName: wName, eventEndsAt: endsAt.toISOString(), eventType: wType });
     resetEventPoints();
     refreshData();
     setIsEventWizardOpen(false);
@@ -598,15 +600,6 @@ const Admin: React.FC = () => {
                   </div>
                   <div><label className="block text-sm font-bold text-slate-400 mb-2">期間(日)</label>
                     <input type="number" value={wDuration} onChange={e => setWDuration(Number(e.target.value))} className="w-24 p-3 border border-slate-700 rounded-xl bg-slate-800 text-white font-bold text-center" /></div>
-                  <div>
-                    <label className="block text-sm font-bold text-slate-400 mb-2">ポイント倍率</label>
-                    <div className="flex items-center gap-3 flex-wrap">
-                      {[1.5, 2, 3].map(v => (
-                        <button key={v} onClick={() => setWMultiplier(v)} className={`px-5 py-2 rounded-xl font-bold border transition-all ${wMultiplier === v ? 'border-yellow-500 bg-yellow-900/20 text-yellow-400' : 'border-slate-700 text-slate-400 hover:bg-white/5'}`}>×{v}</button>
-                      ))}
-                      <input type="number" value={wMultiplier} onChange={e => setWMultiplier(Math.max(1, Number(e.target.value)))} className="w-20 p-3 border border-slate-700 rounded-xl bg-slate-800 text-white font-bold text-center" step="0.5" min="1" />
-                    </div>
-                  </div>
                 </>
               )}
               {wizardStep === 2 && (
@@ -1110,6 +1103,78 @@ const Admin: React.FC = () => {
           <AutoBackupPanel />
 
           {/* Manual Backup / Restore */}
+          {/* ===== デバイス承認管理 ===== */}
+          <Card title="承認済みデバイス管理" icon={<Lock size={18} />}>
+            <div className="space-y-4">
+              <p className="text-xs text-slate-400 font-bold">
+                出席登録・対局記録は承認済みデバイスからのみ操作できます。<br/>
+                このデバイスを承認するか、既存デバイスを管理してください。
+              </p>
+
+              {/* このデバイスを承認 */}
+              <div className="bg-slate-800/60 rounded-xl p-4 border border-slate-700 space-y-3">
+                <div className="text-xs font-black text-slate-300 uppercase tracking-widest">このデバイスを承認する</div>
+                <div className="flex gap-2">
+                  <input
+                    value={newDeviceLabel}
+                    onChange={e => setNewDeviceLabel(e.target.value)}
+                    placeholder="デバイス名（例：部室iPad）"
+                    className="flex-1 bg-slate-700 text-white text-sm font-bold px-3 py-2 rounded-lg border border-slate-600 outline-none focus:border-yellow-500"
+                  />
+                  <button
+                    onClick={() => {
+                      approveThisDevice(newDeviceLabel || '未設定');
+                      refreshData();
+                      alert('✅ このデバイスを承認しました');
+                    }}
+                    className="px-4 py-2 bg-yellow-500 hover:bg-yellow-400 text-slate-900 font-black rounded-lg text-sm transition-all active:scale-95"
+                  >
+                    承認
+                  </button>
+                </div>
+                <div className="text-[10px] text-slate-500 font-bold break-all">
+                  Token: {getOrCreateDeviceToken()}
+                </div>
+              </div>
+
+              {/* 承認済みデバイス一覧 */}
+              <div className="space-y-2">
+                <div className="text-xs font-black text-slate-400 uppercase tracking-widest">承認済みデバイス一覧</div>
+                {approvedDevices.length === 0 ? (
+                  <p className="text-slate-500 text-sm py-3 text-center">承認済みデバイスなし</p>
+                ) : (
+                  approvedDevices.map(d => {
+                    const isThis = d.token === getOrCreateDeviceToken();
+                    return (
+                      <div key={d.token} className={`flex items-center justify-between p-3 rounded-xl border ${isThis ? 'border-yellow-500/40 bg-yellow-900/10' : 'border-slate-700 bg-slate-800/40'}`}>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-black text-white">{d.label}</span>
+                            {isThis && <span className="text-[9px] bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 px-1.5 py-0.5 rounded font-bold">このデバイス</span>}
+                          </div>
+                          <div className="text-[10px] text-slate-500 font-bold mt-0.5">
+                            承認日: {new Date(d.approvedAt).toLocaleDateString('ja-JP')}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => {
+                            if (window.confirm(`「${d.label}」の承認を取り消しますか？`)) {
+                              revokeDevice(d.token);
+                              refreshData();
+                            }
+                          }}
+                          className="text-slate-500 hover:text-red-400 transition-colors p-2"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </Card>
+
           <Card title="バックアップ・復元" icon={<Download />}>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3">

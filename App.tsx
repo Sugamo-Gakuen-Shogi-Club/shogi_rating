@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { HashRouter, Routes, Route, useLocation, Link } from 'react-router-dom';
-import { Home, Trophy, User as UserIcon, Settings, PlusCircle, BookOpen, Cloud, CloudOff, RefreshCw, Loader, AlertCircle, Wrench, Globe, Copy, Check } from 'lucide-react';
+import { Home, Trophy, User as UserIcon, Settings, PlusCircle, BookOpen, Cloud, CloudOff, RefreshCw, Loader, AlertCircle, Wrench, Globe, Copy, Check, Crown } from 'lucide-react';
 import { seedData, loadFromCloud, getUsers, getSyncStatus, manualSync, LoadResult, getMaintenanceState } from './storage';
 import { initAppCheck } from './appCheck';
 import { SyncMeta } from './types';
@@ -14,6 +14,7 @@ import { Guide }  from './Guide';
 import { Screensaver } from './Screensaver';
 import UndoPanel  from './UndoPanel';
 import PublicView from './PublicView';
+import FourKingsHistory from './FourKingsHistory';
 
 /** Maintenance mode banner shown across all pages */
 const MaintenanceBanner: React.FC = () => {
@@ -123,12 +124,13 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   }
 
   const navItems = [
-    { path: '/',         icon: Home,       label: 'ホーム' },
-    { path: '/rankings', icon: Trophy,     label: 'ランキング' },
-    { path: '/match',    icon: PlusCircle, label: '対戦記録' },
-    { path: '/profile',  icon: UserIcon,   label: '個人データ' },
-    { path: '/guide',    icon: BookOpen,   label: 'ガイド' },
-    { path: '/admin',    icon: Settings,   label: '管理画面' },
+    { path: '/',           icon: Home,       label: 'ホーム' },
+    { path: '/rankings',   icon: Trophy,     label: 'ランキング' },
+    { path: '/fourKings',  icon: Crown,      label: '四天王' },
+    { path: '/match',      icon: PlusCircle, label: '対戦記録' },
+    { path: '/profile',    icon: UserIcon,   label: '個人データ' },
+    { path: '/guide',      icon: BookOpen,   label: 'ガイド' },
+    { path: '/admin',      icon: Settings,   label: '管理画面' },
   ];
 
   return (
@@ -277,14 +279,15 @@ const App: React.FC = () => {
       {isIdle && <Screensaver onDismiss={resetTimer} />}
       <Layout>
         <Routes>
-          <Route path="/"         element={<Dashboard />} />
-          <Route path="/rankings" element={<Rankings />} />
-          <Route path="/match"    element={<MatchEntry />} />
-          <Route path="/profile"  element={<Profile />} />
-          <Route path="/guide"    element={<Guide />} />
-          <Route path="/admin"    element={<Admin />} />
-          <Route path="/view"     element={<PublicView />} />
-          <Route path="/board"    element={<PublicView />} />
+          <Route path="/"          element={<Dashboard />} />
+          <Route path="/rankings"  element={<Rankings />} />
+          <Route path="/fourKings" element={<FourKingsHistory />} />
+          <Route path="/match"     element={<MatchEntry />} />
+          <Route path="/profile"   element={<Profile />} />
+          <Route path="/guide"     element={<Guide />} />
+          <Route path="/admin"     element={<Admin />} />
+          <Route path="/view"      element={<PublicView />} />
+          <Route path="/board"     element={<PublicView />} />
         </Routes>
       </Layout>
       {/* 全ページ共通フローティングUndoボタン */}

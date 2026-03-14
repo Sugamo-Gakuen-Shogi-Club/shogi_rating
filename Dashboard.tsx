@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { getUsers, recordAttendance, getSettings, isEventActive, getLogs, getUserAvatarChar, playSound, vibrate, SYSTEM_TITLES, getLocalDateString, getMatches, ICONS_DATA, getUserFrameDef } from './storage';
+import { getUsers, recordAttendance, getSettings, isEventActive, getLogs, getUserAvatarChar, playSound, vibrate, SYSTEM_TITLES, getLocalDateString, getMatches, ICONS_DATA, getUserFrameDef, isDeviceApproved } from './storage';
 import { User, MatchRecord, ActivityType, EventType, AchievementDef, IconDef, SystemTitle } from './types';
 import { Card } from './Card';
 import { Trophy, Users, Calendar, ArrowRight, Zap, Crown, Flame, Snowflake, Search, Activity, Swords, X } from 'lucide-react';
@@ -14,6 +14,7 @@ declare const confetti: any;
 
 const Dashboard: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
+  const [deviceBlocked, setDeviceBlocked] = useState(false);
   const [matches, setMatches] = useState<MatchRecord[]>([]);
   const [isAttendanceOpen, setIsAttendanceOpen] = useState(false);
   const [isFactionModalOpen, setIsFactionModalOpen] = useState(false);
@@ -26,18 +27,31 @@ const Dashboard: React.FC = () => {
   const isFactionWar = activeEvent && settings.eventType === EventType.FACTION_WAR;
 
   useEffect(() => {
-    setUsers(getUsers());
-    setMatches(getMatches());
-    
+    const refresh = () => {
+      setUsers(getUsers());
+      setMatches(getMatches());
+    };
+    refresh();
+
+    // イベント変更時即時反映
+    window.addEventListener('rivals-users-changed', refresh);
+    window.addEventListener('rivals-sync-changed', refresh);
+
     // Auto-refresh interval for live feel
-    const interval = setInterval(() => {
-        setUsers(getUsers());
-        setMatches(getMatches());
-    }, 10000);
-    return () => clearInterval(interval);
+    const interval = setInterval(refresh, 10000);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('rivals-users-changed', refresh);
+      window.removeEventListener('rivals-sync-changed', refresh);
+    };
   }, []);
 
   const handleAttendance = (userId: string) => {
+    // ★ デバイス承認チェック（先に確認してUXを改善）
+    if (!isDeviceApproved()) {
+      setDeviceBlocked(true);
+      return;
+    }
     try {
       const result = recordAttendance(userId);
       if (result.success) {
@@ -120,10 +134,10 @@ const Dashboard: React.FC = () => {
   const titleHolders = useMemo(() => {
       // 複数同時選出に対応：各タイトルのホルダーを全員取得
       const holders: Record<string, User[]> = {
-          MASTER:       users.filter(u => u.systemTitle === 'MASTER'),
-          RISING_STAR:  users.filter(u => u.systemTitle === 'RISING_STAR'),
-          GRINDER:      users.filter(u => u.systemTitle === 'GRINDER'),
-          GIANT_KILLER: users.filter(u => u.systemTitle === 'GIANT_KILLER'),
+          MASTER:       users.filter(u => u.systemTitle.includes('MASTER')),
+          RISING_STAR:  users.filter(u => u.systemTitle.includes('RISING_STAR')),
+          GRINDER:      users.filter(u => u.systemTitle.includes('GRINDER')),
+          GIANT_KILLER: users.filter(u => u.systemTitle.includes('GIANT_KILLER')),
       };
       return holders;
   }, [users]);
@@ -193,6 +207,37 @@ const Dashboard: React.FC = () => {
     <div className="space-y-8 animate-in fade-in duration-500 pb-20">
       
       <AchievementPopup items={newAchievements.map(a => ({ achievement: a.achievement }))} onClose={() => setNewAchievements([])} />
+
+      {/* デバイス未承認モーダル */}
+      {deviceBlocked && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-950/90 backdrop-blur-sm p-4">
+          <div className="bg-slate-900 w-full max-w-sm rounded-3xl border border-red-500/40 shadow-2xl overflow-hidden">
+            <div className="bg-red-900/30 px-6 py-5 border-b border-red-500/20 flex items-center gap-3">
+              <span className="text-2xl">🔒</span>
+              <div>
+                <div className="font-black text-white text-base">このデバイスは未承認です</div>
+                <div className="text-xs text-red-300 font-bold mt-0.5">Device Not Approved</div>
+              </div>
+            </div>
+            <div className="px-6 py-5 space-y-3">
+              <p className="text-sm text-slate-300 font-bold leading-relaxed">
+                出席登録・対局記録は<span className="text-yellow-400">部室の承認済みデバイス</span>からのみ操作できます。
+              </p>
+              <p className="text-xs text-slate-500">
+                管理者に連絡して、このデバイスを管理画面から承認してもらってください。
+              </p>
+            </div>
+            <div className="px-6 pb-6">
+              <button onClick={() => setDeviceBlocked(false)}
+                className="w-full py-3 rounded-xl bg-slate-700 hover:bg-slate-600 text-white font-black transition-all">
+                閉じる
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+
 
       {isAttendanceOpen && (
         <UserSelector 

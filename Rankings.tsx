@@ -1,8 +1,9 @@
 
 import React, { useState } from 'react';
-import { getUsers, ACHIEVEMENTS_DATA, getUserAvatarChar, SYSTEM_TITLES, getSystemTitleHistory, ICONS_DATA, FRAMES_DATA, getUserFrameDef } from './storage';
+import { Link } from 'react-router-dom';
+import { getUsers, ACHIEVEMENTS_DATA, getUserAvatarChar, SYSTEM_TITLES, ICONS_DATA, FRAMES_DATA, getUserFrameDef } from './storage';
 import { Card } from './Card';
-import { TrendingUp, Award, Crown, History } from 'lucide-react';
+import { TrendingUp, Award, Crown } from 'lucide-react';
 import { RankEntry, User } from './types';
 import { ShogiPiece } from './ShogiPiece';
 
@@ -42,7 +43,7 @@ const UserAvatar: React.FC<{ user: User }> = ({ user }) => {
   const isPromoted = !!(iconDef?.char && (iconDef.char.startsWith('と') || iconDef.char.startsWith('成') || iconDef.char.startsWith('龍')));
   const frameDef = getUserFrameDef(user.activeFrameId);
   const avatarChar = getUserAvatarChar(user);
-  const isElite = !!user.systemTitle;
+  const isElite = user.systemTitle.length > 0;
 
   if (isShogi && iconDef) {
     return (
@@ -92,7 +93,7 @@ const FourKingsCriteriaPanel: React.FC = () => {
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-black text-slate-500 w-5">#{i+1}</span>
                   <span className="text-sm font-bold text-slate-200 truncate max-w-[100px]">{u.name}</span>
-                  {u.systemTitle === tc.id && <FourKingsBadge titleId={tc.id} />}
+                  {u.systemTitle.includes(tc.id) && <FourKingsBadge titleId={tc.id} />}
                 </div>
                 <span className="text-sm font-black text-white">{tc.getValue(u)}</span>
               </div>
@@ -104,41 +105,7 @@ const FourKingsCriteriaPanel: React.FC = () => {
   );
 };
 
-const FourKingsHistoryPanel: React.FC = () => {
-  const snap = getSystemTitleHistory();
-  const entries = [...snap.entries].sort((a,b)=>new Date(b.awardedAt).getTime()-new Date(a.awardedAt).getTime());
-  if (entries.length === 0) return (
-    <p className="text-slate-500 text-sm py-4 text-center">まだ記録がありません。管理画面から「四天王を更新」してください。</p>
-  );
-  return (
-    <div className="space-y-2">
-      {entries.map(e=>{
-        const c = FOUR_KINGS_CONFIG[e.titleId];
-        const isActive = !e.revokedAt;
-        const days = e.revokedAt
-          ? Math.ceil((new Date(e.revokedAt).getTime()-new Date(e.awardedAt).getTime())/86400000)
-          : Math.ceil((Date.now()-new Date(e.awardedAt).getTime())/86400000);
-        return (
-          <div key={e.id} className={`flex items-center gap-3 p-3 rounded-xl border ${isActive?'bg-yellow-900/10 border-yellow-500/20':'bg-slate-800/40 border-slate-700/30'}`}>
-            <span className="text-lg shrink-0">{c?.icon}</span>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xs font-black text-yellow-300">第{e.generation}代 {c?.label}</span>
-                <span className="text-sm font-bold text-white truncate">{e.userName}</span>
-                {isActive && <span className="text-[9px] bg-yellow-500/20 text-yellow-300 border border-yellow-500/30 px-1.5 py-0.5 rounded-full font-black">現役</span>}
-              </div>
-              <div className="text-[10px] text-slate-500 mt-0.5">
-                {new Date(e.awardedAt).toLocaleDateString('ja-JP')} 〜 {e.revokedAt?new Date(e.revokedAt).toLocaleDateString('ja-JP'):'現在'} ({days}日間)
-              </div>
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-};
-
-type TabKey = 'seasonGrowth'|'rate'|'activityDays'|'totalPoints'|'fourKings'|'history';
+type TabKey = 'seasonGrowth'|'rate'|'activityDays'|'totalPoints'|'fourKings';
 
 const Rankings: React.FC = () => {
   const users = getUsers();
@@ -163,7 +130,6 @@ const Rankings: React.FC = () => {
     {key:'activityDays',label:'出席数'},
     {key:'totalPoints', label:'通算Pt'},
     {key:'fourKings',   label:'四天王基準',icon:<Crown size={13} className="text-yellow-400"/>},
-    {key:'history',     label:'歴代四天王',icon:<History size={13}/>},
   ];
   const isTable = ['seasonGrowth','rate','activityDays','totalPoints'].includes(activeTab);
 
@@ -200,15 +166,6 @@ const Rankings: React.FC = () => {
         </Card>
       )}
 
-      {activeTab==='history' && (
-        <Card className="border border-yellow-500/20 rounded-[2rem] bg-slate-900/50 backdrop-blur-xl overflow-hidden">
-          <div className="p-6">
-            <h3 className="text-lg font-black text-yellow-400 flex items-center gap-2 mb-4"><History size={18}/> 歴代四天王</h3>
-            <FourKingsHistoryPanel/>
-          </div>
-        </Card>
-      )}
-
       {isTable && (
         <Card className="overflow-hidden border border-white/10 shadow-2xl rounded-[2rem] bg-slate-900/50 backdrop-blur-xl">
           <div className="overflow-x-auto">
@@ -236,7 +193,7 @@ const Rankings: React.FC = () => {
                     const rise = rateDelta+ptDelta;
                     const activeTitle = ACHIEVEMENTS_DATA.find(a=>a.id===user.activeTitle);
                     return (
-                      <tr key={user.id} className={`transition-all group duration-300 ${user.systemTitle ? 'bg-yellow-900/10 hover:bg-yellow-900/20 border-l-2 border-yellow-500/50' : 'hover:bg-white/5'}`}>
+                      <tr key={user.id} className={`transition-all group duration-300 ${user.systemTitle.length > 0 ? 'bg-yellow-900/10 hover:bg-yellow-900/20 border-l-2 border-yellow-500/50' : 'hover:bg-white/5'}`}>
                         <td className="p-4 text-center font-black text-xl">
                           <span className={dispRank===1?'text-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.5)]':'text-slate-500'}>
                             {getRankIcon(dispRank)}
@@ -250,7 +207,7 @@ const Rankings: React.FC = () => {
                             <div className="min-w-0">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <span className="font-black text-slate-200 text-base group-hover:text-blue-400 transition-colors truncate max-w-[110px]">{user.name}</span>
-                                {user.systemTitle && <FourKingsBadge titleId={user.systemTitle}/>}
+                                {user.systemTitle.map(t => <FourKingsBadge key={t} titleId={t}/>)}
                               </div>
                               {activeTitle && <div className="text-[10px] text-slate-400 font-bold mt-0.5">「{activeTitle.name}」</div>}
                               <RankBadge ranks={user.ranks||[]}/>

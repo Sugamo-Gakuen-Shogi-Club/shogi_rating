@@ -177,11 +177,11 @@ const PublicRankings: React.FC<{ onSelectProfile: (id: string) => void }> = ({ o
                           <div className="min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
                               <span className="font-black text-slate-100 group-hover:text-blue-400 transition-colors">{user.name}</span>
-                              {user.systemTitle && (
-                                <span className="text-[9px] px-1.5 py-0.5 bg-yellow-500/10 text-yellow-300 rounded border border-yellow-500/30 font-black">
-                                  {SYSTEM_TITLES.find(t => t.id === user.systemTitle)?.name}
+                              {user.systemTitle.length > 0 && user.systemTitle.map(tid => (
+                                <span key={tid} className="text-[9px] px-1.5 py-0.5 bg-yellow-500/10 text-yellow-300 rounded border border-yellow-500/30 font-black">
+                                  {SYSTEM_TITLES.find(t => t.id === tid)?.name}
                                 </span>
-                              )}
+                              ))}
                               {isFW && user.isGeneral && (
                                 <Crown size={12} className="text-yellow-400" />
                               )}
@@ -281,7 +281,8 @@ const PublicProfile: React.FC<{ userId: string; onBack: () => void; readOnly?: b
   }));
   const totalM  = user.wins + user.losses + user.draws;
   const winRate = totalM > 0 ? Math.round((user.wins / totalM) * 100) : 0;
-  const systemTitleDef = user.systemTitle ? SYSTEM_TITLES.find(t => t.id === user.systemTitle) : null;
+  const systemTitleDefs = user.systemTitle.map(id => SYSTEM_TITLES.find(t => t.id === id)).filter(Boolean) as typeof SYSTEM_TITLES;
+  const systemTitleDef = systemTitleDefs[0] ?? null;
 
   // ── PIN画面 ──────────────────────────────────────────────
   if (!authenticated) {
@@ -358,8 +359,12 @@ const PublicProfile: React.FC<{ userId: string; onBack: () => void; readOnly?: b
               {user.name}
             </h2>
             {systemTitleDef && (
-              <div className={`font-bold text-base ${systemTitleDef.color} flex items-center justify-center md:justify-start gap-2`}>
-                <Crown size={16} /> {systemTitleDef.name} — {systemTitleDef.description}
+              <div className="flex flex-wrap items-center justify-center md:justify-start gap-1.5">
+                {systemTitleDefs.map(def => (
+                  <div key={def.id} className={`font-bold text-sm ${def.color} flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-yellow-900/20 border border-yellow-500/20`}>
+                    <Crown size={12} /> {def.name}
+                  </div>
+                ))}
               </div>
             )}
             <RankBadge ranks={user.ranks || []} />

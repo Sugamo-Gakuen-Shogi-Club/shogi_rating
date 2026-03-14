@@ -22,6 +22,8 @@ const AUTOBACKUP_PREFIX = 'club_rivals_backup_';
 const UNDO_KEY      = 'club_rivals_undo_stack';
 const MAINTENANCE_KEY = 'club_rivals_maintenance';
 const RANK_APPS_KEY   = 'club_rivals_rank_apps';
+const DEVICE_TOKEN_KEY = 'club_rivals_device_token'; // このデバイスのトークン
+const APPROVED_DEVICES_KEY = 'club_rivals_approved_devices'; // 承認済みトークン一覧（設定に埋め込み）
 const UNDO_MAX      = 10;
 const LOGS_MAX      = 200;
 
@@ -254,10 +256,12 @@ export const undoLastAction = (entryId?: string): UndoEntry | null => {
   if (idx === -1) return null;
   const entry = stack[idx];
 
-  // スナップショットを復元
-  localStorage.setItem(USERS_KEY,   JSON.stringify(entry.snapshot.users));
+  // スナップショットを復元（normalizeUserを通して型安全に）
+  const restoredUsers = (entry.snapshot.users as any[]).map(normalizeUser);
+  localStorage.setItem(USERS_KEY,   JSON.stringify(restoredUsers));
   localStorage.setItem(MATCHES_KEY, JSON.stringify(entry.snapshot.matches));
   localStorage.setItem(LOGS_KEY,    JSON.stringify(entry.snapshot.logs));
+  window.dispatchEvent(new CustomEvent('rivals-users-changed'));
 
   // そのエントリ以降（新しい側）をすべてスタックから削除
   const next = stack.slice(idx + 1);
@@ -507,6 +511,7 @@ const pushToCloud = async (): Promise<boolean> => {
       settings: getSettings(),
       logs: getLogs(),
       timestamp,
+      approvedDevices: getApprovedDevices(),
     };
     // メンテナンスモード中はsandboxに書く
     const maint = getMaintenanceState();
@@ -603,6 +608,13 @@ export const loadFromCloud = async (): Promise<LoadResult> => {
     localStorage.setItem(MATCHES_KEY,  JSON.stringify(data.matches || []));
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(data.settings || DEFAULT_SETTINGS));
     localStorage.setItem(LOGS_KEY,     JSON.stringify(data.logs || []));
+    // 承認済みデバイスも復元（ただし上書きは しない：このデバイス自身のトークンを消さないため）
+    if (data.approvedDevices && Array.isArray(data.approvedDevices)) {
+      const local = getApprovedDevices();
+      const merged = [...data.approvedDevices];
+      local.forEach(d => { if (!merged.some(m => m.token === d.token)) merged.push(d); });
+      localStorage.setItem(APPROVED_DEVICES_KEY, JSON.stringify(merged));
+    }
 
     const syncedAt = new Date().toISOString();
     updateSyncMeta({ status: 'SYNCED', lastSync: syncedAt, localTimestamp: cloudTime, pendingChanges: 0 });
@@ -692,7 +704,9 @@ export const getUsers = (includeInactive = false): User[] => {
 };
 
 export const saveUsers = (users: User[]): void => {
-  localStorage.setItem(USERS_KEY, JSON.stringify(users));
+  // 常に normalizeUser を通して保存（型変換漏れ・旧形式データの混入を防ぐ）
+  const normalized = users.map(normalizeUser);
+  localStorage.setItem(USERS_KEY, JSON.stringify(normalized));
   window.dispatchEvent(new CustomEvent('rivals-users-changed'));
   syncWithServer();
 };
@@ -782,6 +796,10 @@ const checkAchievementsAndIcons = (
 // ATTENDANCE
 // ============================================================
 export const recordAttendance = (userId: string): AttendanceResult => {
+  // ★ デバイス承認チェック
+  if (!isDeviceApproved()) {
+    return { success: false, newAchievements: [], newIcons: [], message: 'DEVICE_NOT_APPROVED' };
+  }
   const allUsers = getRawUsers();
   const user = allUsers.find(u => u.id === userId);
   if (!user) return { success: false, newAchievements: [], newIcons: [], message: 'ユーザーが見つかりません' };
@@ -857,6 +875,9 @@ export const processMatch = (
   result: 'PLAYER1_WIN' | 'PLAYER2_WIN' | 'DRAW',
   isDuel = false
 ): { p1RateChange: number; p2RateChange: number; p1PointsDetail: PointBreakdown; p2PointsDetail: PointBreakdown; p1PointsEarned: number; p2PointsEarned: number; newAchievementsP1: AchievementDef[]; newAchievementsP2: AchievementDef[]; newIconsP1: IconDef[]; newIconsP2: IconDef[]; isDuel: boolean; result: 'PLAYER1_WIN' | 'PLAYER2_WIN' | 'DRAW' } => {
+  // ★ デバイス承認チェック
+  if (!isDeviceApproved()) throw new Error('DEVICE_NOT_APPROVED');
+
   const allUsers = getRawUsers();
   const p1 = allUsers.find(u => u.id === p1Id);
   const p2 = allUsers.find(u => u.id === p2Id);
@@ -1336,6 +1357,71 @@ export const manualRateAdjustment = (uid: string, delta: number, reason: string)
   saveUsers(all);
 };
 
+// ============================================================
+// DEVICE TOKEN (承認済みデバイス管理)
+// ============================================================
+
+/** このブラウザ固有のトークンを取得（なければ生成して保存） */
+export const getOrCreateDeviceToken = (): string => {
+  let token = localStorage.getItem(DEVICE_TOKEN_KEY);
+  if (!token) {
+    token = 'dev_' + Math.random().toString(36).slice(2, 10) + '_' + Date.now().toString(36);
+    localStorage.setItem(DEVICE_TOKEN_KEY, token);
+  }
+  return token;
+};
+
+/** このデバイスのトークンを取得（なければ null） */
+export const getDeviceToken = (): string | null =>
+  localStorage.getItem(DEVICE_TOKEN_KEY);
+
+/** 承認済みトークン一覧を取得 */
+export const getApprovedDevices = (): { token: string; label: string; approvedAt: string }[] => {
+  const s = localStorage.getItem(APPROVED_DEVICES_KEY);
+  return s ? JSON.parse(s) : [];
+};
+
+const saveApprovedDevices = (list: { token: string; label: string; approvedAt: string }[]): void => {
+  localStorage.setItem(APPROVED_DEVICES_KEY, JSON.stringify(list));
+  // Firebase にも同期（設定の一部として）
+  syncWithServer();
+};
+
+/** このデバイスが承認済みかチェック */
+export const isDeviceApproved = (): boolean => {
+  const token = getDeviceToken();
+  if (!token) return false;
+  return getApprovedDevices().some(d => d.token === token);
+};
+
+/** このデバイスを承認する（管理者がAdmin画面から実行） */
+export const approveThisDevice = (label: string): void => {
+  const token = getOrCreateDeviceToken();
+  const list = getApprovedDevices();
+  if (!list.some(d => d.token === token)) {
+    list.push({ token, label, approvedAt: new Date().toISOString() });
+    saveApprovedDevices(list);
+  }
+};
+
+/** 指定トークンの承認を取り消す */
+export const revokeDevice = (token: string): void => {
+  const list = getApprovedDevices().filter(d => d.token !== token);
+  saveApprovedDevices(list);
+};
+
+/** 承認済みデバイス一覧をFirebaseから同期して復元（別デバイス間での共有） */
+export const syncApprovedDevicesFromCloud = async (): Promise<void> => {
+  try {
+    const res = await fetch(`${CLOUD_API_URL}?nocache=${Date.now()}`);
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data?.approvedDevices) {
+      localStorage.setItem(APPROVED_DEVICES_KEY, JSON.stringify(data.approvedDevices));
+    }
+  } catch { /* silent */ }
+};
+
 export const resetMonthly = (): void => {
   const all = getRawUsers();
   all.forEach(u => { u.monthlyPoints = 0; });
@@ -1423,22 +1509,12 @@ export const getFactionBalanceSimulation = (users: User[]) => {
     .filter(u => u.isActive !== false)
     .map(u => ({ ...u, _score: u.rate * 0.3 + (u.activityDays || 0) * 300 }))
     .sort((a, b) => b._score - a._score);
-
-  const total = scored.length;
-  const redTarget = Math.ceil(total / 2);   // 奇数のとき紅が1人多い
-  const whiteTarget = total - redTarget;
-
-  // スネークドラフト方式: 強い順に交互に割り振り、人数上限に達したら残りは相手チームへ
   const red: User[] = [], white: User[] = [];
-  scored.forEach((u, i) => {
-    const redFull   = red.length   >= redTarget;
-    const whiteFull = white.length >= whiteTarget;
-    if      (redFull)   { white.push(u); }
-    else if (whiteFull) { red.push(u);   }
-    else if (i % 2 === 0) { red.push(u);   }   // 1位, 4位, 5位, 8位, 9位 ... → 紅
-    else                  { white.push(u); }    // 2位, 3位, 6位, 7位, 10位 ... → 白
+  let rScore = 0, wScore = 0;
+  scored.forEach(u => {
+    if (rScore <= wScore) { red.push(u);   rScore += u._score; }
+    else                  { white.push(u); wScore += u._score; }
   });
-
   const stats = (team: User[]) => ({
     count:      team.length,
     avgRate:    team.length ? Math.round(team.reduce((a, b) => a + b.rate, 0) / team.length) : 0,

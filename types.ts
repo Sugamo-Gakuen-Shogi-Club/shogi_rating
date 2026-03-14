@@ -86,7 +86,7 @@ export interface User {
   seasonStartPoints: number;
 
   // System Title (The Four Kings)
-  systemTitle: SystemTitle | null;
+  systemTitle: SystemTitle[];  // 兼任可：複数保持可能
 
   // Icon System
   activeIconId: string;
@@ -119,6 +119,8 @@ export interface User {
   // ★ アイコンフレーム
   activeFrameId?: string;
   unlockedFrames?: string[];
+  // ★ 永続称号（「第n代 覇者」など、退任後も保持）
+  earnedHonors?: string[];
 }
 
 
@@ -208,6 +210,7 @@ export interface BackupData {
   settings: SystemSettings;
   logs: ActivityLog[];
   timestamp: string;
+  approvedDevices?: { token: string; label: string; approvedAt: string }[];
 }
 
 export interface RivalData {

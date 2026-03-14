@@ -188,7 +188,7 @@ export const UserSelector: React.FC<UserSelectorProps> = ({
                             const isDisabled = mode === 'ATTENDANCE' && isAttendedToday;
                             const isGeneral = u.isGeneral;
                             const isRed = u.faction === 'RED';
-                            const hasSystemTitle = !!u.systemTitle;
+                            const hasSystemTitle = u.systemTitle.length > 0;
 
                             return (
                             <button 

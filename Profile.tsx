@@ -12,6 +12,7 @@ import { NumPad } from './NumPad';
 
 // Title Collection Modal
 const TitleCollectionModal: React.FC<{ user: User, onClose: () => void }> = ({ user, onClose }) => {
+    const honors = user.earnedHonors ?? [];
     return (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-in fade-in zoom-in duration-200">
             <div className="bg-slate-900 w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden border border-white/10 flex flex-col max-h-[90vh]">
@@ -23,28 +24,49 @@ const TitleCollectionModal: React.FC<{ user: User, onClose: () => void }> = ({ u
                          <ArrowLeft size={20} />
                      </button>
                 </div>
-                <div className="p-4 overflow-y-auto bg-slate-900 space-y-2">
-                    {ACHIEVEMENTS_DATA.map(ach => {
-                        const isUnlocked = user.achievements.includes(ach.id);
-                        return (
-                            <div key={ach.id} className={`p-3 rounded-xl border flex items-center justify-between ${isUnlocked ? 'bg-indigo-900/20 border-indigo-500/30' : 'bg-slate-950 border-slate-800 grayscale'}`}>
-                                <div className="flex items-center gap-3">
-                                    <div className={`p-2 rounded-lg ${isUnlocked ? 'bg-indigo-500 text-white' : 'bg-slate-800 text-slate-500'}`}>
-                                        <Award size={20} />
-                                    </div>
-                                    <div>
-                                        <div className={`font-bold ${isUnlocked ? 'text-white' : 'text-slate-500'}`}>{ach.name}</div>
-                                        <div className="text-xs text-slate-600">{ach.description}</div>
-                                    </div>
-                                </div>
-                                {isUnlocked ? (
-                                    <span className="text-xs font-bold text-green-400 bg-green-900/20 px-2 py-1 rounded">獲得済</span>
-                                ) : (
-                                    <Lock size={16} className="text-slate-700" />
-                                )}
+                <div className="p-4 overflow-y-auto bg-slate-900 space-y-4">
+                    {/* 永続称号（四天王歴代）セクション */}
+                    {honors.length > 0 && (
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-yellow-500/70 mb-2 px-1">⚔️ 四天王 永続称号</p>
+                        <div className="space-y-1.5">
+                          {honors.map(h => (
+                            <div key={h} className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-gradient-to-r from-yellow-900/30 to-amber-900/20 border border-yellow-500/30">
+                              <Crown size={14} className="text-yellow-400 shrink-0" fill="currentColor" />
+                              <span className="font-black text-yellow-200 text-sm">{h}</span>
+                              <span className="ml-auto text-[9px] bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 px-2 py-0.5 rounded-full font-black">永久</span>
                             </div>
-                        )
-                    })}
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {/* 実績（アチーブメント）セクション */}
+                    <div>
+                      {honors.length > 0 && <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2 px-1">🏅 実績バッジ</p>}
+                      <div className="space-y-2">
+                        {ACHIEVEMENTS_DATA.map(ach => {
+                            const isUnlocked = user.achievements.includes(ach.id);
+                            return (
+                                <div key={ach.id} className={`p-3 rounded-xl border flex items-center justify-between ${isUnlocked ? 'bg-indigo-900/20 border-indigo-500/30' : 'bg-slate-950 border-slate-800 grayscale'}`}>
+                                    <div className="flex items-center gap-3">
+                                        <div className={`p-2 rounded-lg ${isUnlocked ? 'bg-indigo-500 text-white' : 'bg-slate-800 text-slate-500'}`}>
+                                            <Award size={20} />
+                                        </div>
+                                        <div>
+                                            <div className={`font-bold ${isUnlocked ? 'text-white' : 'text-slate-500'}`}>{ach.name}</div>
+                                            <div className="text-xs text-slate-600">{ach.description}</div>
+                                        </div>
+                                    </div>
+                                    {isUnlocked ? (
+                                        <span className="text-xs font-bold text-green-400 bg-green-900/20 px-2 py-1 rounded">獲得済</span>
+                                    ) : (
+                                        <Lock size={16} className="text-slate-700" />
+                                    )}
+                                </div>
+                            )
+                        })}
+                      </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -59,7 +81,7 @@ const IconSelectorModal: React.FC<{
 }> = ({ user: userProp, onClose, onSelect }) => {
     // ★ 常にstorageから最新を読む（Admin画面での四天王更新直後も正しく反映）
     const user = getUsers().find(u => u.id === userProp.id) ?? userProp;
-    const isEliteUser = !!user.systemTitle;
+    const isEliteUser = user.systemTitle.length > 0;
     const categories: {key: string, label: string, icon: React.ReactNode}[] = [
         { key: 'DEFAULT', label: '基本', icon: <Smile size={16}/> },
         { key: 'SHOGI', label: '将棋の駒', icon: <Grid size={16}/> },
@@ -77,11 +99,11 @@ const IconSelectorModal: React.FC<{
         return i.category === activeCategory;
     });
 
-    // ELITEアイコンはunlockedIconsに入っていればOK、かつrequiredTitleがある場合は現在のsystemTitleと一致が必要
+    // ELITEアイコンはunlockedIconsに入っていればOK、かつrequiredTitleがある場合は現在のsystemTitleに含まれているか確認
     const isIconAvailable = (icon: typeof ICONS_DATA[0]) => {
         if (icon.category === 'ELITE') {
             if (!isEliteUser) return false;
-            if (icon.requiredTitle && icon.requiredTitle !== user.systemTitle) return false;
+            if (icon.requiredTitle && !user.systemTitle.includes(icon.requiredTitle as any)) return false;
             return user.unlockedIcons.includes(icon.id);
         }
         return user.unlockedIcons.includes(icon.id);
@@ -390,7 +412,9 @@ const Profile: React.FC = () => {
   const isRed = user.faction === 'RED';
   
   // System Title Lookups
-  const systemTitleDef = user.systemTitle ? SYSTEM_TITLES.find(t => t.id === user.systemTitle) : null;
+  // 兼任対応：保持している全称号を取得（表示は最初の1つ、バッジは全部）
+  const systemTitleDefs = user.systemTitle.map(id => SYSTEM_TITLES.find(t => t.id === id)).filter(Boolean) as typeof SYSTEM_TITLES;
+  const systemTitleDef = systemTitleDefs[0] ?? null; // 主表示用（最初のタイトル）
 
   // Prepare graph data
   const graphData = user.rateHistory.map(h => ({
@@ -601,8 +625,12 @@ const Profile: React.FC = () => {
                     </h2>
                     
                     {systemTitleDef && (
-                        <div className={`font-serif-jp font-bold text-lg ${systemTitleDef.color} flex items-center justify-center md:justify-start gap-2`}>
-                            <Crown size={18} /> {systemTitleDef.name} - {systemTitleDef.description}
+                        <div className="flex flex-wrap items-center justify-center md:justify-start gap-1.5">
+                          {systemTitleDefs.map(def => (
+                            <div key={def.id} className={`font-serif-jp font-bold text-sm ${def.color} flex items-center gap-1.5 px-2 py-1 rounded-full bg-yellow-900/20 border border-yellow-500/20`}>
+                                <Crown size={13} /> {def.name}
+                            </div>
+                          ))}
                         </div>
                     )}
                 </div>
