@@ -12,7 +12,7 @@ export interface AchievementDef {
   id: string;
   name: string;
   description: string;
-  conditionType: 'WINS' | 'STREAK' | 'RATE' | 'DAYS' | 'MATCHES' | 'SPECIAL';
+  conditionType: 'WINS' | 'STREAK' | 'RATE' | 'DAYS' | 'MATCHES' | 'SPECIAL' | 'DRAWS' | 'POINTS' | 'UPSET_WINS';
   threshold: number;
 }
 
@@ -21,7 +21,7 @@ export interface IconDef {
   char: string;
   name: string;
   conditionDescription: string;
-  type: 'DEFAULT' | 'RATE' | 'WINS' | 'STREAK' | 'SPECIAL' | 'MATCHES' | 'DAYS';
+  type: 'DEFAULT' | 'RATE' | 'WINS' | 'STREAK' | 'SPECIAL' | 'MATCHES' | 'DAYS' | 'DRAWS' | 'POINTS';
   category: 'DEFAULT' | 'SHOGI' | 'CHESS' | 'SPECIAL' | 'RANK' | 'ELITE';
   threshold?: number;
   isLimited?: boolean;
@@ -103,6 +103,8 @@ export interface User {
 
   currentStreak: number;
   maxStreak: number;
+  upsetWins: number;      // 格上撃破（レート差+100以上）の累計
+  lossStreak: number;     // 現在の連敗数（comeback 判定用）
   wins: number;
   losses: number;
   draws: number;

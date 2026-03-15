@@ -50,7 +50,11 @@ const DEFAULT_SETTINGS: SystemSettings = {
 // 初期レートは0（負けで減る仕様のため）
 const INITIAL_RATE = 0;
 
-const DEFAULT_UNLOCKED_ICONS = ['DEFAULT_INITIAL', 'DEFAULT_SMILE', 'DEFAULT_CAT', 'DEFAULT_DOG', 'SHOGI_FU'];
+const DEFAULT_UNLOCKED_ICONS = [
+  'DEFAULT_INITIAL', 'DEFAULT_SMILE', 'DEFAULT_CAT', 'DEFAULT_DOG',
+  'DEFAULT_BEAR', 'DEFAULT_PIG', 'DEFAULT_RABBIT', 'DEFAULT_CHICK',
+  'SHOGI_FU',
+];
 
 // ============================================================
 // STATIC DATA
@@ -63,120 +67,297 @@ export const SYSTEM_TITLES: TitleDef[] = [
 ];
 
 export const ACHIEVEMENTS_DATA: AchievementDef[] = [
-  { id: 'FACTION_GENERAL', name: '大将軍',         description: 'チームの大将に任命される',   conditionType: 'SPECIAL',  threshold: 1 },
-  { id: 'DUEL_VICTORY',    name: '一騎討ち',        description: '敵将との直接対決を制する',   conditionType: 'SPECIAL',  threshold: 1 },
-  { id: 'START_DASH',      name: 'スタートダッシュ', description: '記念すべき最初の対局',       conditionType: 'MATCHES',  threshold: 1 },
-  { id: 'MATCHES_10',      name: '駆け出し棋士',    description: '対局数10回到達',             conditionType: 'MATCHES',  threshold: 10 },
-  { id: 'MATCHES_50',      name: '盤上の常連',      description: '対局数50回到達',             conditionType: 'MATCHES',  threshold: 50 },
-  { id: 'MATCHES_100',     name: '百戦錬磨',        description: '対局数100回到達',            conditionType: 'MATCHES',  threshold: 100 },
-  { id: 'FIRST_WIN',       name: '初勝利',          description: '初めての勝利',               conditionType: 'WINS',     threshold: 1 },
-  { id: 'WINS_10',         name: '十人斬り',        description: '勝利数10回到達',             conditionType: 'WINS',     threshold: 10 },
-  { id: 'WINS_30',         name: '名手',            description: '勝利数30回到達',             conditionType: 'WINS',     threshold: 30 },
-  { id: 'WINS_50',         name: '将棋の鬼',        description: '勝利数50回到達',             conditionType: 'WINS',     threshold: 50 },
-  { id: 'STREAK_3',        name: '好調',            description: '3連勝達成',                 conditionType: 'STREAK',   threshold: 3 },
-  { id: 'STREAK_5',        name: '猛攻',            description: '5連勝達成',                 conditionType: 'STREAK',   threshold: 5 },
-  { id: 'STREAK_10',       name: '無双',            description: '10連勝達成',                conditionType: 'STREAK',   threshold: 10 },
-  { id: 'RATE_1200',       name: '脱・初心者',      description: 'レート1200到達',             conditionType: 'RATE',     threshold: 1200 },
-  { id: 'RATE_1500',       name: '熟練者',          description: 'レート1500到達',             conditionType: 'RATE',     threshold: 1500 },
-  { id: 'RATE_1800',       name: 'マスター',        description: 'レート1800到達',             conditionType: 'RATE',     threshold: 1800 },
-  { id: 'RATE_2000',       name: 'レジェンド',      description: 'レート2000到達',             conditionType: 'RATE',     threshold: 2000 },
-  { id: 'DAYS_10',         name: '将棋好き',        description: '活動日数10日',               conditionType: 'DAYS',     threshold: 10 },
-  { id: 'DAYS_30',         name: '部室の主',        description: '活動日数30日',               conditionType: 'DAYS',     threshold: 30 },
-  { id: 'DAYS_100',        name: '生ける伝説',      description: '活動日数100日',              conditionType: 'DAYS',     threshold: 100 },
+  { id: 'FACTION_GENERAL', name: '大将軍', description: 'チームの大将に任命される', conditionType: 'SPECIAL', threshold: 1 },
+  { id: 'DUEL_VICTORY', name: '一騎討ち', description: '敵将との直接対決を制する', conditionType: 'SPECIAL', threshold: 1 },
+  { id: 'COMEBACK_3', name: '不屈', description: '3連敗後に勝利する', conditionType: 'SPECIAL', threshold: 1 },
+  { id: 'COMEBACK_5', name: '逆境の勇者', description: '5連敗後に勝利する', conditionType: 'SPECIAL', threshold: 1 },
+  { id: 'COMEBACK_10', name: '復活劇', description: '10連敗後に勝利する', conditionType: 'SPECIAL', threshold: 1 },
+  { id: 'COLLECTION_5', name: 'コレクター', description: '称号を5個獲得する', conditionType: 'SPECIAL', threshold: 1 },
+  { id: 'COLLECTION_15', name: '秘宝の番人', description: '称号を15個獲得する', conditionType: 'SPECIAL', threshold: 1 },
+  { id: 'COLLECTION_30', name: '伝説の収集家', description: '称号を30個獲得する', conditionType: 'SPECIAL', threshold: 1 },
+  { id: 'COLLECTION_50', name: '究極の収集家', description: '称号を50個獲得する', conditionType: 'SPECIAL', threshold: 1 },
+  { id: 'RANK_FIRST', name: '公式認定', description: '段位が初めて承認される', conditionType: 'SPECIAL', threshold: 1 },
+  { id: 'FIRST_LOSS', name: '初黒星', description: '初めての敗戦（ネタ称号）', conditionType: 'SPECIAL', threshold: 1 },
+  { id: 'LOSSES_30', name: 'めげない心', description: '敗戦数30回', conditionType: 'SPECIAL', threshold: 1 },
+  { id: 'LOSSES_100', name: '七転八起', description: '敗戦数100回', conditionType: 'SPECIAL', threshold: 1 },
+  { id: 'MAX_STREAK_5', name: 'スプリンター', description: '連勝記録5以上を達成', conditionType: 'SPECIAL', threshold: 1 },
+  { id: 'MAX_STREAK_10', name: '記録破り', description: '連勝記録10以上を達成', conditionType: 'SPECIAL', threshold: 1 },
+  { id: 'MAX_STREAK_15', name: '伝説の連勝', description: '連勝記録15以上を達成', conditionType: 'SPECIAL', threshold: 1 },
+  { id: 'MAX_STREAK_20', name: '神話', description: '連勝記録20以上を達成', conditionType: 'SPECIAL', threshold: 1 },
+  { id: 'START_DASH', name: '初陣', description: '記念すべき最初の対局', conditionType: 'MATCHES', threshold: 1 },
+  { id: 'MATCHES_5', name: '見習い棋士', description: '対局数5回到達', conditionType: 'MATCHES', threshold: 5 },
+  { id: 'MATCHES_10', name: '駆け出し棋士', description: '対局数10回到達', conditionType: 'MATCHES', threshold: 10 },
+  { id: 'MATCHES_25', name: '中堅棋士', description: '対局数25回到達', conditionType: 'MATCHES', threshold: 25 },
+  { id: 'MATCHES_40', name: '盤上の常連', description: '対局数40回到達', conditionType: 'MATCHES', threshold: 40 },
+  { id: 'MATCHES_50', name: '折返し地点', description: '対局数50回到達', conditionType: 'MATCHES', threshold: 50 },
+  { id: 'MATCHES_80', name: '百戦錬磨', description: '対局数80回到達', conditionType: 'MATCHES', threshold: 80 },
+  { id: 'MATCHES_150', name: '千局の侍', description: '対局数150回到達', conditionType: 'MATCHES', threshold: 150 },
+  { id: 'MATCHES_300', name: '無限の棋士', description: '対局数300回到達', conditionType: 'MATCHES', threshold: 300 },
+  { id: 'FIRST_WIN', name: '初勝利', description: '初めての勝利', conditionType: 'WINS', threshold: 1 },
+  { id: 'WINS_3', name: '三連撃', description: '勝利数3回到達', conditionType: 'WINS', threshold: 3 },
+  { id: 'WINS_10', name: '十人斬り', description: '勝利数10回到達', conditionType: 'WINS', threshold: 10 },
+  { id: 'WINS_20', name: '二十連撃', description: '勝利数20回到達', conditionType: 'WINS', threshold: 20 },
+  { id: 'WINS_30', name: '名手', description: '勝利数30回到達', conditionType: 'WINS', threshold: 30 },
+  { id: 'WINS_40', name: '達人', description: '勝利数40回到達', conditionType: 'WINS', threshold: 40 },
+  { id: 'WINS_50', name: '将棋の鬼', description: '勝利数50回到達', conditionType: 'WINS', threshold: 50 },
+  { id: 'WINS_60', name: '覇道', description: '勝利数60回到達', conditionType: 'WINS', threshold: 60 },
+  { id: 'WINS_80', name: '百勝将軍', description: '勝利数80回到達', conditionType: 'WINS', threshold: 80 },
+  { id: 'WINS_100', name: '無敵の証', description: '勝利数100回到達', conditionType: 'WINS', threshold: 100 },
+  { id: 'WINS_120', name: '不滅の強者', description: '勝利数120回到達', conditionType: 'WINS', threshold: 120 },
+  { id: 'WINS_160', name: '伝説の棋士', description: '勝利数160回到達', conditionType: 'WINS', threshold: 160 },
+  { id: 'WINS_250', name: '最強の名', description: '勝利数250回到達', conditionType: 'WINS', threshold: 250 },
+  { id: 'STREAK_3', name: '好調', description: '3連勝達成', conditionType: 'STREAK', threshold: 3 },
+  { id: 'STREAK_5', name: '猛攻', description: '5連勝達成', conditionType: 'STREAK', threshold: 5 },
+  { id: 'STREAK_7', name: '破竹の勢い', description: '7連勝達成', conditionType: 'STREAK', threshold: 7 },
+  { id: 'STREAK_10', name: '無双', description: '10連勝達成', conditionType: 'STREAK', threshold: 10 },
+  { id: 'STREAK_12', name: '覚醒', description: '12連勝達成', conditionType: 'STREAK', threshold: 12 },
+  { id: 'STREAK_15', name: '神がかり', description: '15連勝達成', conditionType: 'STREAK', threshold: 15 },
+  { id: 'STREAK_20', name: '鬼神', description: '20連勝達成', conditionType: 'STREAK', threshold: 20 },
+  { id: 'STREAK_25', name: '無敗伝説', description: '25連勝達成', conditionType: 'STREAK', threshold: 25 },
+  { id: 'STREAK_30', name: '天下無双', description: '30連勝達成', conditionType: 'STREAK', threshold: 30 },
+  { id: 'RATE_200', name: '第一歩', description: 'レート200到達', conditionType: 'RATE', threshold: 200 },
+  { id: 'RATE_400', name: '登り坂', description: 'レート400到達', conditionType: 'RATE', threshold: 400 },
+  { id: 'RATE_600', name: '中堅入り', description: 'レート600到達', conditionType: 'RATE', threshold: 600 },
+  { id: 'RATE_800', name: '脱・初心者', description: 'レート800到達', conditionType: 'RATE', threshold: 800 },
+  { id: 'RATE_950', name: '実力者', description: 'レート950到達', conditionType: 'RATE', threshold: 950 },
+  { id: 'RATE_1100', name: '熟練者', description: 'レート1100到達', conditionType: 'RATE', threshold: 1100 },
+  { id: 'RATE_1250', name: '精鋭', description: 'レート1250到達', conditionType: 'RATE', threshold: 1250 },
+  { id: 'RATE_1400', name: 'マスター', description: 'レート1400到達', conditionType: 'RATE', threshold: 1400 },
+  { id: 'RATE_1550', name: '超越者', description: 'レート1550到達', conditionType: 'RATE', threshold: 1550 },
+  { id: 'RATE_1700', name: 'レジェンド', description: 'レート1700到達', conditionType: 'RATE', threshold: 1700 },
+  { id: 'RATE_1900', name: '覇王', description: 'レート1900到達', conditionType: 'RATE', threshold: 1900 },
+  { id: 'RATE_2100', name: '神の領域', description: 'レート2100到達', conditionType: 'RATE', threshold: 2100 },
+  { id: 'RATE_2300', name: '雲の上', description: 'レート2300到達', conditionType: 'RATE', threshold: 2300 },
+  { id: 'RATE_2500', name: '至高', description: 'レート2500到達', conditionType: 'RATE', threshold: 2500 },
+  { id: 'DAYS_5', name: '将棋好き', description: '活動日数5日到達', conditionType: 'DAYS', threshold: 5 },
+  { id: 'DAYS_15', name: '常連', description: '活動日数15日到達', conditionType: 'DAYS', threshold: 15 },
+  { id: 'DAYS_25', name: '部室の主', description: '活動日数25日到達', conditionType: 'DAYS', threshold: 25 },
+  { id: 'DAYS_40', name: '皆勤候補', description: '活動日数40日到達', conditionType: 'DAYS', threshold: 40 },
+  { id: 'DAYS_55', name: '熱心な部員', description: '活動日数55日到達', conditionType: 'DAYS', threshold: 55 },
+  { id: 'DAYS_70', name: '生ける伝説', description: '活動日数70日到達', conditionType: 'DAYS', threshold: 70 },
+  { id: 'DAYS_100', name: '部の柱', description: '活動日数100日到達', conditionType: 'DAYS', threshold: 100 },
+  { id: 'DAYS_140', name: '鉄の意志', description: '活動日数140日到達', conditionType: 'DAYS', threshold: 140 },
+  { id: 'DAYS_180', name: '永遠の棋士', description: '活動日数180日到達', conditionType: 'DAYS', threshold: 180 },
+  { id: 'DAYS_210', name: '殿堂', description: '活動日数210日到達（3年フル参加）', conditionType: 'DAYS', threshold: 210 },
+  { id: 'DRAWS_1', name: '初和解', description: '引き分け1回', conditionType: 'DRAWS', threshold: 1 },
+  { id: 'DRAWS_5', name: '均衡', description: '引き分け5回', conditionType: 'DRAWS', threshold: 5 },
+  { id: 'DRAWS_10', name: '静寂の盤', description: '引き分け10回', conditionType: 'DRAWS', threshold: 10 },
+  { id: 'DRAWS_20', name: '禅の境地', description: '引き分け20回', conditionType: 'DRAWS', threshold: 20 },
+  { id: 'DRAWS_30', name: '引き分け職人', description: '引き分け30回', conditionType: 'DRAWS', threshold: 30 },
+  { id: 'DRAWS_50', name: '虚無', description: '引き分け50回', conditionType: 'DRAWS', threshold: 50 },
+  { id: 'POINTS_50', name: '活動者', description: '総ポイント50到達', conditionType: 'POINTS', threshold: 50 },
+  { id: 'POINTS_150', name: '勤勉家', description: '総ポイント150到達', conditionType: 'POINTS', threshold: 150 },
+  { id: 'POINTS_300', name: '精力的', description: '総ポイント300到達', conditionType: 'POINTS', threshold: 300 },
+  { id: 'POINTS_600', name: '牽引役', description: '総ポイント600到達', conditionType: 'POINTS', threshold: 600 },
+  { id: 'POINTS_1200', name: '部の功労者', description: '総ポイント1200到達', conditionType: 'POINTS', threshold: 1200 },
+  { id: 'POINTS_2500', name: '金字塔', description: '総ポイント2500到達', conditionType: 'POINTS', threshold: 2500 },
+  { id: 'POINTS_4000', name: '金剛', description: '総ポイント4000到達', conditionType: 'POINTS', threshold: 4000 },
+  { id: 'POINTS_6000', name: '無限の積み重ね', description: '総ポイント6000到達', conditionType: 'POINTS', threshold: 6000 },
+  { id: 'UPSET_1', name: '番狂わせ', description: '格上（+100以上）に勝利', conditionType: 'UPSET_WINS', threshold: 1 },
+  { id: 'UPSET_10', name: 'ジャイアントキリング', description: '格上撃破10回', conditionType: 'UPSET_WINS', threshold: 10 },
+  { id: 'UPSET_20', name: '下剋上', description: '格上撃破20回', conditionType: 'UPSET_WINS', threshold: 20 },
+  { id: 'UPSET_30', name: '巨人の天敵', description: '格上撃破30回', conditionType: 'UPSET_WINS', threshold: 30 },
+  { id: 'UPSET_50', name: '不可能を可能に', description: '格上撃破50回', conditionType: 'UPSET_WINS', threshold: 50 }
 ];
-
 export const ICONS_DATA: IconDef[] = [
-  { id: 'DEFAULT_INITIAL', char: '名',   name: '頭文字',  conditionDescription: 'デフォルト',        type: 'DEFAULT',  category: 'DEFAULT' },
-  { id: 'DEFAULT_SMILE',   char: '🙂',  name: 'スマイル', conditionDescription: 'デフォルト',        type: 'DEFAULT',  category: 'DEFAULT' },
-  { id: 'DEFAULT_CAT',     char: '🐱',  name: 'ねこ',    conditionDescription: '最初から所持',       type: 'DEFAULT',  category: 'DEFAULT' },
-  { id: 'DEFAULT_DOG',     char: '🐶',  name: 'いぬ',    conditionDescription: '最初から所持',       type: 'DEFAULT',  category: 'DEFAULT' },
-  { id: 'SHOGI_FU',        char: '歩兵', name: '歩兵',    conditionDescription: '最初から所持',       type: 'DEFAULT',  category: 'SHOGI' },
-  { id: 'SHOGI_TO',        char: 'と金', name: 'と金',    conditionDescription: '対局数3回',          type: 'MATCHES',  threshold: 3,    category: 'SHOGI' },
-  { id: 'SHOGI_KY',        char: '香車', name: '香車',    conditionDescription: '対局数5回',          type: 'MATCHES',  threshold: 5,    category: 'SHOGI' },
-  { id: 'SHOGI_NKY',       char: '成香', name: '成香',    conditionDescription: '対局数10回',         type: 'MATCHES',  threshold: 10,   category: 'SHOGI' },
-  { id: 'SHOGI_KE',        char: '桂馬', name: '桂馬',    conditionDescription: '勝利数3回',          type: 'WINS',     threshold: 3,    category: 'SHOGI' },
-  { id: 'SHOGI_NKE',       char: '成桂', name: '成桂',    conditionDescription: '勝利数5回',          type: 'WINS',     threshold: 5,    category: 'SHOGI' },
-  { id: 'SHOGI_GI',        char: '銀将', name: '銀将',    conditionDescription: '勝利数7回',          type: 'WINS',     threshold: 7,    category: 'SHOGI' },
-  { id: 'SHOGI_NGI',       char: '成銀', name: '成銀',    conditionDescription: '勝利数12回',         type: 'WINS',     threshold: 12,   category: 'SHOGI' },
-  { id: 'SHOGI_KI',        char: '金将', name: '金将',    conditionDescription: '勝利数15回',         type: 'WINS',     threshold: 15,   category: 'SHOGI' },
-  { id: 'SHOGI_KA',        char: '角行', name: '角行',    conditionDescription: 'レート1100到達',     type: 'RATE',     threshold: 1100, category: 'SHOGI' },
-  { id: 'SHOGI_UMA',       char: '龍馬', name: '龍馬',    conditionDescription: 'レート1250到達',     type: 'RATE',     threshold: 1250, category: 'SHOGI' },
-  { id: 'SHOGI_HI',        char: '飛車', name: '飛車',    conditionDescription: 'レート1200到達',     type: 'RATE',     threshold: 1200, category: 'SHOGI' },
-  { id: 'SHOGI_RYU',       char: '龍王', name: '龍王',    conditionDescription: 'レート1400到達',     type: 'RATE',     threshold: 1400, category: 'SHOGI' },
-  { id: 'SHOGI_OU',        char: '王将', name: '王将',    conditionDescription: 'レート1600到達',     type: 'RATE',     threshold: 1600, category: 'SHOGI' },
-  { id: 'SHOGI_GYOKU',     char: '玉将', name: '玉将',    conditionDescription: 'レート1800到達',     type: 'RATE',     threshold: 1800, category: 'SHOGI' },
-  { id: 'CHESS_PAWN',      char: '♟️',  name: 'ポーン',  conditionDescription: '勝利数20回',         type: 'WINS',     threshold: 20,   category: 'CHESS' },
-  { id: 'CHESS_KNIGHT',    char: '♞',   name: 'ナイト',  conditionDescription: '勝利数40回',         type: 'WINS',     threshold: 40,   category: 'CHESS' },
-  { id: 'CHESS_BISHOP',    char: '♝',   name: 'ビショップ',conditionDescription: 'レート1350到達',   type: 'RATE',     threshold: 1350, category: 'CHESS' },
-  { id: 'CHESS_ROOK',      char: '♜',   name: 'ルーク',  conditionDescription: 'レート1450到達',     type: 'RATE',     threshold: 1450, category: 'CHESS' },
-  { id: 'CHESS_QUEEN',     char: '♛',   name: 'クイーン',conditionDescription: 'レート1700到達',     type: 'RATE',     threshold: 1700, category: 'CHESS' },
-  { id: 'CHESS_KING',      char: '♚',   name: 'キング',  conditionDescription: 'レート2000到達',     type: 'RATE',     threshold: 2000, category: 'CHESS' },
-  // ── 期間限定アイコン ───────────────────────────────────────
-  { id: 'SPECIAL_SAKURA',  char: '🌸',  name: '桜',      conditionDescription: '春季限定（4〜5月）',   type: 'SPECIAL',  category: 'SPECIAL', isLimited: true },
-  { id: 'SPECIAL_HIMAWARI',char: '🌻',  name: 'ひまわり', conditionDescription: '夏季限定（7〜8月）',  type: 'SPECIAL',  category: 'SPECIAL', isLimited: true },
-  { id: 'SPECIAL_MOMIJI',  char: '🍁',  name: '紅葉',     conditionDescription: '秋季限定（10〜11月）', type: 'SPECIAL',  category: 'SPECIAL', isLimited: true },
-  { id: 'SPECIAL_YUKI',    char: '❄️',  name: '雪',      conditionDescription: '冬季限定（12〜1月）',  type: 'SPECIAL',  category: 'SPECIAL', isLimited: true },
-  { id: 'SPECIAL_TANUKI',  char: '🦝',  name: 'たぬき',   conditionDescription: '出席50日達成',         type: 'DAYS',     threshold: 50, category: 'SPECIAL' },
-  { id: 'SPECIAL_KITSUNE', char: '🦊',  name: 'きつね',   conditionDescription: '連勝5以上',            type: 'STREAK',   threshold: 5,  category: 'SPECIAL' },
-  { id: 'SPECIAL_DRAGON',  char: '🐉',  name: '龍',       conditionDescription: '勝利数100回',          type: 'WINS',     threshold: 100, category: 'SPECIAL' },
-  { id: 'SPECIAL_ONI',     char: '👹',  name: '鬼',       conditionDescription: '格上に10勝',           type: 'SPECIAL',  category: 'SPECIAL' },
-  { id: 'SPECIAL_STAR',    char: '⭐',  name: '星',       conditionDescription: '四天王に選出',         type: 'SPECIAL',  category: 'SPECIAL' },
-  { id: 'SPECIAL_CROWN',   char: '👑',  name: '王冠',     conditionDescription: '四天王に2回以上選出',  type: 'SPECIAL',  category: 'SPECIAL' },
-  { id: 'SPECIAL_FIRE',    char: '🔥',  name: '炎',       conditionDescription: '10連勝達成',           type: 'STREAK',   threshold: 10, category: 'SPECIAL' },
-  { id: 'SPECIAL_ZEN',     char: '☯️',  name: '禅',       conditionDescription: '引き分け20回',         type: 'SPECIAL',  category: 'SPECIAL' },
-
-  // ── 四天王限定アイコン（タイトル保持中のみ使用可）─────────────
-  // 覇者（MASTER）専用
-  { id: 'ELITE_MASTER_SWORD',   char: '⚔️',  name: '覇者の剣',     conditionDescription: '覇者に選出中のみ',   type: 'SPECIAL', category: 'ELITE', requiredTitle: 'MASTER', isLimited: true },
-  { id: 'ELITE_MASTER_SHIELD',  char: '🛡',   name: '覇者の盾',     conditionDescription: '覇者に選出中のみ',   type: 'SPECIAL', category: 'ELITE', requiredTitle: 'MASTER', isLimited: true },
-  { id: 'ELITE_MASTER_CROWN',   char: '👑',  name: '覇者の冠',     conditionDescription: '覇者に選出中のみ',   type: 'SPECIAL', category: 'ELITE', requiredTitle: 'MASTER', isLimited: true },
-  { id: 'ELITE_MASTER_GOLD',    char: '🏆',  name: '金杯',         conditionDescription: '覇者に選出中のみ',   type: 'SPECIAL', category: 'ELITE', requiredTitle: 'MASTER', isLimited: true },
-  { id: 'ELITE_MASTER_LION',    char: '🦁',  name: '百獣の王',     conditionDescription: '覇者に選出中のみ',   type: 'SPECIAL', category: 'ELITE', requiredTitle: 'MASTER', isLimited: true },
-  // 新星（RISING_STAR）専用
-  { id: 'ELITE_RISING_STAR',    char: '🌟',  name: '金の星',       conditionDescription: '新星に選出中のみ',   type: 'SPECIAL', category: 'ELITE', requiredTitle: 'RISING_STAR', isLimited: true },
-  { id: 'ELITE_RISING_METEOR',  char: '☄️',  name: '流星',         conditionDescription: '新星に選出中のみ',   type: 'SPECIAL', category: 'ELITE', requiredTitle: 'RISING_STAR', isLimited: true },
-  { id: 'ELITE_RISING_ROCKET',  char: '🚀',  name: '急上昇',       conditionDescription: '新星に選出中のみ',   type: 'SPECIAL', category: 'ELITE', requiredTitle: 'RISING_STAR', isLimited: true },
-  { id: 'ELITE_RISING_COMET',   char: '💫',  name: '彗星',         conditionDescription: '新星に選出中のみ',   type: 'SPECIAL', category: 'ELITE', requiredTitle: 'RISING_STAR', isLimited: true },
-  { id: 'ELITE_RISING_ANGEL',   char: '😇',  name: '新星の翼',     conditionDescription: '新星に選出中のみ',   type: 'SPECIAL', category: 'ELITE', requiredTitle: 'RISING_STAR', isLimited: true },
-  // 鉄人（GRINDER）専用
-  { id: 'ELITE_GRINDER_IRON',   char: '⚙️',  name: '鉄の歯車',    conditionDescription: '鉄人に選出中のみ',   type: 'SPECIAL', category: 'ELITE', requiredTitle: 'GRINDER', isLimited: true },
-  { id: 'ELITE_GRINDER_MUSCLE', char: '💪',  name: '鉄腕',         conditionDescription: '鉄人に選出中のみ',   type: 'SPECIAL', category: 'ELITE', requiredTitle: 'GRINDER', isLimited: true },
-  { id: 'ELITE_GRINDER_ANVIL',  char: '🔩',  name: '鉄のボルト',   conditionDescription: '鉄人に選出中のみ',   type: 'SPECIAL', category: 'ELITE', requiredTitle: 'GRINDER', isLimited: true },
-  { id: 'ELITE_GRINDER_ROBOT',  char: '🤖',  name: '鉄人ロボ',     conditionDescription: '鉄人に選出中のみ',   type: 'SPECIAL', category: 'ELITE', requiredTitle: 'GRINDER', isLimited: true },
-  { id: 'ELITE_GRINDER_BULL',   char: '🐂',  name: '鉄牛',         conditionDescription: '鉄人に選出中のみ',   type: 'SPECIAL', category: 'ELITE', requiredTitle: 'GRINDER', isLimited: true },
-  // 巨人キラー（GIANT_KILLER）専用
-  { id: 'ELITE_KILLER_SKULL',   char: '💀',  name: '骸骨',         conditionDescription: '巨人キラーに選出中のみ', type: 'SPECIAL', category: 'ELITE', requiredTitle: 'GIANT_KILLER', isLimited: true },
-  { id: 'ELITE_KILLER_AXE',     char: '🪓',  name: '斧',           conditionDescription: '巨人キラーに選出中のみ', type: 'SPECIAL', category: 'ELITE', requiredTitle: 'GIANT_KILLER', isLimited: true },
-  { id: 'ELITE_KILLER_NINJA',   char: '🥷',  name: '忍者',         conditionDescription: '巨人キラーに選出中のみ', type: 'SPECIAL', category: 'ELITE', requiredTitle: 'GIANT_KILLER', isLimited: true },
-  { id: 'ELITE_KILLER_WOLF',    char: '🐺',  name: '一匹狼',       conditionDescription: '巨人キラーに選出中のみ', type: 'SPECIAL', category: 'ELITE', requiredTitle: 'GIANT_KILLER', isLimited: true },
-  { id: 'ELITE_KILLER_VIPER',   char: '🐍',  name: '毒蛇',         conditionDescription: '巨人キラーに選出中のみ', type: 'SPECIAL', category: 'ELITE', requiredTitle: 'GIANT_KILLER', isLimited: true },
-  // 四天王共通（どのタイトルでも使用可）
-  { id: 'ELITE_COMMON_GEM',     char: '💎',  name: '宝石',         conditionDescription: '四天王に選出中のみ',  type: 'SPECIAL', category: 'ELITE', isLimited: true },
-  { id: 'ELITE_COMMON_THUNDER', char: '⚡',  name: '雷帝',         conditionDescription: '四天王に選出中のみ',  type: 'SPECIAL', category: 'ELITE', isLimited: true },
-  { id: 'ELITE_COMMON_DRAGON',  char: '🐲',  name: '神龍',         conditionDescription: '四天王に選出中のみ',  type: 'SPECIAL', category: 'ELITE', isLimited: true },
-  { id: 'ELITE_COMMON_SAMURAI', char: '⛩️',  name: '武者',         conditionDescription: '四天王に選出中のみ',  type: 'SPECIAL', category: 'ELITE', isLimited: true },
-  { id: 'ELITE_COMMON_FLAME',   char: '🔥',  name: '業火',         conditionDescription: '四天王に選出中のみ',  type: 'SPECIAL', category: 'ELITE', isLimited: true },
+  { id: 'DEFAULT_INITIAL', char: '名', name: '頭文字', conditionDescription: 'デフォルト', type: 'DEFAULT', category: 'DEFAULT' },
+  { id: 'DEFAULT_SMILE', char: '🙂', name: 'スマイル', conditionDescription: 'デフォルト', type: 'DEFAULT', category: 'DEFAULT' },
+  { id: 'DEFAULT_CAT', char: '🐱', name: 'ねこ', conditionDescription: '最初から所持', type: 'DEFAULT', category: 'DEFAULT' },
+  { id: 'DEFAULT_DOG', char: '🐶', name: 'いぬ', conditionDescription: '最初から所持', type: 'DEFAULT', category: 'DEFAULT' },
+  { id: 'DEFAULT_BEAR', char: '🐻', name: 'くま', conditionDescription: '最初から所持', type: 'DEFAULT', category: 'DEFAULT' },
+  { id: 'DEFAULT_PIG', char: '🐷', name: 'ぶた', conditionDescription: '最初から所持', type: 'DEFAULT', category: 'DEFAULT' },
+  { id: 'DEFAULT_RABBIT', char: '🐰', name: 'うさぎ', conditionDescription: '最初から所持', type: 'DEFAULT', category: 'DEFAULT' },
+  { id: 'DEFAULT_CHICK', char: '🐤', name: 'ひよこ', conditionDescription: '最初から所持', type: 'DEFAULT', category: 'DEFAULT' },
+  { id: 'DEFAULT_BUTTERFLY', char: '🦋', name: 'ちょうちょ', conditionDescription: '初勝利', type: 'WINS', category: 'DEFAULT', threshold: 1 },
+  { id: 'DEFAULT_TURTLE', char: '🐢', name: 'かめ', conditionDescription: '対局20回', type: 'MATCHES', category: 'DEFAULT', threshold: 20 },
+  { id: 'DEFAULT_PENGUIN', char: '🐧', name: 'ペンギン', conditionDescription: '出席5日', type: 'DAYS', category: 'DEFAULT', threshold: 5 },
+  { id: 'DEFAULT_PANDA', char: '🐼', name: 'パンダ', conditionDescription: '対局5回', type: 'MATCHES', category: 'DEFAULT', threshold: 5 },
+  { id: 'DEFAULT_TIGER', char: '🐯', name: 'とら', conditionDescription: '勝利5回', type: 'WINS', category: 'DEFAULT', threshold: 5 },
+  { id: 'DEFAULT_OWL', char: '🦉', name: 'ふくろう', conditionDescription: '出席10日', type: 'DAYS', category: 'DEFAULT', threshold: 10 },
+  { id: 'DEFAULT_SHARK', char: '🦈', name: 'さめ', conditionDescription: '格上に初勝利', type: 'SPECIAL', category: 'DEFAULT' },
+  { id: 'DEFAULT_LION', char: '🦁', name: 'ライオン', conditionDescription: '勝利20回', type: 'WINS', category: 'DEFAULT', threshold: 20 },
+  { id: 'DEFAULT_EAGLE', char: '🦅', name: 'わし', conditionDescription: 'レート400到達', type: 'RATE', category: 'DEFAULT', threshold: 400 },
+  { id: 'DEFAULT_FOX', char: '🦊', name: 'きつね', conditionDescription: '連勝5以上', type: 'STREAK', category: 'DEFAULT', threshold: 5 },
+  { id: 'DEFAULT_WOLF', char: '🐺', name: 'おおかみ', conditionDescription: '勝利30回', type: 'WINS', category: 'DEFAULT', threshold: 30 },
+  { id: 'DEFAULT_DRAGON', char: '🐉', name: '龍', conditionDescription: '勝利100回', type: 'WINS', category: 'DEFAULT', threshold: 100 },
+  { id: 'DEFAULT_HEDGEHOG', char: '🦔', name: 'はりねずみ', conditionDescription: '引き分け3回', type: 'DRAWS', category: 'DEFAULT', threshold: 3 },
+  { id: 'DEFAULT_OCTOPUS', char: '🐙', name: 'たこ', conditionDescription: '引き分け10回', type: 'DRAWS', category: 'DEFAULT', threshold: 10 },
+  { id: 'DEFAULT_FISH', char: '🐠', name: 'さかな', conditionDescription: '総ポイント150', type: 'POINTS', category: 'DEFAULT', threshold: 150 },
+  { id: 'DEFAULT_TANUKI', char: '🦝', name: 'たぬき', conditionDescription: '出席30日', type: 'DAYS', category: 'DEFAULT', threshold: 30 },
+  { id: 'DEFAULT_CRAB', char: '🦀', name: 'かに', conditionDescription: '総ポイント600', type: 'POINTS', category: 'DEFAULT', threshold: 600 },
+  { id: 'DEFAULT_CROW', char: '🐦', name: 'からす', conditionDescription: '連勝10以上', type: 'STREAK', category: 'DEFAULT', threshold: 10 },
+  { id: 'DEFAULT_SEAL', char: '🦭', name: 'あざらし', conditionDescription: '引き分け20回', type: 'DRAWS', category: 'DEFAULT', threshold: 20 },
+  { id: 'DEFAULT_PIRATE', char: '🏴‍☠️', name: '海賊', conditionDescription: '格上撃破10回', type: 'SPECIAL', category: 'DEFAULT' },
+  { id: 'DEFAULT_DODO', char: '🦤', name: 'ドードー', conditionDescription: '10連敗記録', type: 'SPECIAL', category: 'DEFAULT' },
+  { id: 'SHOGI_FU', char: '歩兵', name: '歩兵', conditionDescription: '最初から所持', type: 'DEFAULT', category: 'SHOGI' },
+  { id: 'SHOGI_TO', char: 'と金', name: 'と金', conditionDescription: '対局数3回', type: 'MATCHES', category: 'SHOGI', threshold: 3 },
+  { id: 'SHOGI_KY', char: '香車', name: '香車', conditionDescription: '対局数5回', type: 'MATCHES', category: 'SHOGI', threshold: 5 },
+  { id: 'SHOGI_NKY', char: '成香', name: '成香', conditionDescription: '対局数10回', type: 'MATCHES', category: 'SHOGI', threshold: 10 },
+  { id: 'SHOGI_KE', char: '桂馬', name: '桂馬', conditionDescription: '勝利数3回', type: 'WINS', category: 'SHOGI', threshold: 3 },
+  { id: 'SHOGI_NKE', char: '成桂', name: '成桂', conditionDescription: '勝利数5回', type: 'WINS', category: 'SHOGI', threshold: 5 },
+  { id: 'SHOGI_GI', char: '銀将', name: '銀将', conditionDescription: '勝利数7回', type: 'WINS', category: 'SHOGI', threshold: 7 },
+  { id: 'SHOGI_NGI', char: '成銀', name: '成銀', conditionDescription: '勝利数12回', type: 'WINS', category: 'SHOGI', threshold: 12 },
+  { id: 'SHOGI_KI', char: '金将', name: '金将', conditionDescription: '勝利数15回', type: 'WINS', category: 'SHOGI', threshold: 15 },
+  { id: 'SHOGI_KA', char: '角行', name: '角行', conditionDescription: 'レート700到達', type: 'RATE', category: 'SHOGI', threshold: 700 },
+  { id: 'SHOGI_UMA', char: '龍馬', name: '龍馬', conditionDescription: 'レート900到達', type: 'RATE', category: 'SHOGI', threshold: 900 },
+  { id: 'SHOGI_HI', char: '飛車', name: '飛車', conditionDescription: 'レート800到達', type: 'RATE', category: 'SHOGI', threshold: 800 },
+  { id: 'SHOGI_RYU', char: '龍王', name: '龍王', conditionDescription: 'レート1050到達', type: 'RATE', category: 'SHOGI', threshold: 1050 },
+  { id: 'SHOGI_OU', char: '王将', name: '王将', conditionDescription: 'レート1200到達', type: 'RATE', category: 'SHOGI', threshold: 1200 },
+  { id: 'SHOGI_GYOKU', char: '玉将', name: '玉将', conditionDescription: 'レート1400到達', type: 'RATE', category: 'SHOGI', threshold: 1400 },
+  { id: 'SHOGI_FU2', char: '歩', name: '歩（古体）', conditionDescription: '対局数80回', type: 'MATCHES', category: 'SHOGI', threshold: 80 },
+  { id: 'SHOGI_GI2', char: '銀', name: '銀（草書）', conditionDescription: '活動日数70日', type: 'DAYS', category: 'SHOGI', threshold: 70 },
+  { id: 'SHOGI_KI2', char: '金', name: '金（古風）', conditionDescription: '活動日数100日', type: 'DAYS', category: 'SHOGI', threshold: 100 },
+  { id: 'SHOGI_OU2', char: '王', name: '王（草書）', conditionDescription: 'レート1700到達', type: 'RATE', category: 'SHOGI', threshold: 1700 },
+  { id: 'SHOGI_GYOKU2', char: '玉', name: '玉（古体）', conditionDescription: 'レート2100到達', type: 'RATE', category: 'SHOGI', threshold: 2100 },
+  { id: 'SHOGI_RYU2', char: '飛', name: '飛（草書）', conditionDescription: '勝利数160回', type: 'WINS', category: 'SHOGI', threshold: 160 },
+  { id: 'SHOGI_UMA2', char: '角', name: '角（草書）', conditionDescription: '連勝記録15', type: 'SPECIAL', category: 'SHOGI' },
+  { id: 'CHESS_PAWN', char: '♟️', name: 'ポーン', conditionDescription: '勝利数20回', type: 'WINS', category: 'CHESS', threshold: 20 },
+  { id: 'CHESS_KNIGHT', char: '♞', name: 'ナイト', conditionDescription: '勝利数40回', type: 'WINS', category: 'CHESS', threshold: 40 },
+  { id: 'CHESS_BISHOP', char: '♝', name: 'ビショップ', conditionDescription: 'レート950到達', type: 'RATE', category: 'CHESS', threshold: 950 },
+  { id: 'CHESS_ROOK', char: '♜', name: 'ルーク', conditionDescription: 'レート1100到達', type: 'RATE', category: 'CHESS', threshold: 1100 },
+  { id: 'CHESS_QUEEN', char: '♛', name: 'クイーン', conditionDescription: 'レート1400到達', type: 'RATE', category: 'CHESS', threshold: 1400 },
+  { id: 'CHESS_KING', char: '♚', name: 'キング', conditionDescription: 'レート1700到達', type: 'RATE', category: 'CHESS', threshold: 1700 },
+  { id: 'SPECIAL_SAKURA', char: '🌸', name: '桜', conditionDescription: '春季限定', type: 'SPECIAL', category: 'SPECIAL', isLimited: true },
+  { id: 'SPECIAL_HIMAWARI', char: '🌻', name: 'ひまわり', conditionDescription: '夏季限定', type: 'SPECIAL', category: 'SPECIAL', isLimited: true },
+  { id: 'SPECIAL_MOMIJI', char: '🍁', name: '紅葉', conditionDescription: '秋季限定', type: 'SPECIAL', category: 'SPECIAL', isLimited: true },
+  { id: 'SPECIAL_YUKI', char: '❄️', name: '雪', conditionDescription: '冬季限定', type: 'SPECIAL', category: 'SPECIAL', isLimited: true },
+  { id: 'SPECIAL_KOINOBORI', char: '🎏', name: '鯉のぼり', conditionDescription: '春の合宿参加', type: 'SPECIAL', category: 'SPECIAL', isLimited: true },
+  { id: 'SPECIAL_HANABI', char: '🎆', name: '花火', conditionDescription: '夏の合宿参加', type: 'SPECIAL', category: 'SPECIAL', isLimited: true },
+  { id: 'SPECIAL_MATSU', char: '🎍', name: '松飾り', conditionDescription: '3学期参加', type: 'SPECIAL', category: 'SPECIAL', isLimited: true },
+  { id: 'SPECIAL_SAKURA2', char: '🌸❄', name: '卒業桜', conditionDescription: '卒部・引退時', type: 'SPECIAL', category: 'SPECIAL', isLimited: true },
+  { id: 'SPECIAL_KITSUNE', char: '🦊', name: 'きつね', conditionDescription: '連勝5以上（SPECIALタブ）', type: 'STREAK', category: 'SPECIAL', threshold: 5 },
+  { id: 'SPECIAL_TANUKI', char: '🦝', name: 'たぬき', conditionDescription: '出席30日', type: 'DAYS', category: 'SPECIAL', threshold: 30 },
+  { id: 'SPECIAL_DRAGON', char: '🐉', name: '龍（S）', conditionDescription: '勝利100回', type: 'WINS', category: 'SPECIAL', threshold: 100 },
+  { id: 'SPECIAL_STAR', char: '⭐', name: '星', conditionDescription: '四天王に選出', type: 'SPECIAL', category: 'SPECIAL' },
+  { id: 'SPECIAL_CROWN', char: '👑', name: '王冠', conditionDescription: '四天王に2回以上選出', type: 'SPECIAL', category: 'SPECIAL' },
+  { id: 'SPECIAL_FIRE', char: '🔥', name: '炎', conditionDescription: '10連勝達成', type: 'STREAK', category: 'SPECIAL', threshold: 10 },
+  { id: 'SPECIAL_ZEN', char: '☯️', name: '禅', conditionDescription: '引き分け20回', type: 'DRAWS', category: 'SPECIAL', threshold: 20 },
+  { id: 'SPECIAL_VOLCANO', char: '🌋', name: '火山', conditionDescription: '15連勝達成', type: 'STREAK', category: 'SPECIAL', threshold: 15 },
+  { id: 'SPECIAL_WAVE', char: '🌊', name: '大波', conditionDescription: '20連勝達成', type: 'STREAK', category: 'SPECIAL', threshold: 20 },
+  { id: 'SPECIAL_TYPHOON', char: '🌪️', name: '竜巻', conditionDescription: '25連勝達成', type: 'STREAK', category: 'SPECIAL', threshold: 25 },
+  { id: 'SPECIAL_SPROUT', char: '🌱', name: '芽', conditionDescription: 'レート400到達', type: 'RATE', category: 'SPECIAL', threshold: 400 },
+  { id: 'SPECIAL_TREE', char: '🌳', name: '大樹', conditionDescription: 'レート800到達', type: 'RATE', category: 'SPECIAL', threshold: 800 },
+  { id: 'SPECIAL_FUJI', char: '🗻', name: '富士山', conditionDescription: 'レート1400到達', type: 'RATE', category: 'SPECIAL', threshold: 1400 },
+  { id: 'SPECIAL_GALAXY', char: '🌌', name: '銀河', conditionDescription: 'レート1900到達', type: 'RATE', category: 'SPECIAL', threshold: 1900 },
+  { id: 'SPECIAL_COIN', char: '💰', name: '小判', conditionDescription: '総ポイント300', type: 'POINTS', category: 'SPECIAL', threshold: 300 },
+  { id: 'SPECIAL_DIAMOND', char: '💎', name: 'ダイヤ', conditionDescription: '総ポイント1200', type: 'POINTS', category: 'SPECIAL', threshold: 1200 },
+  { id: 'SPECIAL_VAULT', char: '🏦', name: '金庫', conditionDescription: '総ポイント4000', type: 'POINTS', category: 'SPECIAL', threshold: 4000 },
+  { id: 'SPECIAL_TARGET', char: '🎯', name: '的', conditionDescription: '対局150回', type: 'MATCHES', category: 'SPECIAL', threshold: 150 },
+  { id: 'SPECIAL_MEDAL', char: '🏅', name: 'メダル', conditionDescription: '対局300回', type: 'MATCHES', category: 'SPECIAL', threshold: 300 },
+  { id: 'SPECIAL_SWORDS', char: '⚔️', name: '交差する剣', conditionDescription: '勝利60回', type: 'WINS', category: 'SPECIAL', threshold: 60 },
+  { id: 'SPECIAL_RIBBON', char: '🎗️', name: 'リボン', conditionDescription: '勝利160回', type: 'WINS', category: 'SPECIAL', threshold: 160 },
+  { id: 'SPECIAL_AXE', char: '🪓', name: '斧', conditionDescription: '格上（+200）に勝利', type: 'SPECIAL', category: 'SPECIAL' },
+  { id: 'SPECIAL_DAGGER', char: '🗡️', name: '短剣', conditionDescription: '格上（+300）に勝利', type: 'SPECIAL', category: 'SPECIAL' },
+  { id: 'SPECIAL_FIST', char: '👊', name: 'こぶし', conditionDescription: '格上撃破20回', type: 'SPECIAL', category: 'SPECIAL' },
+  { id: 'SPECIAL_BOMB', char: '💣', name: '爆弾', conditionDescription: '格上撃破50回', type: 'SPECIAL', category: 'SPECIAL' },
+  { id: 'SPECIAL_TROPHY', char: '🏆', name: 'トロフィー', conditionDescription: '勝利80回', type: 'WINS', category: 'SPECIAL', threshold: 80 },
+  { id: 'SPECIAL_SCALES', char: '⚖️', name: '天秤', conditionDescription: '引き分け15回', type: 'DRAWS', category: 'SPECIAL', threshold: 15 },
+  { id: 'SPECIAL_HANDSHAKE', char: '🤝', name: '握手', conditionDescription: '引き分け30回', type: 'DRAWS', category: 'SPECIAL', threshold: 30 },
+  { id: 'SPECIAL_DOOR', char: '🚪', name: '扉', conditionDescription: '出席3日', type: 'DAYS', category: 'SPECIAL', threshold: 3 },
+  { id: 'SPECIAL_CLOCK', char: '⏰', name: '時計', conditionDescription: '出席55日', type: 'DAYS', category: 'SPECIAL', threshold: 55 },
+  { id: 'SPECIAL_HOME', char: '🏠', name: '家', conditionDescription: '出席100日', type: 'DAYS', category: 'SPECIAL', threshold: 100 },
+  { id: 'SPECIAL_PALACE', char: '🏛️', name: '殿堂', conditionDescription: '出席180日', type: 'DAYS', category: 'SPECIAL', threshold: 180 },
+  { id: 'SPECIAL_EGG', char: '🥚', name: 'たまご', conditionDescription: '称号を5個獲得', type: 'SPECIAL', category: 'SPECIAL' },
+  { id: 'SPECIAL_KEY', char: '🗝️', name: '鍵', conditionDescription: '称号を15個獲得', type: 'SPECIAL', category: 'SPECIAL' },
+  { id: 'SPECIAL_CRYSTAL', char: '🔮', name: '水晶球', conditionDescription: '称号を30個獲得', type: 'SPECIAL', category: 'SPECIAL' },
+  { id: 'SPECIAL_WAND', char: '🪄', name: '魔法の杖', conditionDescription: '称号を50個獲得', type: 'SPECIAL', category: 'SPECIAL' },
+  { id: 'SPECIAL_LIGHTNING', char: '⚡', name: '雷帝', conditionDescription: '10連勝＋格上撃破あり', type: 'SPECIAL', category: 'SPECIAL' },
+  { id: 'SPECIAL_ONI', char: '👹', name: '鬼', conditionDescription: '格上撃破10回', type: 'SPECIAL', category: 'SPECIAL' },
+  { id: 'SPECIAL_NINJA', char: '🥷', name: '忍者', conditionDescription: '格上撃破20回', type: 'SPECIAL', category: 'SPECIAL' },
+  { id: 'SPECIAL_SKULL', char: '💀', name: '骸骨', conditionDescription: '敗戦100回', type: 'SPECIAL', category: 'SPECIAL' },
+  { id: 'SPECIAL_ICE', char: '🧊', name: '氷塊', conditionDescription: '連敗10回', type: 'SPECIAL', category: 'SPECIAL' },
+  { id: 'SPECIAL_PHOENIX', char: '🐦', name: '不死鳥', conditionDescription: '5連敗後に勝利', type: 'SPECIAL', category: 'SPECIAL' },
+  { id: 'SPECIAL_HAT', char: '🎩', name: '帽子', conditionDescription: 'アイコン20種解放', type: 'SPECIAL', category: 'SPECIAL' },
+  { id: 'ELITE_MASTER_SWORD', char: '⚔️', name: '覇者の剣', conditionDescription: '覇者に選出中のみ', type: 'SPECIAL', category: 'ELITE', requiredTitle: 'MASTER', isLimited: true },
+  { id: 'ELITE_MASTER_SHIELD', char: '🛡', name: '覇者の盾', conditionDescription: '覇者に選出中のみ', type: 'SPECIAL', category: 'ELITE', requiredTitle: 'MASTER', isLimited: true },
+  { id: 'ELITE_MASTER_CROWN', char: '👑', name: '覇者の冠', conditionDescription: '覇者に選出中のみ', type: 'SPECIAL', category: 'ELITE', requiredTitle: 'MASTER', isLimited: true },
+  { id: 'ELITE_MASTER_GOLD', char: '🏆', name: '金杯', conditionDescription: '覇者に選出中のみ', type: 'SPECIAL', category: 'ELITE', requiredTitle: 'MASTER', isLimited: true },
+  { id: 'ELITE_MASTER_LION', char: '🦁', name: '百獣の王', conditionDescription: '覇者に選出中のみ', type: 'SPECIAL', category: 'ELITE', requiredTitle: 'MASTER', isLimited: true },
+  { id: 'ELITE_MASTER_FLAME', char: '🔥', name: '覇者の炎', conditionDescription: '覇者に選出中のみ', type: 'SPECIAL', category: 'ELITE', requiredTitle: 'MASTER', isLimited: true },
+  { id: 'ELITE_MASTER_STAR', char: '⭐', name: '覇者の星', conditionDescription: '覇者に選出中のみ', type: 'SPECIAL', category: 'ELITE', requiredTitle: 'MASTER', isLimited: true },
+  { id: 'ELITE_MASTER_CASTLE', char: '🏯', name: '城', conditionDescription: '覇者に選出中のみ', type: 'SPECIAL', category: 'ELITE', requiredTitle: 'MASTER', isLimited: true },
+  { id: 'ELITE_MASTER_HAWK', char: '🦅', name: '鷹', conditionDescription: '覇者に選出中のみ', type: 'SPECIAL', category: 'ELITE', requiredTitle: 'MASTER', isLimited: true },
+  { id: 'ELITE_MASTER_SUN', char: '☀️', name: '太陽', conditionDescription: '覇者に選出中のみ', type: 'SPECIAL', category: 'ELITE', requiredTitle: 'MASTER', isLimited: true },
+  { id: 'ELITE_RISING_STAR', char: '🌟', name: '金の星', conditionDescription: '新星に選出中のみ', type: 'SPECIAL', category: 'ELITE', requiredTitle: 'RISING_STAR', isLimited: true },
+  { id: 'ELITE_RISING_METEOR', char: '☄️', name: '流星', conditionDescription: '新星に選出中のみ', type: 'SPECIAL', category: 'ELITE', requiredTitle: 'RISING_STAR', isLimited: true },
+  { id: 'ELITE_RISING_ROCKET', char: '🚀', name: '急上昇', conditionDescription: '新星に選出中のみ', type: 'SPECIAL', category: 'ELITE', requiredTitle: 'RISING_STAR', isLimited: true },
+  { id: 'ELITE_RISING_COMET', char: '💫', name: '彗星', conditionDescription: '新星に選出中のみ', type: 'SPECIAL', category: 'ELITE', requiredTitle: 'RISING_STAR', isLimited: true },
+  { id: 'ELITE_RISING_ANGEL', char: '😇', name: '新星の翼', conditionDescription: '新星に選出中のみ', type: 'SPECIAL', category: 'ELITE', requiredTitle: 'RISING_STAR', isLimited: true },
+  { id: 'ELITE_RISING_MOON', char: '🌙', name: '月', conditionDescription: '新星に選出中のみ', type: 'SPECIAL', category: 'ELITE', requiredTitle: 'RISING_STAR', isLimited: true },
+  { id: 'ELITE_RISING_SPACE', char: '🌌', name: '宇宙', conditionDescription: '新星に選出中のみ', type: 'SPECIAL', category: 'ELITE', requiredTitle: 'RISING_STAR', isLimited: true },
+  { id: 'ELITE_RISING_PRISM', char: '🔮', name: 'プリズム', conditionDescription: '新星に選出中のみ', type: 'SPECIAL', category: 'ELITE', requiredTitle: 'RISING_STAR', isLimited: true },
+  { id: 'ELITE_RISING_LIGHT', char: '✨', name: '光', conditionDescription: '新星に選出中のみ', type: 'SPECIAL', category: 'ELITE', requiredTitle: 'RISING_STAR', isLimited: true },
+  { id: 'ELITE_RISING_WING', char: '🕊️', name: '翼', conditionDescription: '新星に選出中のみ', type: 'SPECIAL', category: 'ELITE', requiredTitle: 'RISING_STAR', isLimited: true },
+  { id: 'ELITE_GRINDER_IRON', char: '⚙️', name: '鉄の歯車', conditionDescription: '鉄人に選出中のみ', type: 'SPECIAL', category: 'ELITE', requiredTitle: 'GRINDER', isLimited: true },
+  { id: 'ELITE_GRINDER_MUSCLE', char: '💪', name: '鉄腕', conditionDescription: '鉄人に選出中のみ', type: 'SPECIAL', category: 'ELITE', requiredTitle: 'GRINDER', isLimited: true },
+  { id: 'ELITE_GRINDER_ANVIL', char: '🔩', name: '鉄のボルト', conditionDescription: '鉄人に選出中のみ', type: 'SPECIAL', category: 'ELITE', requiredTitle: 'GRINDER', isLimited: true },
+  { id: 'ELITE_GRINDER_ROBOT', char: '🤖', name: '鉄人ロボ', conditionDescription: '鉄人に選出中のみ', type: 'SPECIAL', category: 'ELITE', requiredTitle: 'GRINDER', isLimited: true },
+  { id: 'ELITE_GRINDER_BULL', char: '🐂', name: '鉄牛', conditionDescription: '鉄人に選出中のみ', type: 'SPECIAL', category: 'ELITE', requiredTitle: 'GRINDER', isLimited: true },
+  { id: 'ELITE_GRINDER_ANVIL2', char: '🏋️', name: 'ダンベル', conditionDescription: '鉄人に選出中のみ', type: 'SPECIAL', category: 'ELITE', requiredTitle: 'GRINDER', isLimited: true },
+  { id: 'ELITE_GRINDER_FORT', char: '🏯', name: '要塞', conditionDescription: '鉄人に選出中のみ', type: 'SPECIAL', category: 'ELITE', requiredTitle: 'GRINDER', isLimited: true },
+  { id: 'ELITE_GRINDER_MTN', char: '⛰️', name: '山', conditionDescription: '鉄人に選出中のみ', type: 'SPECIAL', category: 'ELITE', requiredTitle: 'GRINDER', isLimited: true },
+  { id: 'ELITE_GRINDER_GORILLA', char: '🦍', name: '鉄の意志', conditionDescription: '鉄人に選出中のみ', type: 'SPECIAL', category: 'ELITE', requiredTitle: 'GRINDER', isLimited: true },
+  { id: 'ELITE_GRINDER_TRAIN', char: '🚂', name: '機関車', conditionDescription: '鉄人に選出中のみ', type: 'SPECIAL', category: 'ELITE', requiredTitle: 'GRINDER', isLimited: true },
+  { id: 'ELITE_KILLER_SKULL', char: '💀', name: '骸骨', conditionDescription: '巨人キラーに選出中のみ', type: 'SPECIAL', category: 'ELITE', requiredTitle: 'GIANT_KILLER', isLimited: true },
+  { id: 'ELITE_KILLER_AXE', char: '🪓', name: '斧', conditionDescription: '巨人キラーに選出中のみ', type: 'SPECIAL', category: 'ELITE', requiredTitle: 'GIANT_KILLER', isLimited: true },
+  { id: 'ELITE_KILLER_NINJA', char: '🥷', name: '忍者', conditionDescription: '巨人キラーに選出中のみ', type: 'SPECIAL', category: 'ELITE', requiredTitle: 'GIANT_KILLER', isLimited: true },
+  { id: 'ELITE_KILLER_WOLF', char: '🐺', name: '一匹狼', conditionDescription: '巨人キラーに選出中のみ', type: 'SPECIAL', category: 'ELITE', requiredTitle: 'GIANT_KILLER', isLimited: true },
+  { id: 'ELITE_KILLER_VIPER', char: '🐍', name: '毒蛇', conditionDescription: '巨人キラーに選出中のみ', type: 'SPECIAL', category: 'ELITE', requiredTitle: 'GIANT_KILLER', isLimited: true },
+  { id: 'ELITE_KILLER_STAR', char: '🌠', name: '流れ星', conditionDescription: '巨人キラーに選出中のみ', type: 'SPECIAL', category: 'ELITE', requiredTitle: 'GIANT_KILLER', isLimited: true },
+  { id: 'ELITE_KILLER_SHURIKEN', char: '🌀', name: '手裏剣', conditionDescription: '巨人キラーに選出中のみ', type: 'SPECIAL', category: 'ELITE', requiredTitle: 'GIANT_KILLER', isLimited: true },
+  { id: 'ELITE_KILLER_SPIDER', char: '🕷️', name: '蜘蛛', conditionDescription: '巨人キラーに選出中のみ', type: 'SPECIAL', category: 'ELITE', requiredTitle: 'GIANT_KILLER', isLimited: true },
+  { id: 'ELITE_KILLER_DAGGER', char: '🗡️', name: '刃', conditionDescription: '巨人キラーに選出中のみ', type: 'SPECIAL', category: 'ELITE', requiredTitle: 'GIANT_KILLER', isLimited: true },
+  { id: 'ELITE_KILLER_BOMB', char: '💥', name: '爆裂', conditionDescription: '巨人キラーに選出中のみ', type: 'SPECIAL', category: 'ELITE', requiredTitle: 'GIANT_KILLER', isLimited: true },
+  { id: 'ELITE_COMMON_GEM', char: '💎', name: '宝石', conditionDescription: '四天王に選出中のみ', type: 'SPECIAL', category: 'ELITE', isLimited: true },
+  { id: 'ELITE_COMMON_THUNDER', char: '⚡', name: '雷帝', conditionDescription: '四天王に選出中のみ', type: 'SPECIAL', category: 'ELITE', isLimited: true },
+  { id: 'ELITE_COMMON_DRAGON', char: '🐲', name: '神龍', conditionDescription: '四天王に選出中のみ', type: 'SPECIAL', category: 'ELITE', isLimited: true },
+  { id: 'ELITE_COMMON_SHRINE', char: '⛩️', name: '武者', conditionDescription: '四天王に選出中のみ', type: 'SPECIAL', category: 'ELITE', isLimited: true },
+  { id: 'ELITE_COMMON_FLAME', char: '🔥', name: '業火', conditionDescription: '四天王に選出中のみ', type: 'SPECIAL', category: 'ELITE', isLimited: true },
+  { id: 'ELITE_COMMON_MOON', char: '🌕', name: '満月', conditionDescription: '四天王に選出中のみ', type: 'SPECIAL', category: 'ELITE', isLimited: true },
+  { id: 'ELITE_COMMON_AURORA', char: '🌌', name: 'オーロラ', conditionDescription: '四天王に選出中のみ', type: 'SPECIAL', category: 'ELITE', isLimited: true },
+  { id: 'ELITE_COMMON_CROWN', char: '👑', name: '黄金の冠', conditionDescription: '四天王に選出中のみ', type: 'SPECIAL', category: 'ELITE', isLimited: true },
+  { id: 'ELITE_COMMON_INFINITY', char: '♾️', name: '無限', conditionDescription: '四天王に選出中のみ', type: 'SPECIAL', category: 'ELITE', isLimited: true },
+  { id: 'ELITE_COMMON_SWORD', char: '🗡️', name: '神の剣', conditionDescription: '四天王に選出中のみ', type: 'SPECIAL', category: 'ELITE', isLimited: true }
 ];
-
-// ── フレーム（枠）データ ─────────────────────────────────────────
 export const FRAMES_DATA: FrameDef[] = [
-  { id: 'FRAME_NONE',       name: 'なし',         description: 'フレームなし',         ringClass: '',                                        glowClass: '', isEliteOnly: false },
-  { id: 'FRAME_DEFAULT',    name: '標準',         description: 'デフォルトフレーム',   ringClass: 'ring-2 ring-white/20',                    glowClass: '', isEliteOnly: false },
-  { id: 'FRAME_BLUE',       name: 'ブルー',       description: '対局数10回以上',       ringClass: 'ring-2 ring-blue-500',                    glowClass: 'shadow-[0_0_8px_rgba(59,130,246,0.6)]',  isEliteOnly: false },
-  { id: 'FRAME_GREEN',      name: 'グリーン',     description: '出席30日以上',         ringClass: 'ring-2 ring-green-500',                   glowClass: 'shadow-[0_0_8px_rgba(34,197,94,0.6)]',  isEliteOnly: false },
-  // 四天王共通フレーム
-  { id: 'FRAME_GOLD',       name: '黄金',         description: '四天王に選出中のみ',   ringClass: 'ring-[3px] ring-yellow-400',              glowClass: 'shadow-[0_0_16px_rgba(251,191,36,0.9)]', isEliteOnly: true },
-  { id: 'FRAME_GOLD_PULSE', name: '黄金（光）',   description: '四天王に選出中のみ',   ringClass: 'ring-[3px] ring-yellow-300 animate-pulse',glowClass: 'shadow-[0_0_20px_rgba(251,191,36,1)]',   isEliteOnly: true },
-  // タイトル専用フレーム
-  { id: 'FRAME_MASTER',     name: '覇者の枠',     description: '覇者に選出中のみ',     ringClass: 'ring-[3px] ring-amber-400',               glowClass: 'shadow-[0_0_18px_rgba(251,191,36,0.9)]', isEliteOnly: true, requiredTitle: 'MASTER',       gradientStyle: 'linear-gradient(135deg,#f59e0b,#d97706,#fbbf24)' },
-  { id: 'FRAME_RISING',     name: '新星の枠',     description: '新星に選出中のみ',     ringClass: 'ring-[3px] ring-sky-400',                 glowClass: 'shadow-[0_0_18px_rgba(56,189,248,0.9)]', isEliteOnly: true, requiredTitle: 'RISING_STAR',  gradientStyle: 'linear-gradient(135deg,#38bdf8,#0284c7,#7dd3fc)' },
-  { id: 'FRAME_GRINDER',    name: '鉄人の枠',     description: '鉄人に選出中のみ',     ringClass: 'ring-[3px] ring-emerald-400',             glowClass: 'shadow-[0_0_18px_rgba(52,211,153,0.9)]', isEliteOnly: true, requiredTitle: 'GRINDER',      gradientStyle: 'linear-gradient(135deg,#34d399,#059669,#6ee7b7)' },
-  { id: 'FRAME_KILLER',     name: 'キラーの枠',   description: '巨人キラーに選出中のみ', ringClass: 'ring-[3px] ring-rose-400',              glowClass: 'shadow-[0_0_18px_rgba(251,113,133,0.9)]',isEliteOnly: true, requiredTitle: 'GIANT_KILLER', gradientStyle: 'linear-gradient(135deg,#fb7185,#e11d48,#fda4af)' },
+  { id: 'FRAME_NONE', name: 'なし', description: 'フレームなし', ringClass: '', glowClass: '', isEliteOnly: false },
+  { id: 'FRAME_DEFAULT', name: '標準', description: 'デフォルトフレーム', ringClass: 'ring-2 ring-white/20', glowClass: '', isEliteOnly: false },
+  { id: 'FRAME_BLUE', name: 'ブルー', description: '対局数10回以上', ringClass: 'ring-2 ring-blue-500', glowClass: 'shadow-[0_0_8px_rgba(59,130,246,0.6)]', isEliteOnly: false },
+  { id: 'FRAME_GREEN', name: 'グリーン', description: '出席25日以上', ringClass: 'ring-2 ring-green-500', glowClass: 'shadow-[0_0_8px_rgba(34,197,94,0.6)]', isEliteOnly: false },
+  { id: 'FRAME_SILVER', name: 'シルバー', description: '勝利10回以上', ringClass: 'ring-2 ring-slate-400', glowClass: 'shadow-[0_0_6px_rgba(148,163,184,0.5)]', isEliteOnly: false },
+  { id: 'FRAME_RED', name: 'レッド', description: '勝利30回以上', ringClass: 'ring-2 ring-red-500', glowClass: 'shadow-[0_0_8px_rgba(239,68,68,0.6)]', isEliteOnly: false },
+  { id: 'FRAME_PURPLE', name: 'パープル', description: '勝利50回以上', ringClass: 'ring-2 ring-purple-500', glowClass: 'shadow-[0_0_8px_rgba(168,85,247,0.6)]', isEliteOnly: false },
+  { id: 'FRAME_ORANGE', name: 'オレンジ', description: '連勝5以上を達成', ringClass: 'ring-2 ring-orange-500', glowClass: 'shadow-[0_0_8px_rgba(249,115,22,0.6)]', isEliteOnly: false },
+  { id: 'FRAME_WHITE', name: 'ホワイト', description: '活動日数40日以上', ringClass: 'ring-2 ring-white', glowClass: 'shadow-[0_0_8px_rgba(255,255,255,0.5)]', isEliteOnly: false },
+  { id: 'FRAME_CYAN', name: 'シアン', description: 'レート950以上', ringClass: 'ring-2 ring-cyan-500', glowClass: 'shadow-[0_0_8px_rgba(6,182,212,0.6)]', isEliteOnly: false },
+  { id: 'FRAME_EMERALD', name: 'エメラルド', description: '出席70日以上', ringClass: 'ring-[3px] ring-emerald-400', glowClass: 'shadow-[0_0_12px_rgba(52,211,153,0.7)]', isEliteOnly: false },
+  { id: 'FRAME_DEEPSEA', name: '深海', description: 'レート1250以上', ringClass: 'ring-2 ring-cyan-600', glowClass: 'shadow-[0_0_12px_rgba(8,145,178,0.7)]', isEliteOnly: false },
+  { id: 'FRAME_FIRE', name: '炎', description: 'レート1700以上', ringClass: 'ring-[3px] ring-orange-500 animate-pulse', glowClass: 'shadow-[0_0_16px_rgba(249,115,22,0.8)]', isEliteOnly: false },
+  { id: 'FRAME_RAINBOW', name: '虹', description: '称号20個以上獲得', ringClass: 'ring-[3px] ring-pink-400', glowClass: 'shadow-[0_0_14px_rgba(244,114,182,0.8)]', isEliteOnly: false },
+  { id: 'FRAME_PURPLEGOLD', name: '紫金', description: '総ポイント2500以上', ringClass: 'ring-[3px] ring-violet-500', glowClass: 'shadow-[0_0_14px_rgba(139,92,246,0.8)]', isEliteOnly: false },
+  { id: 'FRAME_CRIMSON', name: '深紅', description: '格上撃破30回以上', ringClass: 'ring-[3px] ring-rose-600', glowClass: 'shadow-[0_0_14px_rgba(225,29,72,0.8)]', isEliteOnly: false },
+  { id: 'FRAME_STEEL', name: '鋼鉄', description: '対局200回以上', ringClass: 'ring-[3px] ring-slate-300', glowClass: 'shadow-[0_0_10px_rgba(203,213,225,0.6)]', isEliteOnly: false },
+  { id: 'FRAME_GOLD', name: '黄金', description: '四天王に選出中のみ', ringClass: 'ring-[3px] ring-yellow-400', glowClass: 'shadow-[0_0_16px_rgba(251,191,36,0.9)]', isEliteOnly: true },
+  { id: 'FRAME_GOLD_PULSE', name: '黄金（光）', description: '四天王に選出中のみ', ringClass: 'ring-[3px] ring-yellow-300 animate-pulse', glowClass: 'shadow-[0_0_20px_rgba(251,191,36,1)]', isEliteOnly: true },
+  { id: 'FRAME_ELITE_MOON', name: '月光', description: '四天王に選出中のみ', ringClass: 'ring-[3px] ring-indigo-400', glowClass: 'shadow-[0_0_18px_rgba(129,140,248,0.9)]', isEliteOnly: true },
+  { id: 'FRAME_ELITE_DARK', name: '暗黒', description: '四天王に選出中のみ', ringClass: 'ring-[3px] ring-slate-700', glowClass: 'shadow-[0_0_16px_rgba(15,23,42,1)]', isEliteOnly: true },
+  { id: 'FRAME_MASTER', name: '覇者の枠', description: '覇者に選出中のみ', ringClass: 'ring-[3px] ring-amber-400', glowClass: 'shadow-[0_0_18px_rgba(251,191,36,0.9)]', isEliteOnly: true, requiredTitle: 'MASTER' },
+  { id: 'FRAME_MASTER2', name: '覇者の炎枠', description: '覇者に選出中のみ', ringClass: 'ring-[4px] ring-amber-500 animate-pulse', glowClass: 'shadow-[0_0_24px_rgba(245,158,11,1)]', isEliteOnly: true, requiredTitle: 'MASTER' },
+  { id: 'FRAME_MASTER3', name: '覇者の黒金枠', description: '覇者に選出中のみ', ringClass: 'ring-[3px] ring-yellow-200', glowClass: 'shadow-[0_0_20px_rgba(254,240,138,0.8)]', isEliteOnly: true, requiredTitle: 'MASTER' },
+  { id: 'FRAME_MASTER4', name: '覇者の王冠枠', description: '覇者に選出中のみ', ringClass: 'ring-[4px] ring-yellow-300 animate-pulse', glowClass: 'shadow-[0_0_28px_rgba(253,224,71,1)]', isEliteOnly: true, requiredTitle: 'MASTER' },
+  { id: 'FRAME_RISING', name: '新星の枠', description: '新星に選出中のみ', ringClass: 'ring-[3px] ring-sky-400', glowClass: 'shadow-[0_0_18px_rgba(56,189,248,0.9)]', isEliteOnly: true, requiredTitle: 'RISING_STAR' },
+  { id: 'FRAME_RISING2', name: '新星の銀河枠', description: '新星に選出中のみ', ringClass: 'ring-[3px] ring-indigo-400', glowClass: 'shadow-[0_0_18px_rgba(99,102,241,0.9)]', isEliteOnly: true, requiredTitle: 'RISING_STAR' },
+  { id: 'FRAME_RISING3', name: '新星の彗星枠', description: '新星に選出中のみ', ringClass: 'ring-[3px] ring-sky-200', glowClass: 'shadow-[0_0_20px_rgba(186,230,253,0.8)]', isEliteOnly: true, requiredTitle: 'RISING_STAR' },
+  { id: 'FRAME_RISING4', name: '新星の夜光枠', description: '新星に選出中のみ', ringClass: 'ring-[4px] ring-blue-300 animate-pulse', glowClass: 'shadow-[0_0_22px_rgba(147,197,253,0.9)]', isEliteOnly: true, requiredTitle: 'RISING_STAR' },
+  { id: 'FRAME_GRINDER', name: '鉄人の枠', description: '鉄人に選出中のみ', ringClass: 'ring-[3px] ring-emerald-400', glowClass: 'shadow-[0_0_18px_rgba(52,211,153,0.9)]', isEliteOnly: true, requiredTitle: 'GRINDER' },
+  { id: 'FRAME_GRINDER2', name: '鉄人の鋼枠', description: '鉄人に選出中のみ', ringClass: 'ring-[4px] ring-slate-300', glowClass: 'shadow-[0_0_14px_rgba(203,213,225,0.7)]', isEliteOnly: true, requiredTitle: 'GRINDER' },
+  { id: 'FRAME_GRINDER3', name: '鉄人の岩枠', description: '鉄人に選出中のみ', ringClass: 'ring-[3px] ring-stone-500', glowClass: 'shadow-[0_0_12px_rgba(120,113,108,0.7)]', isEliteOnly: true, requiredTitle: 'GRINDER' },
+  { id: 'FRAME_GRINDER4', name: '鉄人の鎧枠', description: '鉄人に選出中のみ', ringClass: 'ring-[4px] ring-emerald-300 animate-pulse', glowClass: 'shadow-[0_0_22px_rgba(110,231,183,0.9)]', isEliteOnly: true, requiredTitle: 'GRINDER' },
+  { id: 'FRAME_KILLER', name: 'キラーの枠', description: '巨人キラーに選出中のみ', ringClass: 'ring-[3px] ring-rose-400', glowClass: 'shadow-[0_0_18px_rgba(251,113,133,0.9)]', isEliteOnly: true, requiredTitle: 'GIANT_KILLER' },
+  { id: 'FRAME_KILLER2', name: '刺客の血枠', description: '巨人キラーに選出中のみ', ringClass: 'ring-[3px] ring-red-900', glowClass: 'shadow-[0_0_14px_rgba(127,29,29,0.8)]', isEliteOnly: true, requiredTitle: 'GIANT_KILLER' },
+  { id: 'FRAME_KILLER3', name: '闇の枠', description: '巨人キラーに選出中のみ', ringClass: 'ring-[3px] ring-slate-800', glowClass: 'shadow-[0_0_16px_rgba(30,41,59,0.9)]', isEliteOnly: true, requiredTitle: 'GIANT_KILLER' },
+  { id: 'FRAME_KILLER4', name: '毒の枠', description: '巨人キラーに選出中のみ', ringClass: 'ring-[4px] ring-rose-500 animate-pulse', glowClass: 'shadow-[0_0_20px_rgba(244,63,94,0.9)]', isEliteOnly: true, requiredTitle: 'GIANT_KILLER' }
 ];
-
-// ============================================================
-// UTILITIES
-// ============================================================
 export const getLocalDateString = (date?: Date | string): string => {
   const d = date ? new Date(date) : new Date();
   const offset = 9 * 60;
@@ -661,6 +842,8 @@ const normalizeUser = (user: any): User => ({
   draws:          user.draws          ?? 0,
   currentStreak:  user.currentStreak  ?? 0,
   maxStreak:      user.maxStreak      ?? 0,
+  upsetWins:      user.upsetWins      ?? 0,
+  lossStreak:     user.lossStreak     ?? 0,
   activityDays:   user.activityDays   ?? 0,
   totalPoints:    user.totalPoints    ?? 0,
   monthlyPoints:  user.monthlyPoints  ?? 0,
@@ -747,43 +930,102 @@ const appendLogs = (newLogs: ActivityLog[]): void => {
 // ============================================================
 const checkAchievementsAndIcons = (
   user: User,
-  matchContext?: { isDuelWin: boolean }
+  matchContext?: { isDuelWin: boolean; opponentRateBefore?: number }
 ): { newAchievements: AchievementDef[]; newIcons: IconDef[] } => {
   const newAchievements: AchievementDef[] = [];
   const newIcons: IconDef[] = [];
-  const ach = user.achievements || [];
-  const icons = user.unlockedIcons || [];
+  const ach   = user.achievements    || [];
+  const icons = user.unlockedIcons   || [];
   const totalMatches = (user.wins || 0) + (user.losses || 0) + (user.draws || 0);
+  const draws       = user.draws       || 0;
+  const totalPoints = user.totalPoints || 0;
+  const upsetWins   = user.upsetWins   || 0;
+  const lossStreak  = user.lossStreak  || 0;
+  const maxStreak   = user.maxStreak   || 0;
+  const achCount    = ach.length;
+  const iconCount   = icons.length;
 
+  // ── Achievements ─────────────────────────────────────────
   ACHIEVEMENTS_DATA.forEach(a => {
     if (ach.includes(a.id)) return;
     let met = false;
     switch (a.conditionType) {
-      case 'WINS':    met = (user.wins || 0)         >= a.threshold; break;
-      case 'STREAK':  met = (user.currentStreak || 0) >= a.threshold; break;
-      case 'RATE':    met = (user.rate || 0)          >= a.threshold; break;
-      case 'DAYS':    met = (user.activityDays || 0)  >= a.threshold; break;
-      case 'MATCHES': met = totalMatches              >= a.threshold; break;
+      case 'WINS':       met = (user.wins || 0)  >= a.threshold; break;
+      case 'STREAK':     met = (user.currentStreak || 0) >= a.threshold; break;
+      case 'RATE':       met = (user.rate || 0)  >= a.threshold; break;
+      case 'DAYS':       met = (user.activityDays || 0) >= a.threshold; break;
+      case 'MATCHES':    met = totalMatches       >= a.threshold; break;
+      case 'DRAWS':      met = draws              >= a.threshold; break;
+      case 'POINTS':     met = totalPoints        >= a.threshold; break;
+      case 'UPSET_WINS': met = upsetWins          >= a.threshold; break;
       case 'SPECIAL':
         if (a.id === 'FACTION_GENERAL') met = !!user.isGeneral;
         if (a.id === 'DUEL_VICTORY')    met = !!matchContext?.isDuelWin;
+        // 連敗後勝利
+        if (a.id === 'COMEBACK_3')  met = lossStreak >= 3  && (user.wins || 0) > 0 && user.currentStreak > 0;
+        if (a.id === 'COMEBACK_5')  met = lossStreak >= 5  && user.currentStreak > 0;
+        if (a.id === 'COMEBACK_10') met = lossStreak >= 10 && user.currentStreak > 0;
+        // 連勝記録（maxStreak）
+        if (a.id === 'MAX_STREAK_5')  met = maxStreak >= 5;
+        if (a.id === 'MAX_STREAK_10') met = maxStreak >= 10;
+        if (a.id === 'MAX_STREAK_15') met = maxStreak >= 15;
+        if (a.id === 'MAX_STREAK_20') met = maxStreak >= 20;
+        // 累計敗戦
+        if (a.id === 'FIRST_LOSS')  met = (user.losses || 0) >= 1;
+        if (a.id === 'LOSSES_30')   met = (user.losses || 0) >= 30;
+        if (a.id === 'LOSSES_100')  met = (user.losses || 0) >= 100;
+        // 称号コレクション（achCount は push 前の数）
+        if (a.id === 'COLLECTION_5')  met = achCount >= 5;
+        if (a.id === 'COLLECTION_15') met = achCount >= 15;
+        if (a.id === 'COLLECTION_30') met = achCount >= 30;
+        if (a.id === 'COLLECTION_50') met = achCount >= 50;
+        // 段位承認（管理者が呼ぶ approveRankApplication 内で直接push）
+        // → ここでは不要
         break;
     }
     if (met) { user.achievements.push(a.id); newAchievements.push(a); }
   });
 
+  // ── Icons ─────────────────────────────────────────────────
   ICONS_DATA.forEach(icon => {
     if (icon.type === 'DEFAULT') return;
     if (icons.includes(icon.id)) return;
+    // ELITE は四天王在籍中にのみ解放（processMatch/awardSystemTitles で付与）
+    if (icon.category === 'ELITE') return;
+
     let met = false;
+    const th = icon.threshold ?? 9999;
     switch (icon.type) {
-      case 'RATE':    met = (user.rate || 0)          >= (icon.threshold || 9999); break;
-      case 'WINS':    met = (user.wins || 0)          >= (icon.threshold || 9999); break;
-      case 'MATCHES': met = totalMatches              >= (icon.threshold || 9999); break;
-      case 'STREAK':  met = (user.currentStreak || 0) >= (icon.threshold || 9999); break;
+      case 'RATE':    met = (user.rate || 0)          >= th; break;
+      case 'WINS':    met = (user.wins || 0)          >= th; break;
+      case 'MATCHES': met = totalMatches              >= th; break;
+      case 'STREAK':  met = (user.currentStreak || 0) >= th; break;
+      case 'DAYS':    met = (user.activityDays || 0)  >= th; break;
+      case 'DRAWS':   met = draws                     >= th; break;
+      case 'POINTS':  met = totalPoints               >= th; break;
       case 'SPECIAL':
-        if (icon.id === 'SPECIAL_GENERAL') met = !!user.isGeneral;
-        if (icon.id === 'SPECIAL_DUEL')    met = !!matchContext?.isDuelWin;
+        // アイコン固有のSPECIAL条件
+        if (icon.id === 'DEFAULT_SHARK')     met = upsetWins >= 1;
+        if (icon.id === 'DEFAULT_PIRATE')    met = upsetWins >= 10;
+        if (icon.id === 'DEFAULT_DODO')      met = lossStreak >= 10;
+        if (icon.id === 'SPECIAL_STAR')      met = (user.systemTitle?.length || 0) >= 1;
+        if (icon.id === 'SPECIAL_CROWN')     met = (user.earnedHonors?.length || 0) >= 2;
+        if (icon.id === 'SPECIAL_ONI')       met = upsetWins >= 10;
+        if (icon.id === 'SPECIAL_NINJA')     met = upsetWins >= 20;
+        if (icon.id === 'SPECIAL_SKULL')     met = (user.losses || 0) >= 100;
+        if (icon.id === 'SPECIAL_ICE')       met = lossStreak >= 10;
+        if (icon.id === 'SPECIAL_PHOENIX')   met = lossStreak >= 5 && user.currentStreak > 0;
+        if (icon.id === 'SPECIAL_AXE')       met = !!(matchContext?.opponentRateBefore && matchContext.opponentRateBefore - (user.rate - (user.wins > 0 ? 1 : 0)) >= 200 && user.wins > 0);
+        if (icon.id === 'SPECIAL_DAGGER')    met = !!(matchContext?.opponentRateBefore && matchContext.opponentRateBefore - (user.rate - (user.wins > 0 ? 1 : 0)) >= 300 && user.wins > 0);
+        if (icon.id === 'SPECIAL_FIST')      met = upsetWins >= 20;
+        if (icon.id === 'SPECIAL_BOMB')      met = upsetWins >= 50;
+        if (icon.id === 'SPECIAL_LIGHTNING') met = (user.currentStreak || 0) >= 10 && upsetWins >= 1;
+        if (icon.id === 'SPECIAL_EGG')       met = achCount  >= 5;
+        if (icon.id === 'SPECIAL_KEY')       met = achCount  >= 15;
+        if (icon.id === 'SPECIAL_CRYSTAL')   met = achCount  >= 30;
+        if (icon.id === 'SPECIAL_WAND')      met = achCount  >= 50;
+        if (icon.id === 'SPECIAL_HAT')       met = iconCount >= 20;
+        if (icon.id === 'SHOGI_UMA2')        met = maxStreak >= 15;
         break;
     }
     if (met) { user.unlockedIcons.push(icon.id); newIcons.push(icon); }
@@ -931,19 +1173,32 @@ export const processMatch = (
   else if (p2IsWinner) { p2.wins++; p1.losses++; }
   else { p1.draws++; p2.draws++; }
 
-  // Streaks
+  // Streaks + lossStreak
   if (p1IsWinner) {
     p1.currentStreak++;
     if (p1.currentStreak > p1.maxStreak) p1.maxStreak = p1.currentStreak;
     p2.currentStreak = 0;
+    // lossStreak: p1 が勝った → p2 の連敗更新、p1 の連敗リセット
+    p2.lossStreak = (p2.lossStreak || 0) + 1;
+    p1.lossStreak = 0;
   } else if (p2IsWinner) {
     p2.currentStreak++;
     if (p2.currentStreak > p2.maxStreak) p2.maxStreak = p2.currentStreak;
     p1.currentStreak = 0;
+    p1.lossStreak = (p1.lossStreak || 0) + 1;
+    p2.lossStreak = 0;
   } else {
     p1.currentStreak = 0;
     p2.currentStreak = 0;
+    p1.lossStreak = 0;
+    p2.lossStreak = 0;
   }
+
+  // upsetWins: レート差+100以上の格上撃破
+  const p1RateBefore = p1.rate;
+  const p2RateBefore = p2.rate;
+  if (p1IsWinner && p2.rate - p1.rate >= 100) p1.upsetWins = (p1.upsetWins || 0) + 1;
+  if (p2IsWinner && p1.rate - p2.rate >= 100) p2.upsetWins = (p2.upsetWins || 0) + 1;
 
   // Rate (with rateHistory update ← FIX)
   p1.rate = Math.max(0, p1.rate + p1RateChange);
@@ -966,8 +1221,8 @@ export const processMatch = (
   if (eventActive && !isSameFaction) p2.eventPoints = (p2.eventPoints || 0) + p2Detail.total;
 
   // Achievements & Icons
-  const resP1 = checkAchievementsAndIcons(p1, { isDuelWin: effectiveDuel && p1IsWinner });
-  const resP2 = checkAchievementsAndIcons(p2, { isDuelWin: effectiveDuel && p2IsWinner });
+  const resP1 = checkAchievementsAndIcons(p1, { isDuelWin: effectiveDuel && p1IsWinner, opponentRateBefore: p2RateBefore });
+  const resP2 = checkAchievementsAndIcons(p2, { isDuelWin: effectiveDuel && p2IsWinner, opponentRateBefore: p1RateBefore });
 
   saveUsers(allUsers);
 
@@ -1480,6 +1735,8 @@ const newUserBase = (name: string, reading?: string, isNewMember = false): User 
   eventPoints:      0,
   currentStreak:    0,
   maxStreak:        0,
+  upsetWins:        0,
+  lossStreak:       0,
   wins:             0,
   losses:           0,
   draws:            0,
