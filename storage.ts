@@ -955,12 +955,15 @@ export const processMatch = (
   p1.totalPoints   += p1Detail.total;
   p1.monthlyPoints  = (p1.monthlyPoints || 0) + p1Detail.total;
   p1.pointsMatch    = (p1.pointsMatch   || 0) + p1Detail.total;
-  if (eventActive) p1.eventPoints = (p1.eventPoints || 0) + p1Detail.total;
+
+  // 紅白戦中の同士討ち（同じfaction同士）はイベントポイントにカウントしない
+  const isSameFaction = isFactionWar && p1.faction === p2.faction;
+  if (eventActive && !isSameFaction) p1.eventPoints = (p1.eventPoints || 0) + p1Detail.total;
 
   p2.totalPoints   += p2Detail.total;
   p2.monthlyPoints  = (p2.monthlyPoints || 0) + p2Detail.total;
   p2.pointsMatch    = (p2.pointsMatch   || 0) + p2Detail.total;
-  if (eventActive) p2.eventPoints = (p2.eventPoints || 0) + p2Detail.total;
+  if (eventActive && !isSameFaction) p2.eventPoints = (p2.eventPoints || 0) + p2Detail.total;
 
   // Achievements & Icons
   const resP1 = checkAchievementsAndIcons(p1, { isDuelWin: effectiveDuel && p1IsWinner });

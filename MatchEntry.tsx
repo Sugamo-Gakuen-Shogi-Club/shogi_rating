@@ -25,7 +25,7 @@ const MatchEntry: React.FC = () => {
   const [pin, setPin] = useState('');
   const [deviceBlocked, setDeviceBlocked] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [successData, setSuccessData] = useState<{p1Name: string, p2Name: string, record: MatchProcessResult, p1Faction?: string, p2Faction?: string} | null>(null);
+  const [successData, setSuccessData] = useState<{p1Name: string, p2Name: string, record: MatchProcessResult, p1Faction?: string, p2Faction?: string, isSameFaction?: boolean} | null>(null);
   const [newAchievements, setNewAchievements] = useState<AchievementItem[]>([]);
   
   // Modal State
@@ -105,7 +105,8 @@ const MatchEntry: React.FC = () => {
         p2Name,
         record,
         p1Faction: p1User?.faction,
-        p2Faction: p2User?.faction
+        p2Faction: p2User?.faction,
+        isSameFaction: isFactionWarNow && p1User?.faction === p2User?.faction,
       });
 
       // Collect new achievements with names
@@ -323,11 +324,17 @@ const MatchEntry: React.FC = () => {
                         </h2>
                         
                         {/* Faction Victory Banner */}
-                        {isFactionWar && (
+                        {isFactionWar && !successData.isSameFaction && (
                             <div className={`text-3xl md:text-4xl font-black tracking-[0.3em] uppercase mt-4 animate-pulse px-8 py-2 border-y-4 bg-black/30 backdrop-blur-md transform skew-x-[-12deg] inline-block ${
                                 (p1Won ? successData.p1Faction : successData.p2Faction) === 'RED' ? 'text-red-500 border-red-500' : 'text-blue-400 border-blue-500'
                             }`}>
                                 {(p1Won ? successData.p1Faction : successData.p2Faction) === 'RED' ? '紅組 勝利' : '白組 勝利'}
+                            </div>
+                        )}
+                        {/* 同士討ち警告 */}
+                        {isFactionWar && successData.isSameFaction && (
+                            <div className="mt-4 px-6 py-3 rounded-xl border border-amber-600 bg-amber-900/30 text-amber-300 font-black text-sm tracking-wider animate-pulse">
+                                ⚠ 同士討ち — イベントポイントは加算されません
                             </div>
                         )}
                     </>
