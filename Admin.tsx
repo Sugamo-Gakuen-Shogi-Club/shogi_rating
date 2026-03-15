@@ -278,21 +278,35 @@ const Admin: React.FC = () => {
 
   const handleTeamBalance = () => setWSimData(getFactionBalanceSimulation(users));
 
-  const finishEventSetup = () => {
+  const finishEventSetup = async () => {
     if (wType === EventType.FACTION_WAR) {
       if (!wRedGeneral || !wWhiteGeneral) { alert('大将を決定してください'); return; }
       if (!wSimData) { alert('チーム編成を実行してください'); return; }
-      const updatedUsers = getUsers(true).map(u => ({
+
+      // ── 1. ファクション割り当て（全員 RED or WHITE を明示的にセット）──
+      const allForFaction = getUsers(true).map(u => ({
         ...u,
-        faction: wSimData.redUsers.some(r => r.id === u.id) ? 'RED' as const : 'WHITE' as const
+        faction: wSimData.redUsers.some(r => r.id === u.id) ? 'RED' as const : 'WHITE' as const,
       }));
-      saveUsers(updatedUsers);
+      saveUsers(allForFaction);
+
+      // ── 2. 大将任命（getRawUsers で最新のファクション済みデータを使用）──
       assignGenerals(wRedGeneral, wWhiteGeneral);
     }
+
+    // ── 3. イベント設定を保存 ──
     const endsAt = new Date();
     endsAt.setDate(endsAt.getDate() + wDuration);
-    saveSettings({ ...settings, eventName: wName, eventEndsAt: endsAt.toISOString(), eventType: wType });
+    // 最新の settings を読み直して上書きリスクを回避
+    const latestSettings = getSettings();
+    saveSettings({ ...latestSettings, eventName: wName, eventEndsAt: endsAt.toISOString(), eventType: wType });
+
+    // ── 4. イベントポイントをリセット ──
     resetEventPoints();
+
+    // ── 5. 即時クラウド同期（デバウンスをスキップして他端末に即反映）──
+    await manualSync();
+
     refreshData();
     setIsEventWizardOpen(false);
   };
@@ -611,6 +625,11 @@ const Admin: React.FC = () => {
                     </button>
                   ) : (
                     <div className="space-y-4">
+                      {wSimData.redStats.count !== wSimData.whiteStats.count && (
+                        <div className="text-xs text-amber-400 bg-amber-900/20 border border-amber-700/40 rounded-xl px-3 py-2 text-center font-bold">
+                          ⚠ 部員数が奇数のため紅組が1人多くなります
+                        </div>
+                      )}
                       <div className="grid grid-cols-2 gap-4">
                         <div className="bg-red-900/20 border border-red-900/50 p-4 rounded-2xl">
                           <div className="text-red-500 font-black mb-2 flex items-center gap-2"><Users size={16}/> 紅組</div>

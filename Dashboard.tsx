@@ -16,13 +16,13 @@ const Dashboard: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [deviceBlocked, setDeviceBlocked] = useState(false);
   const [matches, setMatches] = useState<MatchRecord[]>([]);
+  const [settings, setSettings] = useState(getSettings());
   const [isAttendanceOpen, setIsAttendanceOpen] = useState(false);
   const [isFactionModalOpen, setIsFactionModalOpen] = useState(false);
   
   // Achievement Popup State
   const [newAchievements, setNewAchievements] = useState<{achievement: AchievementDef}[]>([]);
   
-  const settings = getSettings();
   const activeEvent = isEventActive();
   const isFactionWar = activeEvent && settings.eventType === EventType.FACTION_WAR;
 
@@ -30,6 +30,7 @@ const Dashboard: React.FC = () => {
     const refresh = () => {
       setUsers(getUsers());
       setMatches(getMatches());
+      setSettings(getSettings());
     };
     refresh();
 
@@ -104,16 +105,17 @@ const Dashboard: React.FC = () => {
       let redWins = 0, whiteWins = 0, duelWins = { red: 0, white: 0 };
 
       users.forEach(u => {
-          if (u.faction === 'RED') redScore += (u.eventPoints || 0);
+          if (u.faction === 'RED')   redScore   += (u.eventPoints || 0);
           if (u.faction === 'WHITE') whiteScore += (u.eventPoints || 0);
       });
 
-      // 対局記録からイベント中の勝敗を集計
+      // イベント期間中の対局勝敗を集計（eventEndsAt から最大7日遡って絞る）
       const eventStart = settings.eventEndsAt
-        ? new Date(new Date(settings.eventEndsAt).getTime() - (settings.lastMonthlyReset ? 0 : 0))
+        ? new Date(new Date(settings.eventEndsAt).getTime() - 7 * 24 * 60 * 60 * 1000)
         : null;
 
       matches.forEach(m => {
+          if (eventStart && new Date(m.date) < eventStart) return;
           const winner = m.result === 'PLAYER1_WIN' ? m.player1Id : m.result === 'PLAYER2_WIN' ? m.player2Id : null;
           if (!winner) return;
           const winnerUser = users.find(u => u.id === winner);
@@ -128,8 +130,10 @@ const Dashboard: React.FC = () => {
 
       const total = redScore + whiteScore;
       const redPercent = total === 0 ? 50 : (redScore / total) * 100;
-      return { redScore, whiteScore, redPercent, redWins, whiteWins, duelWins };
-  }, [users, matches]);
+      const redCount   = users.filter(u => u.faction === 'RED').length;
+      const whiteCount = users.filter(u => u.faction === 'WHITE').length;
+      return { redScore, whiteScore, redPercent, redWins, whiteWins, duelWins, redCount, whiteCount };
+  }, [users, matches, settings]);
 
   const titleHolders = useMemo(() => {
       // 複数同時選出に対応：各タイトルのホルダーを全員取得
@@ -267,7 +271,7 @@ const Dashboard: React.FC = () => {
                   <div className="flex-1 overflow-hidden flex flex-col md:flex-row rounded-b-3xl bg-slate-900">
                       <div className="flex-1 p-4 bg-gradient-to-br from-red-950/30 to-slate-900 overflow-y-auto border-r border-white/5">
                           <h4 className="text-red-400 font-black uppercase tracking-widest mb-4 sticky top-0 bg-slate-900/90 p-2 backdrop-blur z-10 border-b border-red-900/30 flex justify-between">
-                              Red Army <span className="text-xs opacity-50">{users.filter(u => u.faction === 'RED').length}名</span>
+                              Red Army <span className="text-xs opacity-50">{factionStats.redCount}名</span>
                           </h4>
                           <div className="grid grid-cols-2 gap-2">
                               {users.filter(u => u.faction === 'RED').map(u => (
@@ -281,7 +285,7 @@ const Dashboard: React.FC = () => {
                       </div>
                       <div className="flex-1 p-4 bg-gradient-to-bl from-blue-950/30 to-slate-900 overflow-y-auto">
                           <h4 className="text-blue-400 font-black uppercase tracking-widest mb-4 sticky top-0 bg-slate-900/90 p-2 backdrop-blur z-10 border-b border-blue-900/30 flex justify-between">
-                              White Army <span className="text-xs opacity-50">{users.filter(u => u.faction === 'WHITE').length}名</span>
+                              White Army <span className="text-xs opacity-50">{factionStats.whiteCount}名</span>
                           </h4>
                           <div className="grid grid-cols-2 gap-2">
                               {users.filter(u => u.faction === 'WHITE').map(u => (

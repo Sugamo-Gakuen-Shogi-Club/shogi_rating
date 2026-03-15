@@ -1509,11 +1509,21 @@ export const getFactionBalanceSimulation = (users: User[]) => {
     .filter(u => u.isActive !== false)
     .map(u => ({ ...u, _score: u.rate * 0.3 + (u.activityDays || 0) * 300 }))
     .sort((a, b) => b._score - a._score);
+
+  const n = scored.length;
+  // 人数を均等に（奇数の場合は紅組が1人多い）
+  const redTarget   = Math.ceil(n / 2);
+  const whiteTarget = Math.floor(n / 2);
+
   const red: User[] = [], white: User[] = [];
   let rScore = 0, wScore = 0;
   scored.forEach(u => {
-    if (rScore <= wScore) { red.push(u);   rScore += u._score; }
-    else                  { white.push(u); wScore += u._score; }
+    const redFull   = red.length   >= redTarget;
+    const whiteFull = white.length >= whiteTarget;
+    if      (redFull)                          { white.push(u); wScore += u._score; }
+    else if (whiteFull)                        { red.push(u);   rScore += u._score; }
+    else if (rScore <= wScore)                 { red.push(u);   rScore += u._score; }
+    else                                       { white.push(u); wScore += u._score; }
   });
   const stats = (team: User[]) => ({
     count:      team.length,

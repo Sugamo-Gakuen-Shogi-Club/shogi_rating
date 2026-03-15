@@ -57,10 +57,18 @@ const RankIcon: React.FC<{ rank: number }> = ({ rank }) => {
 
 // ─── ランキングビュー ────────────────────────────────────────
 const PublicRankings: React.FC<{ onSelectProfile: (id: string) => void }> = ({ onSelectProfile }) => {
-  const users  = getUsers();
+  const [users, setUsers]       = useState(() => getUsers());
+  const [settings, setSettings] = useState(() => getSettings());
   const [tab, setTab] = useState<SortKey>('seasonGrowth');
-  const settings = getSettings();
   const isFW = isEventActive() && settings.eventType === EventType.FACTION_WAR;
+
+  useEffect(() => {
+    const refresh = () => { setUsers(getUsers()); setSettings(getSettings()); };
+    window.addEventListener('rivals-users-changed', refresh);
+    window.addEventListener('rivals-sync-changed', refresh);
+    const id = setInterval(refresh, 10000);
+    return () => { clearInterval(id); window.removeEventListener('rivals-users-changed', refresh); window.removeEventListener('rivals-sync-changed', refresh); };
+  }, []);
 
   // Faction score
   const factionStats = (() => {
