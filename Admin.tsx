@@ -970,6 +970,27 @@ const Admin: React.FC = () => {
                   {Object.values(Season).map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
+              {/* シーズン終了日 */}
+              <div className="border-t border-white/5 pt-4">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block mb-2">
+                  シーズン終了予定日
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="date"
+                    value={settings.seasonEndsAt ? settings.seasonEndsAt.split('T')[0] : ''}
+                    onChange={e => setSettings(s => ({ ...s, seasonEndsAt: e.target.value ? new Date(e.target.value).toISOString() : null }))}
+                    className="flex-1 p-3 border border-slate-700 rounded-xl font-bold bg-slate-900 text-white focus:border-blue-500 outline-none"
+                  />
+                  <button
+                    onClick={() => { saveSettings(settings); alert('シーズン終了日を保存しました。'); }}
+                    className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-black text-sm transition-all"
+                  >
+                    保存
+                  </button>
+                </div>
+                <p className="text-[10px] text-slate-600 mt-1.5">設定すると部員の個人ページに「残り○日」が表示されます</p>
+              </div>
               <div className="pt-4 border-t border-white/5">
                 <p className="text-sm text-slate-400 mb-4">成長度・対局数に基づき四天王称号を再計算します。</p>
                 {maintActive ? (

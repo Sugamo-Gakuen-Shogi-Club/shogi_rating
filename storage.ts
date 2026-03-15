@@ -44,7 +44,8 @@ const DEFAULT_SETTINGS: SystemSettings = {
   eventMultiplier: 2,
   currentSeason: Season.TERM_1_EARLY,
   lastMonthlyReset: new Date().toISOString(),
-  lastTitleUpdate: null
+  lastTitleUpdate: null,
+  seasonEndsAt: null,
 };
 
 // 初期レートは0（負けで減る仕様のため）

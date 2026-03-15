@@ -164,6 +164,7 @@ export interface SystemSettings {
   currentSeason: Season;
   lastMonthlyReset: string;
   lastTitleUpdate: string | null;
+  seasonEndsAt: string | null;    // シーズン終了予定日（管理者が設定）
 }
 
 export interface ActivityLog {

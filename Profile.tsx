@@ -13,12 +13,12 @@ import {
   getLogs, getSettings, isEventActive, getUserFrameDef, SYSTEM_TITLES,
   submitRankApplication, getUserSystemTitleHistory,
 } from './storage';
-import { User, MatchRecord, ActivityLog, ActivityType, RankEntry, EventType } from './types';
+import { User, MatchRecord, ActivityLog, ActivityType, RankEntry, EventType, SystemSettings } from './types';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import {
   ArrowLeft, Tag, Star, Crown, Swords, Search, Skull, Smile, Lock,
   Grid, Shield, Medal, Plus, Check, X as XIcon, Award, TrendingUp,
-  Calendar, ChevronRight, Edit3, List, Flame, Snowflake,
+  Calendar, ChevronRight, Edit3, List, Flame, Snowflake, ChevronUp, ChevronDown,
 } from 'lucide-react';
 import { UserSelector } from './UserSelector';
 import { useNavigate } from 'react-router-dom';
@@ -351,6 +351,219 @@ const RankModal: React.FC<{ userId: string; user: User; onClose: () => void; onR
   );
 };
 
+// ─── シーズン状況カード ───────────────────────────────────────
+const SeasonStatusCard: React.FC<{ userId: string }> = ({ userId }) => {
+  const allUsers = getUsers();
+  const allMatches = getMatches();
+  const settings  = getSettings();
+  const me = allUsers.find(u => u.id === userId);
+  if (!me) return null;
+
+  // ── 残り日数・進行率 ─────────────────────────────────────
+  const now = new Date();
+  const seasonEnd   = settings.seasonEndsAt ? new Date(settings.seasonEndsAt) : null;
+  const seasonStart = new Date(settings.lastMonthlyReset);
+  const totalDays   = seasonEnd ? Math.max(1, Math.ceil((seasonEnd.getTime() - seasonStart.getTime()) / 86400000)) : null;
+  const elapsedDays = Math.max(0, Math.ceil((now.getTime() - seasonStart.getTime()) / 86400000));
+  const remainDays  = seasonEnd ? Math.max(0, Math.ceil((seasonEnd.getTime() - now.getTime()) / 86400000)) : null;
+  const progress    = totalDays ? Math.min(100, Math.round((elapsedDays / totalDays) * 100)) : null;
+
+  // ── 今日の対局数マップ ────────────────────────────────────
+  const todayStr = now.toISOString().split('T')[0];
+  const todayCount: Record<string, number> = {};
+  allUsers.forEach(u => { todayCount[u.id] = 0; });
+  allMatches.forEach(m => {
+    if (m.date.split('T')[0] !== todayStr) return;
+    todayCount[m.player1Id] = (todayCount[m.player1Id] || 0) + 1;
+    todayCount[m.player2Id] = (todayCount[m.player2Id] || 0) + 1;
+  });
+
+  // ── 軸ごとのスコア取得 ────────────────────────────────────
+  type AxisKey = 'seasonGrowth' | 'rate' | 'todayMatches';
+  const getScore = (u: User, axis: AxisKey): number => {
+    if (axis === 'seasonGrowth') return (u.rate + u.totalPoints) - (u.seasonStartRate + u.seasonStartPoints);
+    if (axis === 'rate')         return u.rate;
+    if (axis === 'todayMatches') return todayCount[u.id] || 0;
+    return 0;
+  };
+  const fmtScore = (u: User, axis: AxisKey): string => {
+    const s = getScore(u, axis);
+    if (axis === 'seasonGrowth') return s >= 0 ? `+${s}` : `${s}`;
+    if (axis === 'rate')         return `${Math.round(s)}`;
+    if (axis === 'todayMatches') return `${s}局`;
+    return `${s}`;
+  };
+
+  // ── 前後の順位を計算 ─────────────────────────────────────
+  const buildRankInfo = (axis: AxisKey) => {
+    const sorted = [...allUsers].sort((a, b) => getScore(b, axis) - getScore(a, axis));
+    const myIdx  = sorted.findIndex(u => u.id === userId);
+    if (myIdx === -1) return null;
+
+    // 同率処理
+    let myRank = myIdx + 1;
+    for (let i = myIdx - 1; i >= 0; i--) {
+      if (Math.floor(getScore(sorted[i], axis)) === Math.floor(getScore(sorted[myIdx], axis))) myRank = i + 1;
+      else break;
+    }
+
+    const above = myIdx > 0 ? sorted[myIdx - 1] : null;
+    const below = myIdx < sorted.length - 1 ? sorted[myIdx + 1] : null;
+    const gapAbove = above ? Math.abs(getScore(above, axis) - getScore(sorted[myIdx], axis)) : null;
+    const gapBelow = below ? Math.abs(getScore(sorted[myIdx], axis) - getScore(below, axis)) : null;
+
+    // 「あと○勝で○位へ」推定（今期成長・レート軸のみ）
+    let upsideMsg: string | null = null;
+    if (above && (axis === 'seasonGrowth' || axis === 'rate')) {
+      // Eloで格上に勝ったときの概算レート上昇（K=32, 期待値≈0.5と仮定）
+      const estRateGain = 16; // K*0.5
+      const estPtGain   = 10; // 対局勝利ポイント
+      const estPerWin   = axis === 'seasonGrowth' ? estRateGain + estPtGain : estRateGain;
+      const winsNeeded  = Math.ceil(gapAbove! / estPerWin);
+      if (winsNeeded <= 5) {
+        upsideMsg = `あと約${winsNeeded}勝で${myRank - 1}位に浮上できる見込み`;
+      }
+    }
+    if (axis === 'todayMatches' && above) {
+      const needed = gapAbove! + 1;
+      upsideMsg = `あと${needed}局で${myRank - 1}位に浮上`;
+    }
+
+    return { myRank, myScore: fmtScore(sorted[myIdx], axis), above, below, gapAbove, gapBelow, upsideMsg };
+  };
+
+  const axes: { key: AxisKey; label: string; icon: React.ReactNode; color: string }[] = [
+    { key:'seasonGrowth',  label:'今期成長',    icon:<TrendingUp size={12}/>, color:'text-indigo-400' },
+    { key:'rate',          label:'レート',       icon:<Flame size={12}/>,     color:'text-blue-400' },
+    { key:'todayMatches',  label:'今日の対局数', icon:<Calendar size={12}/>,  color:'text-orange-400' },
+  ];
+
+  return (
+    <div className="bg-slate-900 border border-white/5 rounded-2xl overflow-hidden">
+      {/* ヘッダー */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-white/5 bg-slate-800/40">
+        <div className="flex items-center gap-2 text-[11px] font-black text-slate-300 uppercase tracking-widest">
+          <Calendar size={13} className="text-blue-400"/>
+          シーズン状況
+        </div>
+        {settings.currentSeason && (
+          <span className="text-[9px] font-black text-slate-500 bg-slate-800 px-2 py-0.5 rounded-full border border-white/5">
+            {settings.currentSeason}
+          </span>
+        )}
+      </div>
+
+      <div className="p-4 space-y-4">
+        {/* 残り日数バー */}
+        {seasonEnd ? (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-xs font-bold">
+              <span className="text-slate-400">シーズン残り</span>
+              <span className={`font-black ${remainDays! <= 7 ? 'text-red-400' : remainDays! <= 14 ? 'text-amber-400' : 'text-slate-200'}`}>
+                {remainDays}日
+                {remainDays! <= 7 && ' 🔥 ラストスパート！'}
+              </span>
+            </div>
+            <div className="relative h-3 bg-slate-800 rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all duration-700 ${progress! >= 80 ? 'bg-gradient-to-r from-red-500 to-orange-400' : progress! >= 50 ? 'bg-gradient-to-r from-blue-600 to-cyan-500' : 'bg-gradient-to-r from-blue-700 to-blue-500'}`}
+                style={{ width: `${progress}%` }}
+              />
+              <div className="absolute inset-0 flex items-center justify-center text-[9px] font-black text-white/80">
+                {progress}%
+              </div>
+            </div>
+            <div className="flex justify-between text-[9px] text-slate-600 font-bold">
+              <span>{seasonStart.toLocaleDateString('ja-JP', { month:'numeric', day:'numeric' })}</span>
+              <span>{seasonEnd.toLocaleDateString('ja-JP', { month:'numeric', day:'numeric' })}</span>
+            </div>
+          </div>
+        ) : (
+          <div className="text-[11px] text-slate-600 font-bold text-center py-1 bg-slate-800/40 rounded-xl border border-white/5">
+            シーズン終了日は管理者が設定します
+          </div>
+        )}
+
+        {/* 3軸ランキング */}
+        <div className="space-y-3">
+          {axes.map(axis => {
+            const info = buildRankInfo(axis.key);
+            if (!info) return null;
+            const { myRank, myScore, above, below, gapAbove, gapBelow, upsideMsg } = info;
+            return (
+              <div key={axis.key} className="bg-slate-800/50 rounded-2xl border border-white/5 overflow-hidden">
+                {/* 軸ヘッダー */}
+                <div className={`flex items-center gap-1.5 px-3 py-2 border-b border-white/5 ${axis.color}`}>
+                  {axis.icon}
+                  <span className="text-[10px] font-black uppercase tracking-widest">{axis.label}</span>
+                  <span className="ml-auto text-[10px] font-black text-slate-300">現在 {myRank}位</span>
+                </div>
+
+                {/* 前後の人 */}
+                <div className="divide-y divide-white/5">
+                  {/* 1つ上 */}
+                  {above && (
+                    <div className="flex items-center justify-between px-3 py-2.5 bg-slate-800/30">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-[9px] font-black text-slate-500 w-10 shrink-0">
+                          {myRank - 1}位
+                        </span>
+                        <span className="text-xs font-bold text-slate-300 truncate">{above.name}</span>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-xs font-black text-slate-400">{fmtScore(above, axis.key)}</span>
+                        <span className="text-[9px] font-black text-red-400 flex items-center gap-0.5">
+                          <ChevronUp size={10}/>▲{axis.key === 'rate' ? Math.round(gapAbove!) : gapAbove}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 自分 */}
+                  <div className={`flex items-center justify-between px-3 py-2.5 ${above || below ? 'bg-blue-900/20 border-l-2 border-blue-500' : ''}`}>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-[9px] font-black text-blue-400 w-10 shrink-0">
+                        {myRank}位 ←
+                      </span>
+                      <span className="text-xs font-black text-white truncate">{me.name}</span>
+                    </div>
+                    <span className={`text-sm font-black ${axis.color}`}>{myScore}</span>
+                  </div>
+
+                  {/* 1つ下 */}
+                  {below && (
+                    <div className="flex items-center justify-between px-3 py-2.5 bg-slate-800/30">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-[9px] font-black text-slate-500 w-10 shrink-0">
+                          {myRank + 1}位
+                        </span>
+                        <span className="text-xs font-bold text-slate-300 truncate">{below.name}</span>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-xs font-black text-slate-400">{fmtScore(below, axis.key)}</span>
+                        <span className="text-[9px] font-black text-green-400 flex items-center gap-0.5">
+                          <ChevronDown size={10}/>▼{axis.key === 'rate' ? Math.round(gapBelow!) : gapBelow}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* 浮上メッセージ */}
+                {upsideMsg && (
+                  <div className="px-3 py-2 bg-amber-900/20 border-t border-amber-700/20">
+                    <span className="text-[10px] font-black text-amber-300">💡 {upsideMsg}</span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ─── 3列スクエアカード ────────────────────────────────────────
 const SqCard: React.FC<{
   icon: React.ReactNode;
@@ -637,6 +850,9 @@ const Profile: React.FC = () => {
       <div className="bg-slate-900 border border-white/5 rounded-2xl p-4">
         <ActivityHeatmap logs={logs} userId={selectedId}/>
       </div>
+
+      {/* ─── シーズン状況 ─── */}
+      <SeasonStatusCard userId={selectedId}/>
 
       {/* ─── レート推移 ─── */}
       {graphData.length > 1 && (
