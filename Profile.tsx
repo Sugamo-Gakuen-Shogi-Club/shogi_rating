@@ -1,22 +1,24 @@
 /**
- * Profile.tsx
+ * Profile.tsx — Stage 1 fix
  * プロフィール編集画面（PIN必須・本人専用）
- * カード型UI：タップで各モーダルが開く
+ * ・カード3列グリッドUI
+ *・PIN変更は管理者専用のため削除
+ * ・紅白戦表示・星取表を復元
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   getUsers, getMatches, ACHIEVEMENTS_DATA, updateUserTitle, getRivalryStats,
   ICONS_DATA, FRAMES_DATA, updateUserIcon, updateUserFrame, getUserAvatarChar,
   getLogs, getSettings, isEventActive, getUserFrameDef, SYSTEM_TITLES,
-  submitRankApplication, updateProfilePin, getUserSystemTitleHistory,
+  submitRankApplication, getUserSystemTitleHistory,
 } from './storage';
-import { User, MatchRecord, ActivityLog, ActivityType, RankEntry } from './types';
+import { User, MatchRecord, ActivityLog, ActivityType, RankEntry, EventType } from './types';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import {
   ArrowLeft, Tag, Star, Crown, Swords, Search, Skull, Smile, Lock,
   Grid, Shield, Medal, Plus, Check, X as XIcon, Award, TrendingUp,
-  Calendar, ChevronRight, Edit3, Key, List,
+  Calendar, ChevronRight, Edit3, List, Flame, Snowflake,
 } from 'lucide-react';
 import { UserSelector } from './UserSelector';
 import { useNavigate } from 'react-router-dom';
@@ -46,9 +48,9 @@ const Avatar: React.FC<{ user: User; size?: 'md' | 'lg' }> = ({ user, size = 'md
   const isShogi  = iconDef?.category === 'SHOGI';
   const frameDef = getUserFrameDef(user.activeFrameId);
   const isElite  = user.systemTitle.length > 0;
-  const dim      = size === 'lg' ? 'w-24 h-24' : 'w-12 h-12';
-  const text     = size === 'lg' ? 'text-5xl' : 'text-xl';
-  const scale    = size === 'lg' ? 1.0 : 0.46;
+  const dim   = size === 'lg' ? 'w-24 h-24' : 'w-12 h-12';
+  const text  = size === 'lg' ? 'text-5xl' : 'text-xl';
+  const scale = size === 'lg' ? 1.0 : 0.46;
 
   if (isShogi && iconDef) {
     return (
@@ -89,10 +91,12 @@ const ActivityHeatmap: React.FC<{ logs: ActivityLog[]; userId: string }> = ({ lo
   };
   return (
     <div>
-      <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1.5"><Calendar size={11} /> 活動ヒートマップ（直近90日）</div>
+      <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+        <Calendar size={11}/> 活動ヒートマップ（直近90日）
+      </div>
       <div className="flex flex-wrap gap-1">
         {days.map(d => (
-          <div key={d} className={`w-3 h-3 rounded-sm ${color(counts[d])}`} title={`${d}: ${counts[d] || 0}件`} />
+          <div key={d} className={`w-3 h-3 rounded-sm ${color(counts[d])}`} title={`${d}: ${counts[d] || 0}件`}/>
         ))}
       </div>
     </div>
@@ -124,7 +128,7 @@ const IconModal: React.FC<{ user: User; onClose: () => void; onSelect: (id: stri
     return user.unlockedIcons.includes(icon.id);
   };
   return (
-    <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center bg-slate-950/90 backdrop-blur-sm p-0 sm:p-4">
+    <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center bg-slate-950/90 backdrop-blur-sm">
       <div className="bg-slate-900 w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl border border-white/10 flex flex-col max-h-[85vh]">
         <div className="flex items-center justify-between px-5 py-4 bg-slate-800 rounded-t-3xl sm:rounded-t-3xl border-b border-white/5 shrink-0">
           <div className="font-black text-white flex items-center gap-2"><Smile size={16} className="text-blue-400"/> アイコンを選択</div>
@@ -174,7 +178,7 @@ const FrameModal: React.FC<{ user: User; onClose: () => void; onSelect: (id: str
   const user     = getUsers().find(u => u.id === up.id) ?? up;
   const unlocked = user.unlockedFrames || ['FRAME_NONE'];
   return (
-    <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center bg-slate-950/90 backdrop-blur-sm p-0 sm:p-4">
+    <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center bg-slate-950/90 backdrop-blur-sm">
       <div className="bg-slate-900 w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl shadow-2xl border border-white/10 flex flex-col max-h-[80vh]">
         <div className="flex items-center justify-between px-5 py-4 bg-slate-800 rounded-t-3xl sm:rounded-t-3xl border-b border-white/5 shrink-0">
           <div className="font-black text-white flex items-center gap-2"><Crown size={16} className="text-yellow-400"/> フレームを選択</div>
@@ -206,7 +210,7 @@ const FrameModal: React.FC<{ user: User; onClose: () => void; onSelect: (id: str
 const TitleModal: React.FC<{ user: User; onClose: () => void; onChange: (id: string) => void }> = ({ user, onClose, onChange }) => {
   const unlocked = ACHIEVEMENTS_DATA.filter(a => user.achievements.includes(a.id));
   return (
-    <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center bg-slate-950/90 backdrop-blur-sm p-0 sm:p-4">
+    <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center bg-slate-950/90 backdrop-blur-sm">
       <div className="bg-slate-900 w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl shadow-2xl border border-white/10 flex flex-col max-h-[80vh]">
         <div className="flex items-center justify-between px-5 py-4 bg-slate-800 rounded-t-3xl sm:rounded-t-3xl border-b border-white/5 shrink-0">
           <div className="font-black text-white flex items-center gap-2"><Tag size={16} className="text-slate-400"/> 称号を選択</div>
@@ -235,7 +239,7 @@ const TitleModal: React.FC<{ user: User; onClose: () => void; onChange: (id: str
 const TitleCollectionModal: React.FC<{ user: User; onClose: () => void }> = ({ user, onClose }) => {
   const honors = user.earnedHonors ?? [];
   return (
-    <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center bg-slate-950/90 backdrop-blur-sm p-0 sm:p-4">
+    <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center bg-slate-950/90 backdrop-blur-sm">
       <div className="bg-slate-900 w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl border border-white/10 flex flex-col max-h-[85vh]">
         <div className="flex items-center justify-between px-5 py-4 bg-slate-800 rounded-t-3xl sm:rounded-t-3xl border-b border-white/5 shrink-0">
           <div className="font-black text-white flex items-center gap-2"><Award size={16} className="text-yellow-500"/> 称号コレクション</div>
@@ -285,7 +289,7 @@ const RankModal: React.FC<{ userId: string; user: User; onClose: () => void; onR
   const [source, setSource] = useState('');
   const [val, setVal]       = useState('');
   const [note, setNote]     = useState('');
-  const [msg, setMsg]       = useState<{ type: 'ok'|'err'; text: string } | null>(null);
+  const [msg, setMsg]       = useState<{ type: 'ok'|'err'; text: string }|null>(null);
   const submit = () => {
     const res = submitRankApplication(userId, source, val, note);
     if (res.success) {
@@ -297,7 +301,7 @@ const RankModal: React.FC<{ userId: string; user: User; onClose: () => void; onR
     }
   };
   return (
-    <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center bg-slate-950/90 backdrop-blur-sm p-0 sm:p-4">
+    <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center bg-slate-950/90 backdrop-blur-sm">
       <div className="bg-slate-900 w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl border border-white/10 overflow-hidden">
         <div className="flex items-center justify-between px-5 py-4 bg-slate-800 border-b border-white/5">
           <div className="font-black text-white flex items-center gap-2"><Medal size={16} className="text-purple-400"/> ランク申請</div>
@@ -309,7 +313,6 @@ const RankModal: React.FC<{ userId: string; user: User; onClose: () => void; onR
               {msg.type==='ok' ? <Check size={14}/> : <XIcon size={14}/>} {msg.text}
             </div>
           )}
-          {/* 既存ランク */}
           {(user.ranks || []).length > 0 && (
             <div className="space-y-1.5">
               {user.ranks.map((r: RankEntry) => (
@@ -348,84 +351,24 @@ const RankModal: React.FC<{ userId: string; user: User; onClose: () => void; onR
   );
 };
 
-// ─── PIN変更モーダル ─────────────────────────────────────────
-const ChangePinModal: React.FC<{ userId: string; currentPin: string; onClose: () => void }> = ({ userId, currentPin, onClose }) => {
-  const [step, setStep]   = useState<'enter_old' | 'enter_new' | 'done'>('enter_old');
-  const [pin, setPin]     = useState('');
-  const [err, setErr]     = useState(false);
-  const [newPin, setNewPin] = useState('');
-  const { updateProfilePin } = require('./storage');
-
-  const handleOld = (v: string) => {
-    if (v.length < 4) return;
-    if (v === currentPin) { setStep('enter_new'); setPin(''); setErr(false); }
-    else { setErr(true); setPin(''); setTimeout(() => setErr(false), 1500); }
-  };
-  const handleNew = (v: string) => {
-    if (v.length < 4) return;
-    setNewPin(v);
-    updateProfilePin(userId, v);
-    setStep('done');
-  };
-
-  return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/90 backdrop-blur-sm p-4">
-      <div className="bg-slate-900 w-full max-w-sm rounded-3xl shadow-2xl border border-white/10 overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-4 bg-slate-800 border-b border-white/5">
-          <div className="font-black text-white flex items-center gap-2"><Key size={16} className="text-blue-400"/> PINを変更</div>
-          <button onClick={onClose}><XIcon size={18} className="text-slate-400 hover:text-white"/></button>
-        </div>
-        <div className="p-6 text-center">
-          {step === 'done' ? (
-            <div className="space-y-4 py-4">
-              <div className="text-4xl">✅</div>
-              <div className="font-black text-white">PINを変更しました</div>
-              <div className="text-sm text-slate-400">新しいPIN: <span className="font-mono font-black text-white">{newPin}</span></div>
-              <button onClick={onClose} className="w-full bg-blue-600 text-white py-3 rounded-xl font-black">閉じる</button>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <p className="text-sm font-bold text-slate-400">{step === 'enter_old' ? '現在のPINを入力してください' : '新しいPINを入力してください'}</p>
-              <div className={`flex justify-center gap-3 py-2 ${err ? 'animate-bounce' : ''}`}>
-                {[0,1,2,3].map(i => (
-                  <div key={i} className={`w-4 h-4 rounded-full border-2 ${i < pin.length ? (err ? 'bg-red-500 border-red-500' : 'bg-blue-500 border-blue-500') : 'border-slate-600'}`}/>
-                ))}
-              </div>
-              {err && <p className="text-red-400 text-xs font-bold">PINが違います</p>}
-              <NumPad value={pin} onChange={(v) => {
-                setPin(v);
-                if (v.length === 4) {
-                  if (step === 'enter_old') setTimeout(() => handleOld(v), 50);
-                  else setTimeout(() => handleNew(v), 50);
-                }
-              }} maxLength={4} />
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// ─── タップカード ─────────────────────────────────────────────
-const TapCard: React.FC<{
+// ─── 3列スクエアカード ────────────────────────────────────────
+const SqCard: React.FC<{
   icon: React.ReactNode;
-  title: string;
-  subtitle?: string;
+  label: string;
+  sub?: string;
   onClick: () => void;
   accent?: string;
   badge?: string | number;
-}> = ({ icon, title, subtitle, onClick, accent = 'text-slate-400', badge }) => (
+}> = ({ icon, label, sub, onClick, accent = 'text-slate-400', badge }) => (
   <button onClick={onClick}
-    className="w-full flex items-center gap-4 p-4 bg-slate-900 border border-white/5 rounded-2xl hover:bg-slate-800 active:scale-[0.98] transition-all text-left"
+    className="relative flex flex-col items-center justify-center gap-2 aspect-square p-3 bg-slate-900 border border-white/5 rounded-2xl hover:bg-slate-800 active:scale-95 transition-all text-center"
   >
-    <div className={`w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center shrink-0 ${accent}`}>{icon}</div>
-    <div className="flex-1 min-w-0">
-      <div className="font-black text-white text-sm">{title}</div>
-      {subtitle && <div className="text-[11px] text-slate-500 font-medium mt-0.5 truncate">{subtitle}</div>}
-    </div>
-    {badge !== undefined && <span className="bg-blue-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full shrink-0">{badge}</span>}
-    <ChevronRight size={16} className="text-slate-600 shrink-0"/>
+    {badge !== undefined && (
+      <span className="absolute top-2 right-2 bg-blue-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full leading-none">{badge}</span>
+    )}
+    <div className={`w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center ${accent}`}>{icon}</div>
+    <div className="font-black text-white text-xs leading-tight">{label}</div>
+    {sub && <div className="text-[9px] text-slate-500 font-medium truncate w-full">{sub}</div>}
   </button>
 );
 
@@ -439,11 +382,7 @@ const Profile: React.FC = () => {
   const [authenticated, setAuth]    = useState(false);
   const [pin, setPin]               = useState('');
   const [pinErr, setPinErr]         = useState(false);
-
-  // Modal states
-  const [modal, setModal] = useState<
-    'icon' | 'frame' | 'title' | 'titleColl' | 'rank' | 'changePin' | null
-  >(null);
+  const [modal, setModal] = useState<'icon'|'frame'|'title'|'titleColl'|'rank'|null>(null);
   const [showSelector, setShowSelector] = useState(false);
 
   useEffect(() => {
@@ -451,16 +390,25 @@ const Profile: React.FC = () => {
     load();
     window.addEventListener('rivals-users-changed', load);
     window.addEventListener('rivals-sync-changed', load);
-    return () => { window.removeEventListener('rivals-users-changed', load); window.removeEventListener('rivals-sync-changed', load); };
+    return () => {
+      window.removeEventListener('rivals-users-changed', load);
+      window.removeEventListener('rivals-sync-changed', load);
+    };
   }, []);
 
   const refresh = () => setUsers(getUsers());
 
-  // ── ユーザー選択画面 ──────────────────────────────────────
+  // ── ユーザー選択 ──────────────────────────────────────────
   if (!selectedId) {
     return (
       <div className="space-y-6 animate-in fade-in duration-300">
-        <UserSelector users={users} onSelect={(id) => { setSelectedId(id); setAuth(false); setPin(''); }} onClose={() => navigate('/')} title="個人ページ（部員を選択）" mode="SIMPLE" />
+        <UserSelector
+          users={users}
+          onSelect={(id) => { setSelectedId(id); setAuth(false); setPin(''); }}
+          onClose={() => navigate('/')}
+          title="個人ページ（部員を選択）"
+          mode="SIMPLE"
+        />
       </div>
     );
   }
@@ -468,7 +416,7 @@ const Profile: React.FC = () => {
   const user = users.find(u => u.id === selectedId);
   if (!user) return null;
 
-  // ── PIN認証画面 ───────────────────────────────────────────
+  // ── PIN認証 ───────────────────────────────────────────────
   if (!authenticated) {
     const handlePin = (v?: string) => {
       const p = v ?? pin;
@@ -494,7 +442,9 @@ const Profile: React.FC = () => {
           <NumPad value={pin} onChange={(v) => { setPin(v); if (v.length === 4) setTimeout(() => handlePin(v), 50); }} maxLength={4} />
           <div className="px-8 pb-8 pt-2">
             <button onClick={() => handlePin()} disabled={pin.length < 4}
-              className="w-full bg-slate-200 disabled:bg-slate-700 disabled:text-slate-500 text-slate-900 py-3 rounded-xl font-black active:scale-95 transition-all">開く</button>
+              className="w-full bg-slate-200 disabled:bg-slate-700 disabled:text-slate-500 text-slate-900 py-3 rounded-xl font-black active:scale-95 transition-all">
+              開く
+            </button>
             <p className="text-center text-[11px] text-slate-600 font-bold mt-3">初期PINは <span className="text-slate-400">0000</span></p>
           </div>
         </div>
@@ -503,20 +453,47 @@ const Profile: React.FC = () => {
   }
 
   // ── 編集画面（認証済み） ──────────────────────────────────
-  const isElite    = user.systemTitle.length > 0;
-  const titleDefs  = user.systemTitle.map(id => SYSTEM_TITLES.find(t => t.id === id)).filter(Boolean) as typeof SYSTEM_TITLES;
-  const titleDef0  = titleDefs[0] ?? null;
-  const activeTitleName = user.activeTitle ? (ACHIEVEMENTS_DATA.find(a => a.id === user.activeTitle)?.name ?? null) : null;
-  const totalM     = user.wins + user.losses + user.draws;
-  const wr         = totalM > 0 ? Math.round((user.wins / totalM) * 100) : 0;
-  const rivalStats = getRivalryStats(selectedId);
+  const settings     = getSettings();
+  const isFactionWar = isEventActive() && settings.eventType === EventType.FACTION_WAR;
+  const isRed        = user.faction === 'RED';
+  const isElite      = user.systemTitle.length > 0;
+  const titleDefs    = user.systemTitle.map(id => SYSTEM_TITLES.find(t => t.id === id)).filter(Boolean) as typeof SYSTEM_TITLES;
+  const titleDef0    = titleDefs[0] ?? null;
+  const activeTitleName = user.activeTitle
+    ? (ACHIEVEMENTS_DATA.find(a => a.id === user.activeTitle)?.name ?? null)
+    : null;
+  const totalM       = user.wins + user.losses + user.draws;
+  const wr           = totalM > 0 ? Math.round((user.wins / totalM) * 100) : 0;
+  const rivalStats   = getRivalryStats(selectedId);
   const titleHistory = getUserSystemTitleHistory(selectedId);
-  const graphData  = (user.rateHistory || []).map(h => ({
+  const graphData    = (user.rateHistory || []).map(h => ({
     date: new Date(h.date).toLocaleDateString('ja-JP', { month:'numeric', day:'numeric' }),
     rate: h.rate,
   }));
+  const recentMatches = matches
+    .filter(m => m.player1Id === selectedId || m.player2Id === selectedId)
+    .slice(0, 10);
   const recentLogs = getLogs().filter(l => l.userId === selectedId).slice(0, 8);
   const maxPt      = Math.max(user.pointsMatch || 0, user.pointsAttendance || 0, user.pointsSpecial || 0, 1);
+  const unlockedAch = ACHIEVEMENTS_DATA.filter(a => user.achievements.includes(a.id));
+
+  const getMatchResult = (m: MatchRecord) => {
+    if (m.result === 'DRAW') return 'DRAW';
+    if ((m.player1Id === selectedId && m.result === 'PLAYER1_WIN') ||
+        (m.player2Id === selectedId && m.result === 'PLAYER2_WIN')) return 'WIN';
+    return 'LOSS';
+  };
+  const oppName = (m: MatchRecord) =>
+    users.find(u => u.id === (m.player1Id === selectedId ? m.player2Id : m.player1Id))?.name ?? '?';
+
+  // プロフィールカードのボーダー色（紅白戦対応）
+  const cardBorder = isFactionWar && isRed
+    ? 'border-red-800/60'
+    : isFactionWar
+    ? 'border-blue-800/60'
+    : isElite
+    ? 'border-yellow-500/40'
+    : 'border-white/10';
 
   return (
     <div className="space-y-4 pb-20 animate-in fade-in duration-200">
@@ -526,10 +503,13 @@ const Profile: React.FC = () => {
       {modal === 'title'     && <TitleModal user={user} onClose={() => setModal(null)} onChange={(id) => { updateUserTitle(selectedId, id === 'NONE' ? null : id); refresh(); setModal(null); }}/>}
       {modal === 'titleColl' && <TitleCollectionModal user={user} onClose={() => setModal(null)}/>}
       {modal === 'rank'      && <RankModal userId={selectedId} user={user} onClose={() => setModal(null)} onRefresh={refresh}/>}
-      {modal === 'changePin' && <ChangePinModal userId={selectedId} currentPin={user.profilePin ?? '0000'} onClose={() => { setModal(null); refresh(); }}/>}
 
       {showSelector && (
-        <UserSelector users={users} onSelect={(id) => { setSelectedId(id); setAuth(false); setPin(''); setShowSelector(false); }} onClose={() => setShowSelector(false)} title="別の部員を選択"/>
+        <UserSelector users={users}
+          onSelect={(id) => { setSelectedId(id); setAuth(false); setPin(''); setShowSelector(false); }}
+          onClose={() => setShowSelector(false)}
+          title="別の部員を選択"
+        />
       )}
 
       {/* ヘッダーナビ */}
@@ -547,12 +527,22 @@ const Profile: React.FC = () => {
         </div>
       </div>
 
-      {/* ─── アバターカード ─── */}
-      <div className={`relative overflow-hidden rounded-3xl bg-slate-900 border ${isElite ? 'border-yellow-500/40' : 'border-white/10'}`}>
-        {isElite && <div className="absolute inset-0 bg-gradient-to-br from-yellow-900/20 via-transparent to-amber-900/10 pointer-events-none"/>}
+      {/* ─── プロフィールカード ─── */}
+      <div className={`relative overflow-hidden rounded-3xl bg-slate-900 border ${cardBorder}`}>
+        {/* 紅白戦グロー */}
+        {isFactionWar && isRed && (
+          <div className="absolute top-0 right-0 w-64 h-64 bg-red-600 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 opacity-10 pointer-events-none"/>
+        )}
+        {isFactionWar && !isRed && (
+          <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 opacity-10 pointer-events-none"/>
+        )}
+        {isElite && !isFactionWar && (
+          <div className="absolute inset-0 bg-gradient-to-br from-yellow-900/20 via-transparent to-amber-900/10 pointer-events-none"/>
+        )}
         <div className={`absolute inset-0 opacity-15 ${user.avatarColor} bg-gradient-to-br from-white via-transparent to-transparent mix-blend-overlay`}/>
+
         <div className="relative p-5 flex items-start gap-5">
-          {/* アバター（タップでアイコン変更） */}
+          {/* アバター */}
           <div className="flex flex-col items-center gap-2 shrink-0">
             <button onClick={() => setModal('icon')} className="group relative">
               <Avatar user={user} size="lg"/>
@@ -569,19 +559,36 @@ const Profile: React.FC = () => {
               </button>
             </div>
           </div>
-          {/* 名前・称号 */}
+
+          {/* テキスト情報 */}
           <div className="flex-1 min-w-0">
             {titleDef0 && <div className="text-[10px] font-black text-yellow-400 uppercase tracking-widest">{titleDef0.english}</div>}
+            {/* 紅白戦バッジ */}
+            {isFactionWar && user.faction && (
+              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black border mb-1 ${isRed ? 'bg-red-900/50 text-red-200 border-red-800' : 'bg-blue-900/50 text-blue-200 border-blue-800'}`}>
+                {isRed ? <Flame size={9}/> : <Snowflake size={9}/>}
+                {isRed ? '紅組' : '白組'}
+                {user.isGeneral && <Crown size={9} fill="currentColor" className="text-yellow-400"/>}
+              </span>
+            )}
             {activeTitleName && (
-              <div className="inline-flex items-center gap-1 bg-slate-800/80 border border-white/10 px-2 py-0.5 rounded-full text-[10px] font-black text-slate-300 mb-1">
+              <div className="inline-flex items-center gap-1 bg-slate-800/80 border border-white/10 px-2 py-0.5 rounded-full text-[10px] font-black text-slate-300 mb-1 ml-1">
                 <Tag size={9}/> {activeTitleName}
               </div>
             )}
             <h2 className={`font-black text-3xl tracking-tight ${isElite ? 'text-transparent bg-clip-text bg-gradient-to-b from-yellow-200 to-yellow-500' : 'text-white'}`}>
               {user.name}
             </h2>
+            {/* 四天王バッジ */}
             {user.systemTitle.length > 0 && (
               <div className="flex flex-wrap gap-1 mt-1">{user.systemTitle.map(tid => <FKBadge key={tid} id={tid}/>)}</div>
+            )}
+            {/* 大将クラウン */}
+            {isFactionWar && user.isGeneral && (
+              <div className="flex items-center gap-1 mt-1">
+                <Crown size={14} className="text-yellow-400 animate-bounce" fill="currentColor"/>
+                <span className="text-xs font-black text-yellow-300">大将</span>
+              </div>
             )}
             {(user.ranks || []).length > 0 && (
               <div className="flex flex-wrap gap-1 mt-1">
@@ -592,6 +599,7 @@ const Profile: React.FC = () => {
             )}
           </div>
         </div>
+
         {/* スタッツ行 */}
         <div className="relative border-t border-white/5 grid grid-cols-4 divide-x divide-white/5">
           {[
@@ -608,15 +616,21 @@ const Profile: React.FC = () => {
         </div>
       </div>
 
-      {/* ─── カスタマイズカード群 ─── */}
+      {/* ─── カスタマイズ 3列グリッド ─── */}
       <div className="space-y-2">
         <div className="text-[10px] font-black text-slate-600 uppercase tracking-widest px-1">カスタマイズ</div>
-        <TapCard icon={<Smile size={18}/>}  title="アイコンを変更" subtitle={ICONS_DATA.find(i=>i.id===user.activeIconId)?.name ?? '未設定'} onClick={() => setModal('icon')} accent="text-blue-400"/>
-        <TapCard icon={<Crown size={18}/>}  title="フレームを変更" subtitle={user.activeFrameId ? (FRAMES_DATA.find(f=>f.id===user.activeFrameId)?.name ?? 'なし') : 'なし'} onClick={() => setModal('frame')} accent="text-yellow-400"/>
-        <TapCard icon={<Tag size={18}/>}    title="称号を変更"     subtitle={activeTitleName ?? '設定なし'} onClick={() => setModal('title')} accent="text-slate-400"/>
-        <TapCard icon={<Award size={18}/>}  title="称号コレクション" subtitle={`獲得済: ${user.achievements.length}種`} onClick={() => setModal('titleColl')} accent="text-indigo-400" badge={user.achievements.length}/>
-        <TapCard icon={<Medal size={18}/>}  title="段位・級位"     subtitle={user.ranks?.length ? `${user.ranks.length}件登録済` : '未登録'} onClick={() => setModal('rank')} accent="text-purple-400"/>
-        <TapCard icon={<Key size={18}/>}    title="PINを変更"      subtitle="個人ページの暗証番号" onClick={() => setModal('changePin')} accent="text-slate-500"/>
+        <div className="grid grid-cols-3 gap-3">
+          <SqCard icon={<Smile size={22}/>}  label="アイコン"   sub={ICONS_DATA.find(i=>i.id===user.activeIconId)?.name}   onClick={() => setModal('icon')}      accent="text-blue-400"/>
+          <SqCard icon={<Crown size={22}/>}  label="フレーム"   sub={FRAMES_DATA.find(f=>f.id===(user.activeFrameId||'FRAME_NONE'))?.name} onClick={() => setModal('frame')} accent="text-yellow-400"/>
+          <SqCard icon={<Tag size={22}/>}    label="称号"       sub={activeTitleName ?? '設定なし'}                          onClick={() => setModal('title')}     accent="text-slate-400"/>
+          <SqCard icon={<Award size={22}/>}  label="称号一覧"   sub={`${user.achievements.length}種獲得`}                   onClick={() => setModal('titleColl')} accent="text-indigo-400" badge={user.achievements.length}/>
+          <SqCard icon={<Medal size={22}/>}  label="段位申請"   sub={user.ranks?.length ? `${user.ranks.length}件登録済` : '未登録'} onClick={() => setModal('rank')} accent="text-purple-400"/>
+          {/* PIN変更は管理者専用のため、ここには表示しない */}
+          <div className="aspect-square p-3 bg-slate-900/40 border border-white/5 rounded-2xl flex flex-col items-center justify-center text-center opacity-30">
+            <Lock size={22} className="text-slate-600 mb-2"/>
+            <div className="text-[9px] font-bold text-slate-600">PIN変更は<br/>管理者から</div>
+          </div>
+        </div>
       </div>
 
       {/* ─── ヒートマップ ─── */}
@@ -646,12 +660,12 @@ const Profile: React.FC = () => {
           <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">戦績</div>
           <div className="space-y-2">
             {[
-              {label:'勝',   val:user.wins,           color:'text-green-400'},
-              {label:'敗',   val:user.losses,          color:'text-red-400'},
-              {label:'分',   val:user.draws,           color:'text-yellow-400'},
-              {label:'連勝', val:user.currentStreak,   color:'text-rose-400'},
-              {label:'最大連勝', val:user.maxStreak,   color:'text-orange-400'},
-              {label:'格上撃破', val:user.upsetWins||0,color:'text-purple-400'},
+              {label:'勝',      val:user.wins,           color:'text-green-400'},
+              {label:'敗',      val:user.losses,          color:'text-red-400'},
+              {label:'分',      val:user.draws,           color:'text-yellow-400'},
+              {label:'連勝中',  val:user.currentStreak,   color:'text-rose-400'},
+              {label:'最大連勝',val:user.maxStreak,       color:'text-orange-400'},
+              {label:'格上撃破',val:user.upsetWins||0,   color:'text-purple-400'},
             ].map(s => (
               <div key={s.label} className="flex items-center justify-between">
                 <span className="text-xs text-slate-400 font-bold">{s.label}</span>
@@ -683,7 +697,52 @@ const Profile: React.FC = () => {
         </div>
       </div>
 
-      {/* ─── ライバル分析（本人専用・煽り文あり） ─── */}
+      {/* ─── 最近の対局（星取表 + 一覧） ─── */}
+      {recentMatches.length > 0 && (
+        <div className="bg-slate-900 border border-white/5 rounded-2xl p-4 space-y-4">
+          <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5"><Swords size={11}/> 直近の対局</div>
+          {/* 星取表 */}
+          <div className="flex gap-1.5 overflow-x-auto pb-1">
+            {[...recentMatches].reverse().map((m, i) => {
+              const res = getMatchResult(m);
+              return (
+                <div key={i} title={`vs ${oppName(m)}`}
+                  className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-sm shrink-0 ${
+                    res === 'WIN'  ? 'bg-white text-slate-900' :
+                    res === 'LOSS' ? 'bg-slate-800 text-slate-500' :
+                    'bg-slate-700 text-slate-300 border border-slate-500 border-dashed'
+                  }`}>
+                  {res === 'WIN' ? '○' : res === 'LOSS' ? '●' : '△'}
+                </div>
+              );
+            })}
+          </div>
+          {/* 一覧 */}
+          <div className="space-y-0">
+            {recentMatches.map(m => {
+              const res = getMatchResult(m);
+              const rc  = m.player1Id === selectedId ? m.p1RateChange : m.p2RateChange;
+              return (
+                <div key={m.id} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0">
+                  <div className="flex items-center gap-2">
+                    <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${res === 'WIN' ? 'bg-green-900/40 text-green-400' : res === 'DRAW' ? 'bg-yellow-900/40 text-yellow-400' : 'bg-red-900/40 text-red-400'}`}>
+                      {res === 'WIN' ? '勝' : res === 'DRAW' ? '分' : '負'}
+                    </span>
+                    <span className="text-xs font-bold text-slate-300">vs {oppName(m)}</span>
+                    {m.isDuel && <Swords size={11} className="text-yellow-400" title="一騎討ち"/>}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs font-mono font-bold ${rc >= 0 ? 'text-blue-400' : 'text-red-400'}`}>{rc >= 0 ? '+' : ''}{rc}</span>
+                    <span className="text-[10px] text-slate-600">{new Date(m.date).toLocaleDateString('ja-JP',{month:'numeric',day:'numeric'})}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ─── ライバル分析（煽り文あり・本人専用） ─── */}
       {(rivalStats.bestCustomer || rivalStats.nemeses) && (
         <div className="bg-slate-900 border border-white/5 rounded-2xl p-4 space-y-3">
           <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5"><Swords size={11}/> ライバル分析</div>
@@ -736,6 +795,30 @@ const Profile: React.FC = () => {
         </div>
       )}
 
+      {/* ─── 獲得称号リスト（サマリ + 全一覧ボタン） ─── */}
+      <div className="bg-slate-900 border border-white/5 rounded-2xl p-4 space-y-3">
+        <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5"><Award size={11}/> 獲得称号</div>
+        {unlockedAch.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-40 overflow-y-auto">
+            {unlockedAch.map(a => (
+              <div key={a.id} className="flex items-center gap-2 p-2 bg-indigo-900/20 rounded-xl border border-indigo-500/20">
+                <Award size={12} className="text-indigo-400 shrink-0"/>
+                <div>
+                  <div className="text-xs font-bold text-slate-200">{a.name}</div>
+                  <div className="text-[9px] text-slate-500">{a.description}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-slate-500 text-sm">まだ称号を獲得していません。</p>
+        )}
+        <button onClick={() => setModal('titleColl')}
+          className="w-full bg-slate-800 text-slate-300 py-2.5 rounded-xl text-xs font-black hover:bg-slate-700 transition-colors flex items-center justify-center gap-2">
+          <List size={14}/> 全称号コレクションを見る
+        </button>
+      </div>
+
       {/* ─── 最近のポイント履歴 ─── */}
       {recentLogs.length > 0 && (
         <div className="bg-slate-900 border border-white/5 rounded-2xl p-4">
@@ -747,7 +830,7 @@ const Profile: React.FC = () => {
                   <div className="text-[10px] text-slate-500">{new Date(l.date).toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}</div>
                   <div className="text-xs font-bold text-slate-300">{l.description}</div>
                 </div>
-                <span className="text-sm font-black text-amber-400">+{l.points}</span>
+                <span className="text-sm font-black text-amber-400 shrink-0">+{l.points}</span>
               </div>
             ))}
           </div>
