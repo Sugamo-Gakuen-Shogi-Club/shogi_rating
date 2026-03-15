@@ -1603,6 +1603,35 @@ export const manualPointAdjustment = (uid: string, pts: number, reason: string):
   }]);
 };
 
+/**
+ * ランキング入賞ボーナスをログに記録（ポイント付与 + 変動履歴に残す）
+ * 管理者が「四天王を更新」「月次リセット」を実行したタイミングで呼ぶ想定
+ */
+export const recordRankingAward = (
+  uid: string,
+  rankLabel: string,   // 例: '今期成長'
+  position: 1 | 2 | 3,
+  pts: number,
+): void => {
+  const all = getRawUsers();
+  const u = all.find(x => x.id === uid);
+  if (!u || pts <= 0) return;
+  u.totalPoints    += pts;
+  u.pointsSpecial   = (u.pointsSpecial || 0) + pts;
+  u.monthlyPoints  += pts;
+  checkAchievementsAndIcons(u);
+  saveUsers(all);
+  const posLabel = position === 1 ? '🥇 1位' : position === 2 ? '🥈 2位' : '🥉 3位';
+  appendLogs([{
+    id: randomId(), userId: uid,
+    type: ActivityType.BONUS,
+    points: pts,
+    description: `🏆 ${rankLabel}ランキング ${posLabel} — +${pts}pt`,
+    date: new Date().toISOString(),
+  }]);
+  syncWithServer();
+};
+
 export const manualRateAdjustment = (uid: string, delta: number, reason: string): void => {
   const all = getRawUsers();
   const u = all.find(x => x.id === uid);
