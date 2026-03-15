@@ -15,6 +15,9 @@ export const ShogiPiece: React.FC<ShogiPieceProps> = ({
     className = '',
     shadow = true
 }) => {
+    // インスタンスごとにユニークなIDを生成（SVGグラジェントID衝突防止）
+    const uid = React.useId().replace(/:/g, '');
+
     // 駒の色（黄楊・ツゲ）
     const woodColorLight = "#fde0b2";
     const woodColorDark = "#d4a76a";
@@ -41,12 +44,12 @@ export const ShogiPiece: React.FC<ShogiPieceProps> = ({
                 xmlns="http://www.w3.org/2000/svg"
             >
                 <defs>
-                    <linearGradient id="woodGradient" x1="20%" y1="0%" x2="100%" y2="100%">
+                    <linearGradient id={`${uid}-woodGradient`} x1="20%" y1="0%" x2="100%" y2="100%">
                         <stop offset="0%" stopColor="#fef3c7" />
                         <stop offset="50%" stopColor="#fde68a" />
                         <stop offset="100%" stopColor="#d97706" />
                     </linearGradient>
-                    <filter id="woodGrain">
+                    <filter id={`${uid}-woodGrain`}>
                         <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="3" stitchTiles="stitch" />
                         <feColorMatrix type="saturate" values="0.2" />
                         <feComponentTransfer>
@@ -56,7 +59,7 @@ export const ShogiPiece: React.FC<ShogiPieceProps> = ({
                         </feComponentTransfer>
                         <feComposite operator="in" in2="SourceGraphic" />
                     </filter>
-                    <filter id="bevel" x="-50%" y="-50%" width="200%" height="200%">
+                    <filter id={`${uid}-bevel`} x="-50%" y="-50%" width="200%" height="200%">
                         <feGaussianBlur in="SourceAlpha" stdDeviation="1" result="blur"/>
                         <feSpecularLighting in="blur" surfaceScale="2" specularConstant="0.5" specularExponent="20" result="specOut" lightingColor="white">
                             <fePointLight x="-5000" y="-10000" z="20000"/>
@@ -75,7 +78,7 @@ export const ShogiPiece: React.FC<ShogiPieceProps> = ({
                 */}
                 <path 
                     d="M 50 15 L 80 28 L 92 105 L 8 105 L 20 28 Z" 
-                    fill="url(#woodGradient)" 
+                    fill={`url(#${uid}-woodGradient)`}
                     stroke={borderColor} 
                     strokeWidth="1"
                     strokeLinejoin="round"
@@ -84,8 +87,8 @@ export const ShogiPiece: React.FC<ShogiPieceProps> = ({
                 {/* 3D Bevel/Highlight */}
                 <path 
                     d="M 50 15 L 80 28 L 92 105 L 8 105 L 20 28 Z" 
-                    fill="url(#woodGradient)"
-                    filter="url(#bevel)"
+                    fill={`url(#${uid}-woodGradient)`}
+                    filter={`url(#${uid}-bevel)`}
                     opacity="0.6"
                     style={{ mixBlendMode: 'overlay' }}
                 />
@@ -95,7 +98,7 @@ export const ShogiPiece: React.FC<ShogiPieceProps> = ({
                     d="M 50 15 L 80 28 L 92 105 L 8 105 L 20 28 Z" 
                     fill="black"
                     fillOpacity="0.08"
-                    filter="url(#woodGrain)"
+                    filter={`url(#${uid}-woodGrain)`}
                     style={{ mixBlendMode: 'multiply' }}
                 />
 
