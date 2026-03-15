@@ -22,7 +22,7 @@ import {
   CheckCircle, Shuffle, Users, Crown, ChevronRight, X,
   RefreshCw, Languages, FileUp, Upload, Swords, Cloud,
   CloudOff, AlertCircle, Loader, UserCheck, UserX, RotateCcw,
-  Wrench, Medal, Check, KeyRound, Globe, Copy, Star, Lock
+  Wrench, Medal, Check, KeyRound, Star, Lock
 } from 'lucide-react';
 import { UserSelector } from './UserSelector';
 import MaintenancePanel from './MaintenancePanel';
@@ -52,9 +52,6 @@ const Admin: React.FC = () => {
   const [pinTargetId, setPinTargetId] = useState('');
   const [newPin, setNewPin] = useState('');
   const [pinMsg, setPinMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
-
-  // Public URL copy
-  const [urlCopied, setUrlCopied] = useState(false);
 
   // Auto backups
   const [autoBackups, setAutoBackups] = useState<AutoBackupEntry[]>([]);
@@ -780,42 +777,6 @@ const Admin: React.FC = () => {
 
         {/* ── 右列 ── */}
         <div className="space-y-8">
-          {/* ── 公開ランキングページ ── */}
-          <Card title="公開ランキングページ" icon={<Globe className="text-cyan-400" size={18} />}>
-            <div className="space-y-4">
-              <p className="text-xs text-slate-400 font-bold leading-relaxed">
-                管理機能のない閲覧専用ページです。<br/>
-                URLを知っている人だけがアクセスできます。大画面表示や外部共有に使えます。
-              </p>
-              <div className="bg-slate-800/60 rounded-xl border border-slate-700 p-3">
-                <div className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1.5">公開URL</div>
-                <div className="font-mono text-sm text-cyan-300 break-all">
-                  {window.location.origin}{window.location.pathname}#/board
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => {
-                    const url = `${window.location.origin}${window.location.pathname}#/board`;
-                    navigator.clipboard.writeText(url).then(() => {
-                      setUrlCopied(true);
-                      setTimeout(() => setUrlCopied(false), 2500);
-                    });
-                  }}
-                  className="flex-1 flex items-center justify-center gap-2 bg-cyan-900/20 hover:bg-cyan-900/40 border border-cyan-700/40 text-cyan-300 py-2.5 rounded-xl font-black text-sm transition-all active:scale-[0.97]"
-                >
-                  {urlCopied ? <><Check size={14} /> コピー済み</> : <><Copy size={14} /> URLをコピー</>}
-                </button>
-                <button
-                  onClick={() => window.open(`${window.location.origin}${window.location.pathname}#/board`, '_blank')}
-                  className="flex-1 flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-300 py-2.5 rounded-xl font-black text-sm transition-all active:scale-[0.97]"
-                >
-                  <Globe size={14} /> 別タブで開く
-                </button>
-              </div>
-            </div>
-          </Card>
-
           {/* ── ランク申請承認 ── */}
           <Card title={`段位・級位の申請 ${rankApps.length > 0 ? `(${rankApps.length}件待ち)` : ''}`} icon={<Medal className="text-purple-400" size={18} />}>
             <div className="space-y-3">

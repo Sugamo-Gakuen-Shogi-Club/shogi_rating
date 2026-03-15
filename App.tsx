@@ -1,19 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { HashRouter, Routes, Route, useLocation, Link } from 'react-router-dom';
-import { Home, Trophy, User as UserIcon, Settings, PlusCircle, BookOpen, Cloud, CloudOff, RefreshCw, Loader, AlertCircle, Wrench, Globe, Copy, Check, Crown } from 'lucide-react';
+import { Home, Trophy, User as UserIcon, Settings, PlusCircle, BookOpen, Cloud, CloudOff, RefreshCw, Loader, AlertCircle, Wrench, Crown } from 'lucide-react';
 import { seedData, loadFromCloud, getUsers, getSyncStatus, manualSync, LoadResult, getMaintenanceState } from './storage';
 import { initAppCheck } from './appCheck';
 import { SyncMeta } from './types';
 
-import Dashboard  from './Dashboard';
-import Rankings   from './Rankings';
-import MatchEntry from './MatchEntry';
-import Profile    from './Profile';
-import Admin      from './Admin';
-import { Guide }  from './Guide';
+import Dashboard    from './Dashboard';
+import Rankings     from './Rankings';
+import MatchEntry   from './MatchEntry';
+import Profile      from './Profile';
+import ProfileView  from './ProfileView';
+import Admin        from './Admin';
+import { Guide }    from './Guide';
 import { Screensaver } from './Screensaver';
-import UndoPanel  from './UndoPanel';
-import PublicView from './PublicView';
+import UndoPanel    from './UndoPanel';
 import FourKingsHistory from './FourKingsHistory';
 
 /** Maintenance mode banner shown across all pages */
@@ -118,10 +118,7 @@ const SyncIndicator: React.FC = () => {
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
 
-  // 公開ページはアプリシェルを使わない（独自レイアウト）
-  if (location.pathname === '/view' || location.pathname === '/board') {
-    return <>{children}</>;
-  }
+  // 公開ページルートは廃止 — すべてアプリシェルを使用
 
   const navItems = [
     { path: '/',           icon: Home,       label: 'ホーム' },
@@ -279,15 +276,14 @@ const App: React.FC = () => {
       {isIdle && <Screensaver onDismiss={resetTimer} />}
       <Layout>
         <Routes>
-          <Route path="/"          element={<Dashboard />} />
-          <Route path="/rankings"  element={<Rankings />} />
-          <Route path="/fourKings" element={<FourKingsHistory />} />
-          <Route path="/match"     element={<MatchEntry />} />
-          <Route path="/profile"   element={<Profile />} />
-          <Route path="/guide"     element={<Guide />} />
-          <Route path="/admin"     element={<Admin />} />
-          <Route path="/view"      element={<PublicView />} />
-          <Route path="/board"     element={<PublicView />} />
+          <Route path="/"                   element={<Dashboard />} />
+          <Route path="/rankings"            element={<Rankings />} />
+          <Route path="/fourKings"           element={<FourKingsHistory />} />
+          <Route path="/match"               element={<MatchEntry />} />
+          <Route path="/profile"             element={<Profile />} />
+          <Route path="/profile/:userId"     element={<ProfileView />} />
+          <Route path="/guide"               element={<Guide />} />
+          <Route path="/admin"               element={<Admin />} />
         </Routes>
       </Layout>
       {/* 全ページ共通フローティングUndoボタン */}

@@ -193,7 +193,8 @@ const Rankings: React.FC = () => {
                     const rise = rateDelta+ptDelta;
                     const activeTitle = ACHIEVEMENTS_DATA.find(a=>a.id===user.activeTitle);
                     return (
-                      <tr key={user.id} className={`transition-all group duration-300 ${user.systemTitle.length > 0 ? 'bg-yellow-900/10 hover:bg-yellow-900/20 border-l-2 border-yellow-500/50' : 'hover:bg-white/5'}`}>
+                      <tr key={user.id} onClick={() => window.location.hash = `/profile/${user.id}`}
+                        className={`transition-all group duration-300 cursor-pointer ${user.systemTitle.length > 0 ? 'bg-yellow-900/10 hover:bg-yellow-900/20 border-l-2 border-yellow-500/50' : 'hover:bg-white/5'}`}>
                         <td className="p-4 text-center font-black text-xl">
                           <span className={dispRank===1?'text-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.5)]':'text-slate-500'}>
                             {getRankIcon(dispRank)}
