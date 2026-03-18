@@ -41,7 +41,6 @@ const Admin: React.FC = () => {
   // DnD member order
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [dragOver, setDragOver] = useState<number | null>(null);
-  const [activeEvent, setActiveEvent] = useState(false);
 
   // Sync state
   const [syncMeta, setSyncMeta] = useState<SyncMeta>(getSyncStatus());
