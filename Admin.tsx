@@ -41,6 +41,13 @@ const Admin: React.FC = () => {
   // DnD member order
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [dragOver, setDragOver] = useState<number | null>(null);
+  // デバイス承認フロー（未承認デバイス用）
+  const [approveStep, setApproveStep] = useState<'koji' | 'adminPin' | 'label' | 'done'>('koji');
+  const [approveKoji, setApproveKoji] = useState('');
+  const [approveKojiErr, setApproveKojiErr] = useState(false);
+  const [approveAdminPin, setApproveAdminPin] = useState('');
+  const [approveAdminErr, setApproveAdminErr] = useState(false);
+  const [approveLabel, setApproveLabel] = useState('部室iPad');
 
   // Sync state
   const [syncMeta, setSyncMeta] = useState<SyncMeta>(getSyncStatus());
@@ -495,23 +502,98 @@ const Admin: React.FC = () => {
   // ──────────────────────────────────────────────────────────
   if (!isAuthenticated) {
     const deviceOk = isDeviceApproved();
-    // 未承認デバイスは管理者ログイン自体をブロック
-    if (!deviceOk) {
+
+    // 未承認デバイス → koji → 管理者PIN → デバイス名 → 承認
+    if (!deviceOk && approveStep !== 'done') {
+      const handleKojiSubmit = () => {
+        if (approveKoji === 'koji') { setApproveStep('adminPin'); setApproveKojiErr(false); }
+        else { setApproveKojiErr(true); setTimeout(() => setApproveKojiErr(false), 1500); }
+      };
+      const handleAdminPinSubmit = (v: string) => {
+        const s = getSettings();
+        if (v === s.adminPin) { setApproveStep('label'); setApproveAdminErr(false); }
+        else { setApproveAdminErr(true); setTimeout(() => { setApproveAdminErr(false); setApproveAdminPin(''); }, 600); }
+      };
+
       return (
         <div className="flex items-center justify-center min-h-[60vh] p-4">
-          <div className="glass-panel-dark w-full max-w-sm p-8 text-center space-y-5 rounded-3xl border border-red-700/40 shadow-2xl">
-            <Lock className="mx-auto text-red-400" size={48} />
-            <h2 className="text-xl font-black text-white">未承認デバイス</h2>
-            <p className="text-sm text-slate-400 font-bold leading-relaxed">
-              このデバイスは未承認のため<br/>
-              <span className="text-red-300">管理者ページにアクセスできません。</span>
-            </p>
-            <p className="text-xs text-slate-500">
-              承認済みデバイスから管理者画面を開き、<br/>
-              「デバイス承認」→変更パスワード入力で承認してください。
-            </p>
-            <div className="text-[10px] text-slate-600 break-all border border-slate-800 rounded-lg px-3 py-2">
-              Token: {getOrCreateDeviceToken()}
+          <div className="glass-panel-dark w-full max-w-sm rounded-3xl border border-yellow-700/30 shadow-2xl overflow-hidden">
+            <div className="px-6 py-5 border-b border-white/5 bg-yellow-900/20">
+              <div className="flex items-center gap-3">
+                <Lock className="text-yellow-400 shrink-0" size={24} />
+                <div>
+                  <h2 className="text-base font-black text-white">このデバイスを承認する</h2>
+                  <p className="text-[10px] text-slate-400 font-bold mt-0.5">
+                    ステップ {approveStep === 'koji' ? '1' : approveStep === 'adminPin' ? '2' : '3'} / 3
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="p-6 space-y-4">
+              {/* ステップ1: koji */}
+              {approveStep === 'koji' && (
+                <>
+                  <p className="text-sm text-slate-300 font-bold">変更パスワードを入力してください</p>
+                  <input
+                    type="password"
+                    value={approveKoji}
+                    onChange={e => setApproveKoji(e.target.value)}
+                    placeholder="変更パスワード"
+                    className={`w-full p-3 rounded-xl border bg-slate-800 text-white font-bold outline-none focus:border-yellow-500 transition-colors ${approveKojiErr ? 'border-red-500' : 'border-slate-600'}`}
+                    onKeyDown={e => e.key === 'Enter' && handleKojiSubmit()}
+                    autoFocus
+                  />
+                  {approveKojiErr && <p className="text-red-400 text-xs font-bold">パスワードが違います</p>}
+                  <button onClick={handleKojiSubmit}
+                    className="w-full py-3 bg-yellow-500 hover:bg-yellow-400 text-slate-900 font-black rounded-xl transition-all active:scale-95">
+                    次へ
+                  </button>
+                </>
+              )}
+              {/* ステップ2: 管理者PIN */}
+              {approveStep === 'adminPin' && (
+                <>
+                  <p className="text-sm text-slate-300 font-bold">管理者PINを入力してください</p>
+                  <div className="flex justify-center gap-2 py-2">
+                    {[0,1,2,3,4,5].map(i => (
+                      <div key={i} className={`w-4 h-4 rounded-full border-2 transition-all ${
+                        i < approveAdminPin.length
+                          ? approveAdminErr ? 'bg-red-500 border-red-500' : 'bg-yellow-400 border-yellow-400'
+                          : 'border-slate-600 bg-transparent'
+                      }`} />
+                    ))}
+                  </div>
+                  {approveAdminErr && <p className="text-red-400 text-xs font-bold text-center">PINが違います</p>}
+                  <NumPad
+                    value={approveAdminPin}
+                    onChange={v => { setApproveAdminPin(v); if (v.length === 6) handleAdminPinSubmit(v); }}
+                    maxLength={6}
+                  />
+                </>
+              )}
+              {/* ステップ3: デバイス名 */}
+              {approveStep === 'label' && (
+                <>
+                  <p className="text-sm text-slate-300 font-bold">デバイス名を入力してください</p>
+                  <input
+                    value={approveLabel}
+                    onChange={e => setApproveLabel(e.target.value)}
+                    placeholder="例：部室iPad"
+                    className="w-full p-3 rounded-xl border border-slate-600 bg-slate-800 text-white font-bold outline-none focus:border-yellow-500"
+                    autoFocus
+                  />
+                  <div className="text-[10px] text-slate-600 break-all">Token: {getOrCreateDeviceToken()}</div>
+                  <button
+                    onClick={() => {
+                      approveThisDevice(approveLabel || '未設定');
+                      refreshData();
+                      setApproveStep('done');
+                    }}
+                    className="w-full py-3 bg-green-600 hover:bg-green-500 text-white font-black rounded-xl transition-all active:scale-95">
+                    ✅ このデバイスを承認する
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>
