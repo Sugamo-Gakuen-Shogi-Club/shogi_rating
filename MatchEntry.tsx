@@ -10,6 +10,7 @@ import { AchievementPopup } from './AchievementPopup';
 import { UserSelector } from './UserSelector';
 import { MissionPopup } from './MissionPopup';
 import { ShogiPiece } from './ShogiPiece';
+import { NumPad } from './NumPad';
 
 declare const confetti: any;
 
@@ -46,12 +47,11 @@ const PinForm: React.FC<{ user: User; label: string; onSuccess: () => void; onBa
   const isDefault = (user.profilePin ?? DEFAULT_PIN) === DEFAULT_PIN;
 
   const handleChange = (v: string) => {
-    const digits = v.replace(/\D/g, '').slice(0, 6);
-    setPin(digits); setErr(false);
-    if (digits.length === 6) {
-      if (isDefault) { setErr(true); setShake(true); setTimeout(() => setShake(false), 600); setPin(''); return; }
-      if (digits === user.profilePin) { onSuccess(); }
-      else { setErr(true); setShake(true); setTimeout(() => { setShake(false); setErr(false); }, 600); setPin(''); }
+    setPin(v); setErr(false);
+    if (v.length === 6) {
+      if (isDefault) { setErr(true); setShake(true); setTimeout(() => setShake(false), 600); setTimeout(() => setPin(''), 300); return; }
+      if (v === user.profilePin) { onSuccess(); }
+      else { setErr(true); setShake(true); setTimeout(() => { setShake(false); setErr(false); setPin(''); }, 600); }
     }
   };
 
@@ -71,22 +71,19 @@ const PinForm: React.FC<{ user: User; label: string; onSuccess: () => void; onBa
           )}
         </div>
         {!isDefault && (
-          <div className="px-6 py-5 space-y-3">
+          <div className="px-6 py-4 space-y-3">
+            {/* ドット表示 */}
             <div className="flex justify-center gap-3">
               {[0,1,2,3,4,5].map(i => (
                 <div key={i} className={`w-4 h-4 rounded-full border-2 transition-all ${i < pin.length ? err ? 'bg-red-500 border-red-500' : 'bg-white border-white' : 'bg-transparent border-slate-600'}`} />
               ))}
             </div>
-            <input
-              type="password" inputMode="numeric" pattern="[0-9]*" autoFocus
-              value={pin} onChange={e => handleChange(e.target.value)} maxLength={6}
-              className="w-full text-center text-2xl tracking-[0.5em] font-mono py-3 px-4 bg-slate-800 border border-slate-600 rounded-xl text-white outline-none focus:border-indigo-500 transition-colors"
-              placeholder="——————"
-            />
             {err && <p className="text-center text-red-400 text-xs font-bold">PINが間違っています</p>}
+            {/* NumPad */}
+            <NumPad value={pin} onChange={handleChange} maxLength={6} />
           </div>
         )}
-        <div className="px-6 pb-6">
+        <div className="px-6 pb-6 pt-2">
           <button onClick={onBack} className="w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 font-black text-sm transition-all active:scale-95">戻る</button>
         </div>
       </div>

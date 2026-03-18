@@ -508,15 +508,13 @@ const Admin: React.FC = () => {
           <div className="space-y-3">
             <input
               type="password"
-              inputMode="numeric"
-              pattern="[0-9]*"
               value={pin}
-              onChange={e => setPin(e.target.value.replace(/\D/g,'').slice(0,6))}
+              readOnly
               placeholder="管理者PIN（6桁）"
-              className="w-full p-4 border border-slate-700 rounded-xl text-center text-2xl tracking-[0.5em] outline-none bg-slate-900 text-white font-mono focus:border-indigo-500 transition-colors"
+              className="w-full p-4 border border-slate-700 rounded-xl text-center text-2xl tracking-[0.5em] outline-none bg-slate-900 text-white font-mono"
               maxLength={6}
-              onKeyDown={e => e.key === 'Enter' && pin.length === 6 && handleLogin()}
             />
+            <NumPad value={pin} onChange={v => setPin(v)} maxLength={6} />
           </div>
           <button onClick={handleLogin} disabled={pin.length < 6}
             className="w-full bg-slate-200 disabled:bg-slate-700 disabled:text-slate-500 text-slate-900 py-3 rounded-xl font-bold active:scale-95 transition-transform shadow-lg">
