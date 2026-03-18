@@ -55,7 +55,7 @@ export const Card: React.FC<CardProps> = ({
 
       {/* フルスクリーンモーダル */}
       {open && (
-        <div className="fixed inset-0 z-[200] flex flex-col bg-slate-950 animate-in slide-in-from-right duration-250">
+        <div className="fixed inset-0 z-[500] flex flex-col bg-slate-950 animate-in slide-in-from-right duration-250">
           {/* モーダルヘッダー */}
           <div className="flex items-center gap-3 px-4 py-4 border-b border-white/10 bg-slate-900/80 backdrop-blur-md shrink-0">
             <button

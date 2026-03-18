@@ -149,8 +149,8 @@ const TabIntro = () => (
       <div className="absolute -top-12 -right-12 w-48 h-48 bg-blue-500/10 rounded-full blur-2xl" />
       <div className="relative">
         <div className="text-[11px] font-black uppercase tracking-widest text-blue-400 mb-2">Club Rivals</div>
-        <h2 className="text-2xl font-black text-white mb-2 leading-tight">将棋班の活動を<br />記録・可視化・盛り上げる</h2>
-        <p className="text-slate-400 text-sm font-medium">対局記録・レーティング・称号・イベントをひとつのアプリで管理する、将棋班向けの班活管理ツールです。</p>
+        <h2 className="text-2xl font-black text-white mb-2 leading-tight">巣鴨学園将棋班の活動を<br />記録・可視化・盛り上げる</h2>
+        <p className="text-slate-400 text-sm font-medium">巣鴨学園将棋班専用の部活管理ツール。対局記録・レーティング・称号・ランキング・ミッションをひとつで管理。</p>
       </div>
     </div>
 
@@ -339,7 +339,7 @@ const TabRate = () => (
       <H icon={<Star size={16}/>}>ポイント（Points）</H>
       <p className="text-sm text-slate-400 font-medium">出席や対局で貯まる「活動量」の指標。<strong className="text-white">負けても必ずもらえる</strong>ので、参加するほど有利。</p>
       <Table rows={[
-        ['出席',             '班活に来るだけでもらえる'],
+        ['出席',             '部活に来るだけでもらえる'],
         ['対局（勝ち）',     '設定値のポイント'],
         ['対局（負け）',     '設定値の半分（0にはならない）'],
         ['連勝ボーナス',     '3連勝以上で追加ポイント'],
@@ -354,7 +354,7 @@ const TabRate = () => (
       <Table rows={[
         ['今期成長',   'シーズン開始時からのレート増加＋ポイント増加の合計'],
         ['レート',     '現在のEloレート。純粋な実力値'],
-        ['活動日数',   '今シーズンに班活に来た日数'],
+        ['活動日数',   '今シーズンに部活に来た日数'],
         ['総ポイント', '累計の活動ポイント'],
       ]} />
       <Tip type="info">「今期成長」は実力の強さだけでなく、頑張りも評価される指標。レートが低くても大きく伸びれば上位に入れる。</Tip>

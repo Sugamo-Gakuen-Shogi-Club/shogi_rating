@@ -28,11 +28,11 @@ interface Slide {
 const SLIDES: Slide[] = [
   {
     icon: <Trophy size={56} className="text-yellow-400 drop-shadow-[0_0_16px_rgba(251,191,36,0.7)]" />,
-    title: 'ようこそ、巣鴨学園将棋班へ',
+    title: 'ようこそ、巣鴨学園将棋班',
     accent: 'from-yellow-900/40 to-amber-900/20',
     body: (
       <div className="space-y-3 text-slate-300 text-sm leading-relaxed">
-        <p>このアプリは将棋班の<span className="text-white font-black">対局・出席・ランキング</span>をまとめて管理するツールです。</p>
+        <p>このアプリは巣鴨学園将棋班専用の<span className="text-white font-black">対局・出席・ランキング</span>管理ツールです。</p>
         <div className="grid grid-cols-2 gap-2 mt-4">
           {[
             { icon: '⚔️', label: '対局記録',   desc: 'レートが自動計算' },
@@ -154,7 +154,7 @@ const SLIDES: Slide[] = [
         </div>
         <div className="bg-indigo-900/20 border border-indigo-700/30 rounded-xl p-3">
           <p className="text-xs font-bold text-indigo-300 flex items-center gap-1.5">
-            <Target size={12}/> 準備完了！班活を楽しんでください 🎉
+            <Target size={12}/> 準備完了！部活を楽しんでください 🎉
           </p>
         </div>
       </div>
