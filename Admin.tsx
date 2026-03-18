@@ -12,7 +12,7 @@ import {
   getPendingRankApplications, approveRankApplication, rejectRankApplication, removeRank,
   removeAchievement, deleteAttendanceLog, getLogs, ACHIEVEMENTS_DATA,
   updateProfilePin, clearSystemTitleHistory,
-  getApprovedDevices, approveThisDevice, revokeDevice, getOrCreateDeviceToken,
+  getApprovedDevices, approveThisDevice, revokeDevice, getOrCreateDeviceToken, isDeviceApproved,
 } from './storage';
 import { User, SystemSettings, Season, EventType, SyncMeta, AutoBackupEntry, MaintenanceState, RankApplication, ActivityLog, ActivityType } from './types';
 import { Card } from './Card';
@@ -494,17 +494,35 @@ const Admin: React.FC = () => {
   // LOGIN SCREEN
   // ──────────────────────────────────────────────────────────
   if (!isAuthenticated) {
-    const deviceOk = (() => { try { return require('./storage').isDeviceApproved(); } catch { return false; } })();
+    const deviceOk = isDeviceApproved();
+    // 未承認デバイスは管理者ログイン自体をブロック
+    if (!deviceOk) {
+      return (
+        <div className="flex items-center justify-center min-h-[60vh] p-4">
+          <div className="glass-panel-dark w-full max-w-sm p-8 text-center space-y-5 rounded-3xl border border-red-700/40 shadow-2xl">
+            <Lock className="mx-auto text-red-400" size={48} />
+            <h2 className="text-xl font-black text-white">未承認デバイス</h2>
+            <p className="text-sm text-slate-400 font-bold leading-relaxed">
+              このデバイスは未承認のため<br/>
+              <span className="text-red-300">管理者ページにアクセスできません。</span>
+            </p>
+            <p className="text-xs text-slate-500">
+              承認済みデバイスから管理者画面を開き、<br/>
+              「デバイス承認」→変更パスワード入力で承認してください。
+            </p>
+            <div className="text-[10px] text-slate-600 break-all border border-slate-800 rounded-lg px-3 py-2">
+              Token: {getOrCreateDeviceToken()}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="flex items-center justify-center min-h-[60vh] p-4">
         <div className="glass-panel-dark w-full max-w-sm p-8 text-center space-y-6 rounded-3xl border border-white/10 shadow-2xl">
           <Settings className="mx-auto text-slate-500" size={48} />
           <h2 className="text-2xl font-bold text-white font-serif-jp">管理者ログイン</h2>
-          {!deviceOk && (
-            <div className="bg-red-900/20 border border-red-700/30 rounded-xl px-4 py-3 text-xs text-red-300 font-bold text-left">
-              ⚠ このデバイスは未承認です。管理者機能（対局・出席）は承認済みデバイスからのみ使用できます。閲覧は可能です。
-            </div>
-          )}
           <div className="space-y-3">
             <input
               type="password"
@@ -838,7 +856,7 @@ const Admin: React.FC = () => {
         {/* ── 列2 ── */}
         <div className="space-y-6">
           {/* ── ランク申請承認 ── */}
-          <Card title={`段位・級位の申請 ${rankApps.length > 0 ? `(${rankApps.length}件待ち)` : ''}`} icon={<Medal className="text-purple-400" size={18} />}>
+          <Card title={`段位・級位の申請`} icon={<Medal className="text-purple-400" size={18} />} badge={rankApps.length > 0 ? rankApps.length : undefined}>
             <div className="space-y-3">
               {rankApps.length === 0 ? (
                 <p className="text-slate-500 text-sm font-bold py-2">承認待ちの申請はありません。</p>
