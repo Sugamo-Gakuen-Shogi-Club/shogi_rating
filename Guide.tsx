@@ -148,8 +148,8 @@ const TabIntro = () => (
       <div className="absolute -top-12 -right-12 w-48 h-48 bg-blue-500/10 rounded-full blur-2xl" />
       <div className="relative">
         <div className="text-[11px] font-black uppercase tracking-widest text-blue-400 mb-2">Club Rivals</div>
-        <h2 className="text-2xl font-black text-white mb-2 leading-tight">将棋部の活動を<br />記録・可視化・盛り上げる</h2>
-        <p className="text-slate-400 text-sm font-medium">対局記録・レーティング・称号・イベントをひとつのアプリで管理する、将棋部向けの部活管理ツールです。</p>
+        <h2 className="text-2xl font-black text-white mb-2 leading-tight">将棋班の活動を<br />記録・可視化・盛り上げる</h2>
+        <p className="text-slate-400 text-sm font-medium">対局記録・レーティング・称号・イベントをひとつのアプリで管理する、将棋班向けの班活管理ツールです。</p>
       </div>
     </div>
 
@@ -177,10 +177,10 @@ const TabIntro = () => (
       <Table rows={[
         ['🏠 ホーム',      '出席記録・イベント状況・四天王'],
         ['⊕ 対局記録',    '結果入力（管理者PIN必要）'],
-        ['🏆 ランキング',  '全部員の順位・四天王基準'],
+        ['🏆 ランキング',  '全班員の順位・四天王基準'],
         ['👤 個人データ',  'レート推移・称号・ライバル（PIN必要）'],
         ['📖 ガイド',      'このページ'],
-        ['⚙️ 管理画面',   '部員管理・各種設定（管理者専用）'],
+        ['⚙️ 管理画面',   '班員管理・各種設定（管理者専用）'],
         ['🌐 /board',     'URL共有の閲覧専用ページ'],
       ]} />
     </div>
@@ -192,7 +192,7 @@ const TabIntro = () => (
         ['管理者PIN', '対局登録・管理画面の操作に必要'],
         ['個人PIN',   '個人ページの閲覧に必要。初期値 0000'],
       ]} />
-      <Tip type="warn">管理者PINは他の部員に見られないよう管理してください。</Tip>
+      <Tip type="warn">管理者PINは他の班員に見られないよう管理してください。</Tip>
     </div>
 
     {/* 基本の流れ */}
@@ -251,10 +251,11 @@ const TabMatch = () => (
         <H icon={<PlusCircle size={16}/>}>対局の記録手順</H>
         <div className="space-y-3">
           <Step n={1} title="「対局記録」ページを開く">下部ナビの ⊕ ボタンから</Step>
-          <Step n={2} title="Player 1（先手）を選ぶ">カードをタップ → 部員リストから選択</Step>
-          <Step n={3} title="Player 2（後手）を選ぶ">同様に選択。同じ人は選べない</Step>
-          <Step n={4} title="勝者のカードを押す">「Winner」ボタン、または「引き分け」ボタン</Step>
-          <Step n={5} title="管理者PINを入力して送信">4桁のPINを入力 → 結果画面が表示される</Step>
+          <Step n={2} title="Player 1 を選ぶ">班員リストからタップして選択</Step>
+          <Step n={3} title="Player 1 の PIN を入力">本人が自分のPINを入力（他の人に見せない）。初期値（000000）のままだと対局できない。</Step>
+          <Step n={4} title="Player 2 を選ぶ">同様に選択。同じ人は選べない</Step>
+          <Step n={5} title="Player 2 の PIN を入力">同様に本人が入力</Step>
+          <Step n={6} title="勝者を選んで送信">勝者ボタン or 引き分けを選択 → 「記録する」を押す（管理者PIN不要）</Step>
         </div>
       </div>
 
@@ -337,7 +338,7 @@ const TabRate = () => (
       <H icon={<Star size={16}/>}>ポイント（Points）</H>
       <p className="text-sm text-slate-400 font-medium">出席や対局で貯まる「活動量」の指標。<strong className="text-white">負けても必ずもらえる</strong>ので、参加するほど有利。</p>
       <Table rows={[
-        ['出席',             '部活に来るだけでもらえる'],
+        ['出席',             '班活に来るだけでもらえる'],
         ['対局（勝ち）',     '設定値のポイント'],
         ['対局（負け）',     '設定値の半分（0にはならない）'],
         ['連勝ボーナス',     '3連勝以上で追加ポイント'],
@@ -352,7 +353,7 @@ const TabRate = () => (
       <Table rows={[
         ['今期成長',   'シーズン開始時からのレート増加＋ポイント増加の合計'],
         ['レート',     '現在のEloレート。純粋な実力値'],
-        ['活動日数',   '今シーズンに部活に来た日数'],
+        ['活動日数',   '今シーズンに班活に来た日数'],
         ['総ポイント', '累計の活動ポイント'],
       ]} />
       <Tip type="info">「今期成長」は実力の強さだけでなく、頑張りも評価される指標。レートが低くても大きく伸びれば上位に入れる。</Tip>
@@ -396,7 +397,7 @@ const TabAchievements = () => (
     {/* 四天王 */}
     <div className="space-y-3">
       <H icon={<Crown size={16}/>}>システム称号（四天王）</H>
-      <p className="text-sm text-slate-400 font-medium">各部門でシーズン1位の部員に自動付与される特別称号。毎月の更新時に再計算される。</p>
+      <p className="text-sm text-slate-400 font-medium">各部門でシーズン1位の班員に自動付与される特別称号。毎月の更新時に再計算される。</p>
       <div className="grid grid-cols-2 gap-3">
         {[
           { id: 'MASTER',       desc: '今期レート上昇1位' },
@@ -410,7 +411,7 @@ const TabAchievements = () => (
           </div>
         ))}
       </div>
-      <Tip type="info">四天王称号は兼任可能（複数の部員が同時に保持できる）。履歴も管理画面で確認できる。</Tip>
+      <Tip type="info">四天王称号は兼任可能（複数の班員が同時に保持できる）。履歴も管理画面で確認できる。</Tip>
     </div>
 
     {/* アイコン・フレーム */}
@@ -469,7 +470,7 @@ const TabEvents = () => (
         ['チーム分け',     '管理者がシャッフル → レートが均等になるよう自動振り分け。手動変更も可'],
         ['大将（将軍）',   '各チーム1人を任命。任命時に「大将軍」称号が付与される'],
         ['一騎討ち',       '大将同士の対局は自動で一騎討ち判定。勝者に「一騎討ち」称号'],
-        ['チームスコア',   'イベント期間中の各部員のポイント合計がチームスコアになる'],
+        ['チームスコア',   'イベント期間中の各班員のポイント合計がチームスコアになる'],
       ]} />
       <Tip type="info">ホーム画面のゲージでリアルタイムにチームスコアが確認できる。</Tip>
     </div>
@@ -540,14 +541,14 @@ const TabAdmin = () => (
     <div className="space-y-3">
       <H icon={<Settings size={16}/>}>管理画面でできること</H>
       <Table rows={[
-        ['部員管理',           '追加・退部・再入班（データは保持）・CSV一括追加'],
+        ['部員管理',           '追加・退班・再入班（データは保持）・CSV一括追加'],
         ['対局管理',           '直近の対局の削除'],
         ['出席・ポイント調整', '手動でポイントを加減算'],
         ['レート調整',         '手動でレートを変更'],
         ['シーズン管理',       '基準値のスナップショット・月次リセット'],
         ['四天王の更新',       'システム称号を現在の成績で再計算'],
         ['イベント管理',       '作成・チーム編成・大将任命'],
-        ['段位申請の承認',     '部員からの申請を承認・却下'],
+        ['段位申請の承認',     '班員からの申請を承認・却下'],
         ['PIN管理',            '個人ページPINの変更'],
         ['デバイス管理',       '出席操作を許可するデバイスの承認・取り消し'],
         ['公開URL管理',        '/board ページのURLをコピー・開く'],
@@ -559,7 +560,7 @@ const TabAdmin = () => (
     </div>
 
     <DetailOnly>
-      <Acc title="部員をCSVで一括追加">
+      <Acc title="班員をCSVで一括追加">
         <p className="text-xs text-slate-400">以下の形式のCSVを用意してください：</p>
         <div className="bg-slate-800 rounded-xl p-3 font-mono text-xs text-slate-300 leading-relaxed">
           名前,読み<br/>
@@ -611,7 +612,7 @@ const TabPublic = () => (
 
     <div className="space-y-3">
       <H icon={<Monitor size={16}/>}>スクリーンセーバー</H>
-      <p className="text-sm text-slate-400 font-medium">ホーム画面で一定時間操作がないと自動起動する。部室のモニターに映しっぱなしにするのに最適。</p>
+      <p className="text-sm text-slate-400 font-medium">ホーム画面で一定時間操作がないと自動起動する。班室のモニターに映しっぱなしにするのに最適。</p>
       <DetailOnly>
         <Tip type="ok">/board ページをブラウザのフルスクリーンで開くと、ナビゲーションバーがなくなりスッキリした表示になる。</Tip>
       </DetailOnly>

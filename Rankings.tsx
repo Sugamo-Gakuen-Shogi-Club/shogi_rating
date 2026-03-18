@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { getUsers, getMatches, ACHIEVEMENTS_DATA, getUserAvatarChar, SYSTEM_TITLES, ICONS_DATA, getUserFrameDef } from './storage';
+import { getUsers, getMatches, ACHIEVEMENTS_DATA, getUserAvatarChar, SYSTEM_TITLES, ICONS_DATA, getUserFrameDef, getSettings } from './storage';
 import { Card } from './Card';
 import {
   TrendingUp, Award, Crown, Zap, Calendar, Star,
@@ -21,13 +21,14 @@ type TabKey =
   | 'maxStreak'
   | 'monthlyPoints'
   | 'draws'
-  | 'fourKings';
+  | 'fourKings'
+  | 'summary';
 
 // ─── タブ定義 ─────────────────────────────────────────────────
 const TABS: { key: TabKey; label: string; icon: React.ReactNode; badge?: string }[] = [
   { key: 'seasonGrowth',  label: '今期成長',     icon: <TrendingUp size={12}/> },
   { key: 'rate',          label: 'レート',        icon: <Zap size={12}/> },
-  { key: 'todayMatches',  label: '今日の対局数',  icon: <Flame size={12}/>,    badge: '今日' },
+  { key: 'todayMatches',  label: '最終活動日',    icon: <Flame size={12}/>,    badge: '活動日' },
   { key: 'weekWinRate',   label: '今週の勝率',    icon: <Target size={12}/>,   badge: '今週' },
   { key: 'monthlyPoints', label: '今月のPt',      icon: <Star size={12}/>,     badge: '今月' },
   { key: 'upsetWins',     label: '格上撃破',      icon: <Swords size={12}/> },
@@ -37,6 +38,7 @@ const TABS: { key: TabKey; label: string; icon: React.ReactNode; badge?: string 
   { key: 'totalPoints',   label: '通算Pt',        icon: <Award size={12}/> },
   { key: 'draws',         label: '引き分け',      icon: <Shield size={12}/> },
   { key: 'fourKings',     label: '四天王基準',    icon: <Crown size={12} className="text-yellow-400"/> },
+  { key: 'summary',       label: '📊 まとめ',     icon: null },
 ];
 
 // 軸ごとの1位バッジラベル
@@ -53,6 +55,7 @@ const FIRST_BADGES: Record<TabKey, string> = {
   totalPoints:   '💎 通算1位',
   draws:         '☯️ 均衡の達人',
   fourKings:     '',
+  summary:       '',
 };
 
 // ─── 四天王バッジ ─────────────────────────────────────────────
@@ -156,6 +159,151 @@ const rowBg = (rank: number, isElite: boolean): string => {
   return 'hover:bg-white/5';
 };
 
+// ─── 選択可能な軸一覧（まとめタブ用） ───────────────────────
+const SUMMARY_AXES: { key: TabKey; label: string; icon: string }[] = [
+  { key: 'seasonGrowth',  label: '今期成長',   icon: '📈' },
+  { key: 'rate',          label: 'レート',     icon: '⚡' },
+  { key: 'monthlyPoints', label: '今月Pt',     icon: '⭐' },
+  { key: 'totalPoints',   label: '通算Pt',     icon: '💎' },
+  { key: 'activityDays',  label: '活動日数',   icon: '📅' },
+  { key: 'upsetWins',     label: '格上撃破',   icon: '💀' },
+  { key: 'maxStreak',     label: '最大連勝',   icon: '🔥' },
+  { key: 'seasonMatches', label: '今期対局数', icon: '🏟️' },
+  { key: 'weekWinRate',   label: '今週勝率',   icon: '🎯' },
+  { key: 'draws',         label: '引き分け',   icon: '☯️' },
+];
+const DEFAULT_SELECTED: TabKey[] = ['seasonGrowth', 'rate', 'monthlyPoints', 'totalPoints', 'activityDays', 'upsetWins'];
+const SUMMARY_STORAGE_KEY = 'rivals_summary_axes';
+
+const getSavedAxes = (): TabKey[] => {
+  try {
+    const raw = localStorage.getItem(SUMMARY_STORAGE_KEY);
+    if (!raw) return DEFAULT_SELECTED;
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) && arr.length === 6 ? arr : DEFAULT_SELECTED;
+  } catch { return DEFAULT_SELECTED; }
+};
+
+const SummaryPanel: React.FC<{
+  users: User[];
+  getScore: (u: User, k: TabKey) => number;
+  getScoreLabel: (u: User, k: TabKey) => string;
+  tiebreak: (a: User, b: User) => number;
+}> = ({ users, getScore, getScoreLabel, tiebreak }) => {
+  const [selectedAxes, setSelectedAxes] = React.useState<TabKey[]>(getSavedAxes);
+  const [editing, setEditing] = React.useState(false);
+
+  const toggleAxis = (key: TabKey) => {
+    setSelectedAxes(prev => {
+      const next = prev.includes(key)
+        ? prev.filter(k => k !== key)
+        : prev.length < 6 ? [...prev, key] : prev;
+      localStorage.setItem(SUMMARY_STORAGE_KEY, JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const podium = (axis: TabKey): { user: User; rank: number }[] => {
+    const sorted = [...users]
+      .filter(u => getScore(u, axis) > (axis === 'weekWinRate' ? -1 : -Infinity))
+      .sort((a, b) => {
+        const diff = getScore(b, axis) - getScore(a, axis);
+        return diff !== 0 ? diff : tiebreak(a, b);
+      });
+    const result: { user: User; rank: number }[] = [];
+    let rank = 1;
+    for (let i = 0; i < Math.min(sorted.length, 3); i++) {
+      if (i > 0 && getScore(sorted[i], axis) < getScore(sorted[i-1], axis)) rank = i + 1;
+      if (rank > 3) break;
+      result.push({ user: sorted[i], rank });
+    }
+    return result;
+  };
+
+  const axisConfig = Object.fromEntries(SUMMARY_AXES.map(a => [a.key, a]));
+
+  return (
+    <div className="space-y-4">
+      {/* 軸選択 */}
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-slate-500 font-bold">表示する軸を6つ選択</p>
+        <button onClick={() => setEditing(v => !v)}
+          className={`text-xs font-black px-3 py-1.5 rounded-lg transition-all ${editing ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}>
+          {editing ? '✓ 完了' : '⚙ カスタム'}
+        </button>
+      </div>
+
+      {editing && (
+        <div className="bg-slate-800/60 border border-slate-700 rounded-2xl p-3">
+          <p className="text-[10px] text-slate-500 font-bold mb-2">選択中: {selectedAxes.length}/6</p>
+          <div className="flex flex-wrap gap-2">
+            {SUMMARY_AXES.map(a => {
+              const sel = selectedAxes.includes(a.key);
+              const disabled = !sel && selectedAxes.length >= 6;
+              return (
+                <button key={a.key} onClick={() => !disabled && toggleAxis(a.key)}
+                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-black border transition-all ${
+                    sel ? 'bg-indigo-600 border-indigo-500 text-white' :
+                    disabled ? 'bg-slate-900 border-slate-800 text-slate-700 cursor-not-allowed' :
+                    'bg-slate-700 border-slate-600 text-slate-300 hover:border-indigo-500'
+                  }`}>
+                  {a.icon} {a.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* まとめグリッド */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+        {selectedAxes.map(axisKey => {
+          const axis = axisConfig[axisKey];
+          if (!axis) return null;
+          const top3 = podium(axisKey);
+          const medals = ['🥇','🥈','🥉'];
+          return (
+            <div key={axisKey} className="bg-slate-900 border border-white/8 rounded-2xl p-4 space-y-2">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-base">{axis.icon}</span>
+                <span className="font-black text-white text-sm">{axis.label}</span>
+              </div>
+              {top3.length === 0 ? (
+                <p className="text-[11px] text-slate-600 font-bold py-2">データなし</p>
+              ) : top3.map(({ user, rank }, i) => (
+                <div key={user.id} className={`flex items-center gap-2 px-2 py-1.5 rounded-xl ${
+                  rank === 1 ? 'bg-yellow-900/20 border border-yellow-700/30' :
+                  rank === 2 ? 'bg-slate-800/60 border border-slate-700/40' :
+                  'bg-slate-800/40 border border-slate-800'
+                }`}>
+                  <span className="text-lg shrink-0 w-7 text-center">{medals[i]}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className={`font-black text-sm truncate ${rank === 1 ? 'text-yellow-200' : 'text-slate-200'}`}>
+                      {user.name}
+                    </div>
+                    {user.systemTitle.length > 0 && (
+                      <div className="flex gap-1 mt-0.5 flex-wrap">
+                        {user.systemTitle.slice(0,2).map(t => {
+                          const cfg = FK_CFG[t]; if (!cfg) return null;
+                          return <span key={t} className={`text-[8px] px-1.5 py-0.5 rounded-full font-black bg-gradient-to-r ${cfg.gradient} text-slate-900`}>{cfg.icon}</span>;
+                        })}
+                        {user.isNewMember && <span className="text-[9px] text-green-400">🔰</span>}
+                      </div>
+                    )}
+                  </div>
+                  <span className={`font-black font-mono text-sm shrink-0 ${rank === 1 ? 'text-yellow-300' : rank === 2 ? 'text-slate-300' : 'text-amber-600'}`}>
+                    {getScoreLabel(user, axisKey)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
 const rankIcon = (r: number) => {
   if (r === 1) return <span className="text-2xl drop-shadow-[0_0_8px_rgba(250,204,21,0.6)]">🥇</span>;
   if (r === 2) return <span className="text-2xl">🥈</span>;
@@ -169,22 +317,23 @@ const Rankings: React.FC = () => {
   const matches = getMatches();
   const [activeTab, setActiveTab] = useState<TabKey>('seasonGrowth');
 
-  // 今日の日付
-  const todayStr = new Date().toISOString().split('T')[0];
+  // 最終活動日（出席が1件でも記録された日を活動日とみなす）
+  const lastActivityDate = getSettings().lastActivityDate;
+  const activityDateStr = lastActivityDate ?? new Date().toISOString().split('T')[0];
   // 7日前
   const weekAgo  = new Date(Date.now() - 7 * 86400000).toISOString();
 
-  // 今日の対局数マップ
+  // 最終活動日の対局数マップ
   const todayMatchCount = useMemo(() => {
     const m: Record<string, number> = {};
     users.forEach(u => { m[u.id] = 0; });
     matches.forEach(match => {
-      if (match.date.split('T')[0] !== todayStr) return;
+      if (match.date.split('T')[0] !== activityDateStr) return;
       m[match.player1Id] = (m[match.player1Id] || 0) + 1;
       m[match.player2Id] = (m[match.player2Id] || 0) + 1;
     });
     return m;
-  }, [users, matches, todayStr]);
+  }, [users, matches, activityDateStr]);
 
   // 今週の勝率マップ
   const weekStats = useMemo(() => {
@@ -248,8 +397,20 @@ const Rankings: React.FC = () => {
     }
   };
 
-  const sortedUsers = [...users].sort((a, b) => getScore(b, activeTab) - getScore(a, activeTab));
-  const isTable = activeTab !== 'fourKings';
+  const memberOrder = getSettings().memberOrder ?? [];
+  const tiebreak = (a: User, b: User): number => {
+    const ai = memberOrder.indexOf(a.id);
+    const bi = memberOrder.indexOf(b.id);
+    if (ai === -1 && bi === -1) return 0;
+    if (ai === -1) return 1;
+    if (bi === -1) return -1;
+    return ai - bi;
+  };
+  const sortedUsers = [...users].sort((a, b) => {
+    const diff = getScore(b, activeTab) - getScore(a, activeTab);
+    return diff !== 0 ? diff : tiebreak(a, b);
+  });
+  const isTable = activeTab !== 'fourKings' && activeTab !== 'summary';
 
   // タブのスコア色
   const scoreColor = (key: TabKey, rank: number): string => {
@@ -299,11 +460,26 @@ const Rankings: React.FC = () => {
       </div>
 
       {/* 四天王基準タブ */}
-      {!isTable && (
+      {activeTab === 'fourKings' && (
         <Card className="border border-yellow-500/20 rounded-[2rem] bg-slate-900/50 backdrop-blur-xl overflow-hidden">
           <div className="p-6">
             <h3 className="text-lg font-black text-yellow-400 flex items-center gap-2 mb-4"><Crown size={18}/> 四天王 選出基準</h3>
             <FourKingsCriteriaPanel/>
+          </div>
+        </Card>
+      )}
+
+      {/* まとめタブ */}
+      {activeTab === 'summary' && (
+        <Card className="border border-indigo-500/20 rounded-[2rem] bg-slate-900/50 backdrop-blur-xl overflow-hidden">
+          <div className="p-6">
+            <h3 className="text-lg font-black text-indigo-300 flex items-center gap-2 mb-4">📊 ランキングまとめ</h3>
+            <SummaryPanel
+              users={sortedUsers}
+              getScore={getScore}
+              getScoreLabel={getScoreLabel}
+              tiebreak={tiebreak}
+            />
           </div>
         </Card>
       )}
@@ -374,12 +550,12 @@ const Rankings: React.FC = () => {
                                   </span>
                                 </div>
                               )}
-                              {activeTitle && !badge && (
+                              {activeTitle && (
                                 <div className="text-[10px] text-slate-400 font-bold mt-0.5">「{activeTitle.name}」</div>
                               )}
                               <RankBadge ranks={user.ranks || []}/>
                               <div className="flex items-center gap-2 text-[10px] text-slate-500 font-bold mt-0.5">
-                                {user.isNewMember && <span className="text-green-500">🔰</span>}
+                                {user.isNewMember && <span className="text-green-500 font-black">🔰 新入班員</span>}
                                 {user.currentStreak >= 3 && <span className="text-rose-500">🔥{user.currentStreak}連勝</span>}
                               </div>
                             </div>

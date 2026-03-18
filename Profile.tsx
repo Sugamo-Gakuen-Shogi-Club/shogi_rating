@@ -24,6 +24,7 @@ import { UserSelector } from './UserSelector';
 import { useNavigate } from 'react-router-dom';
 import { ShogiPiece } from './ShogiPiece';
 import { NumPad } from './NumPad';
+import { MissionCard } from './MissionCard';
 
 // ─── 四天王設定 ───────────────────────────────────────────────
 const FK_CFG: Record<string, { gradient: string; glow: string; icon: string; label: string }> = {
@@ -368,74 +369,121 @@ const SeasonStatusCard: React.FC<{ userId: string }> = ({ userId }) => {
   const remainDays  = seasonEnd ? Math.max(0, Math.ceil((seasonEnd.getTime() - now.getTime()) / 86400000)) : null;
   const progress    = totalDays ? Math.min(100, Math.round((elapsedDays / totalDays) * 100)) : null;
 
-  // ── 今日の対局数マップ ────────────────────────────────────
-  const todayStr = now.toISOString().split('T')[0];
-  const todayCount: Record<string, number> = {};
-  allUsers.forEach(u => { todayCount[u.id] = 0; });
+  // ── 軸ごとのスコア取得 ────────────────────────────────────
+  type AxisKey = 'seasonGrowth' | 'rate' | 'activityDays' | 'totalPoints' | 'todayMatches'
+    | 'weekWinRate' | 'upsetWins' | 'seasonMatches' | 'maxStreak' | 'monthlyPoints' | 'draws';
+
+  // 週間勝率マップ
+  const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString();
+  const weekStats: Record<string, { wins: number; total: number }> = {};
+  allUsers.forEach(u => { weekStats[u.id] = { wins: 0, total: 0 }; });
   allMatches.forEach(m => {
-    if (m.date.split('T')[0] !== todayStr) return;
-    todayCount[m.player1Id] = (todayCount[m.player1Id] || 0) + 1;
-    todayCount[m.player2Id] = (todayCount[m.player2Id] || 0) + 1;
+    if (m.date < weekAgo) return;
+    weekStats[m.player1Id].total++; weekStats[m.player2Id].total++;
+    if (m.result === 'PLAYER1_WIN') weekStats[m.player1Id].wins++;
+    if (m.result === 'PLAYER2_WIN') weekStats[m.player2Id].wins++;
+  });
+  // 今期対局数マップ
+  const seasonMatchCount: Record<string, number> = {};
+  allUsers.forEach(u => { seasonMatchCount[u.id] = 0; });
+  allMatches.forEach(m => {
+    seasonMatchCount[m.player1Id] = (seasonMatchCount[m.player1Id] || 0) + 1;
+    seasonMatchCount[m.player2Id] = (seasonMatchCount[m.player2Id] || 0) + 1;
   });
 
-  // ── 軸ごとのスコア取得 ────────────────────────────────────
-  type AxisKey = 'seasonGrowth' | 'rate' | 'todayMatches';
+  // lastActivityDate 対応
+  const activityDateStr = settings.lastActivityDate ?? now.toISOString().split('T')[0];
+
+  // 最終活動日の対局数マップ
+  const activityDayCount: Record<string, number> = {};
+  allUsers.forEach(u => { activityDayCount[u.id] = 0; });
+  allMatches.forEach(m => {
+    if (m.date.split('T')[0] !== activityDateStr) return;
+    activityDayCount[m.player1Id] = (activityDayCount[m.player1Id] || 0) + 1;
+    activityDayCount[m.player2Id] = (activityDayCount[m.player2Id] || 0) + 1;
+  });
+
   const getScore = (u: User, axis: AxisKey): number => {
-    if (axis === 'seasonGrowth') return (u.rate + u.totalPoints) - (u.seasonStartRate + u.seasonStartPoints);
-    if (axis === 'rate')         return u.rate;
-    if (axis === 'todayMatches') return todayCount[u.id] || 0;
-    return 0;
+    switch (axis) {
+      case 'seasonGrowth':  return (u.rate + u.totalPoints) - (u.seasonStartRate + u.seasonStartPoints);
+      case 'rate':          return u.rate;
+      case 'activityDays':  return u.activityDays || 0;
+      case 'totalPoints':   return u.totalPoints || 0;
+      case 'todayMatches':  return activityDayCount[u.id] || 0;
+      case 'weekWinRate':   return weekStats[u.id]?.total >= 3 ? Math.round((weekStats[u.id].wins / weekStats[u.id].total) * 100) : -1;
+      case 'upsetWins':     return u.upsetWins || 0;
+      case 'seasonMatches': return seasonMatchCount[u.id] || 0;
+      case 'maxStreak':     return u.maxStreak || 0;
+      case 'monthlyPoints': return u.monthlyPoints || 0;
+      case 'draws':         return u.draws || 0;
+      default: return 0;
+    }
   };
   const fmtScore = (u: User, axis: AxisKey): string => {
     const s = getScore(u, axis);
-    if (axis === 'seasonGrowth') return s >= 0 ? `+${s}` : `${s}`;
-    if (axis === 'rate')         return `${Math.round(s)}`;
-    if (axis === 'todayMatches') return `${s}局`;
-    return `${s}`;
+    switch (axis) {
+      case 'seasonGrowth':  return s >= 0 ? `+${s}` : `${s}`;
+      case 'rate':          return `${Math.round(s)}`;
+      case 'activityDays':  return `${s}日`;
+      case 'totalPoints':   return `${s}pt`;
+      case 'todayMatches':  return `${s}局`;
+      case 'weekWinRate':   return s < 0 ? '—' : `${s}%`;
+      case 'upsetWins':     return `${s}回`;
+      case 'seasonMatches': return `${s}局`;
+      case 'maxStreak':     return `${s}連勝`;
+      case 'monthlyPoints': return `${s}pt`;
+      case 'draws':         return `${s}回`;
+      default: return `${s}`;
+    }
+  };
+
+  // ── memberOrder タイブレーカー ─────────────────────────────
+  const memberOrder = settings.memberOrder ?? [];
+  const tiebreak = (a: User, b: User) => {
+    const ai = memberOrder.indexOf(a.id); const bi = memberOrder.indexOf(b.id);
+    if (ai === -1 && bi === -1) return 0;
+    if (ai === -1) return 1; if (bi === -1) return -1;
+    return ai - bi;
   };
 
   // ── 前後の順位を計算 ─────────────────────────────────────
   const buildRankInfo = (axis: AxisKey) => {
-    const sorted = [...allUsers].sort((a, b) => getScore(b, axis) - getScore(a, axis));
-    const myIdx  = sorted.findIndex(u => u.id === userId);
+    const sorted = [...allUsers]
+      .filter(u => axis === 'weekWinRate' ? getScore(u, axis) >= 0 : true)
+      .sort((a, b) => { const d = getScore(b, axis) - getScore(a, axis); return d !== 0 ? d : tiebreak(a, b); });
+    const myIdx = sorted.findIndex(u => u.id === userId);
     if (myIdx === -1) return null;
-
-    // 同率処理
     let myRank = myIdx + 1;
     for (let i = myIdx - 1; i >= 0; i--) {
-      if (Math.floor(getScore(sorted[i], axis)) === Math.floor(getScore(sorted[myIdx], axis))) myRank = i + 1;
+      if (getScore(sorted[i], axis) === getScore(sorted[myIdx], axis)) myRank = i + 1;
       else break;
     }
-
-    const above = myIdx > 0 ? sorted[myIdx - 1] : null;
-    const below = myIdx < sorted.length - 1 ? sorted[myIdx + 1] : null;
-    const gapAbove = above ? Math.abs(getScore(above, axis) - getScore(sorted[myIdx], axis)) : null;
-    const gapBelow = below ? Math.abs(getScore(sorted[myIdx], axis) - getScore(below, axis)) : null;
-
-    // 「あと○勝で○位へ」推定（今期成長・レート軸のみ）
+    const above     = myIdx > 0 ? sorted[myIdx - 1] : null;
+    const below     = myIdx < sorted.length - 1 ? sorted[myIdx + 1] : null;
+    const gapAbove  = above ? Math.abs(getScore(above, axis) - getScore(sorted[myIdx], axis)) : null;
+    const gapBelow  = below ? Math.abs(getScore(sorted[myIdx], axis) - getScore(below, axis)) : null;
     let upsideMsg: string | null = null;
     if (above && (axis === 'seasonGrowth' || axis === 'rate')) {
-      // Eloで格上に勝ったときの概算レート上昇（K=32, 期待値≈0.5と仮定）
-      const estRateGain = 16; // K*0.5
-      const estPtGain   = 10; // 対局勝利ポイント
-      const estPerWin   = axis === 'seasonGrowth' ? estRateGain + estPtGain : estRateGain;
-      const winsNeeded  = Math.ceil(gapAbove! / estPerWin);
-      if (winsNeeded <= 5) {
-        upsideMsg = `あと約${winsNeeded}勝で${myRank - 1}位に浮上できる見込み`;
-      }
+      const estPerWin = axis === 'seasonGrowth' ? 26 : 16;
+      const winsNeeded = Math.ceil(gapAbove! / estPerWin);
+      if (winsNeeded <= 5) upsideMsg = `あと約${winsNeeded}勝で${myRank - 1}位に浮上できる見込み`;
     }
-    if (axis === 'todayMatches' && above) {
-      const needed = gapAbove! + 1;
-      upsideMsg = `あと${needed}局で${myRank - 1}位に浮上`;
-    }
-
+    if (axis === 'todayMatches' && above) upsideMsg = `あと${gapAbove! + 1}局で${myRank - 1}位に浮上`;
     return { myRank, myScore: fmtScore(sorted[myIdx], axis), above, below, gapAbove, gapBelow, upsideMsg };
   };
 
   const axes: { key: AxisKey; label: string; icon: React.ReactNode; color: string }[] = [
-    { key:'seasonGrowth',  label:'今期成長',    icon:<TrendingUp size={12}/>, color:'text-indigo-400' },
-    { key:'rate',          label:'レート',       icon:<Flame size={12}/>,     color:'text-blue-400' },
-    { key:'todayMatches',  label:'今日の対局数', icon:<Calendar size={12}/>,  color:'text-orange-400' },
+    { key:'seasonGrowth',  label:'今期成長',       icon:<TrendingUp size={12}/>, color:'text-indigo-400' },
+    { key:'rate',          label:'レート',          icon:<Flame size={12}/>,      color:'text-blue-400' },
+    { key:'monthlyPoints', label:'今月Pt',          icon:<Star size={12}/>,       color:'text-amber-400' },
+    { key:'totalPoints',   label:'通算Pt',          icon:<Award size={12}/>,      color:'text-yellow-400' },
+    { key:'activityDays',  label:'活動日数',        icon:<Calendar size={12}/>,   color:'text-green-400' },
+    { key:'todayMatches',  label:'最終活動日の対局', icon:<Calendar size={12}/>,  color:'text-orange-400' },
+    { key:'upsetWins',     label:'格上撃破',        icon:<Swords size={12}/>,     color:'text-red-400' },
+    { key:'maxStreak',     label:'最大連勝',        icon:<Flame size={12}/>,      color:'text-rose-400' },
+    { key:'seasonMatches', label:'今期対局数',      icon:<Calendar size={12}/>,   color:'text-sky-400' },
+    { key:'weekWinRate',   label:'今週勝率',        icon:<TrendingUp size={12}/>, color:'text-teal-400' },
+    { key:'draws',         label:'引き分け',        icon:<ChevronDown size={12}/>, color:'text-slate-400' },
   ];
 
   return (
@@ -484,77 +532,48 @@ const SeasonStatusCard: React.FC<{ userId: string }> = ({ userId }) => {
           </div>
         )}
 
-        {/* 3軸ランキング */}
-        <div className="space-y-3">
-          {axes.map(axis => {
-            const info = buildRankInfo(axis.key);
-            if (!info) return null;
-            const { myRank, myScore, above, below, gapAbove, gapBelow, upsideMsg } = info;
+        {/* 全軸ランキング順位 */}
+        <div>
+          <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+            <Award size={11}/> 現在の各ランキング順位
+          </div>
+          <div className="grid grid-cols-2 gap-1.5">
+            {axes.map(axis => {
+              const info = buildRankInfo(axis.key);
+              if (!info) return null;
+              const { myRank, myScore, above, upsideMsg } = info;
+              const medal = myRank === 1 ? '🥇' : myRank === 2 ? '🥈' : myRank === 3 ? '🥉' : null;
+              return (
+                <div key={axis.key}
+                  className={`flex items-center gap-2 px-2.5 py-2 rounded-xl border transition-all ${
+                    myRank <= 3
+                      ? 'bg-yellow-900/15 border-yellow-700/30'
+                      : 'bg-slate-800/40 border-white/5'
+                  }`}
+                >
+                  <div className={`w-7 shrink-0 text-center text-xs font-black ${axis.color}`}>
+                    {medal ?? `#${myRank}`}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[9px] text-slate-500 font-bold truncate">{axis.label}</div>
+                    <div className={`text-xs font-black ${myRank <= 3 ? 'text-yellow-200' : 'text-slate-300'}`}>{myScore}</div>
+                  </div>
+                  {above && myRank > 1 && (
+                    <div className="text-[9px] text-slate-600 shrink-0 truncate max-w-[48px]">
+                      ↑{above.name}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          {/* 浮上メッセージ（rate/seasonGrowthのみ） */}
+          {(['rate','seasonGrowth'] as AxisKey[]).map(k => {
+            const info = buildRankInfo(k);
+            if (!info?.upsideMsg) return null;
             return (
-              <div key={axis.key} className="bg-slate-800/50 rounded-2xl border border-white/5 overflow-hidden">
-                {/* 軸ヘッダー */}
-                <div className={`flex items-center gap-1.5 px-3 py-2 border-b border-white/5 ${axis.color}`}>
-                  {axis.icon}
-                  <span className="text-[10px] font-black uppercase tracking-widest">{axis.label}</span>
-                  <span className="ml-auto text-[10px] font-black text-slate-300">現在 {myRank}位</span>
-                </div>
-
-                {/* 前後の人 */}
-                <div className="divide-y divide-white/5">
-                  {/* 1つ上 */}
-                  {above && (
-                    <div className="flex items-center justify-between px-3 py-2.5 bg-slate-800/30">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="text-[9px] font-black text-slate-500 w-10 shrink-0">
-                          {myRank - 1}位
-                        </span>
-                        <span className="text-xs font-bold text-slate-300 truncate">{above.name}</span>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span className="text-xs font-black text-slate-400">{fmtScore(above, axis.key)}</span>
-                        <span className="text-[9px] font-black text-red-400 flex items-center gap-0.5">
-                          <ChevronUp size={10}/>▲{axis.key === 'rate' ? Math.round(gapAbove!) : gapAbove}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* 自分 */}
-                  <div className={`flex items-center justify-between px-3 py-2.5 ${above || below ? 'bg-blue-900/20 border-l-2 border-blue-500' : ''}`}>
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-[9px] font-black text-blue-400 w-10 shrink-0">
-                        {myRank}位 ←
-                      </span>
-                      <span className="text-xs font-black text-white truncate">{me.name}</span>
-                    </div>
-                    <span className={`text-sm font-black ${axis.color}`}>{myScore}</span>
-                  </div>
-
-                  {/* 1つ下 */}
-                  {below && (
-                    <div className="flex items-center justify-between px-3 py-2.5 bg-slate-800/30">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="text-[9px] font-black text-slate-500 w-10 shrink-0">
-                          {myRank + 1}位
-                        </span>
-                        <span className="text-xs font-bold text-slate-300 truncate">{below.name}</span>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span className="text-xs font-black text-slate-400">{fmtScore(below, axis.key)}</span>
-                        <span className="text-[9px] font-black text-green-400 flex items-center gap-0.5">
-                          <ChevronDown size={10}/>▼{axis.key === 'rate' ? Math.round(gapBelow!) : gapBelow}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* 浮上メッセージ */}
-                {upsideMsg && (
-                  <div className="px-3 py-2 bg-amber-900/20 border-t border-amber-700/20">
-                    <span className="text-[10px] font-black text-amber-300">💡 {upsideMsg}</span>
-                  </div>
-                )}
+              <div key={k} className="mt-1.5 px-3 py-1.5 bg-amber-900/15 border border-amber-700/20 rounded-xl">
+                <span className="text-[10px] font-black text-amber-300">💡 {info.upsideMsg}</span>
               </div>
             );
           })}
@@ -678,6 +697,7 @@ const Profile: React.FC = () => {
   const totalM       = user.wins + user.losses + user.draws;
   const wr           = totalM > 0 ? Math.round((user.wins / totalM) * 100) : 0;
   const rivalStats   = getRivalryStats(selectedId);
+  const { allRivals, currentRival } = rivalStats;
   const titleHistory = getUserSystemTitleHistory(selectedId);
   const graphData    = (user.rateHistory || []).map(h => ({
     date: new Date(h.date).toLocaleDateString('ja-JP', { month:'numeric', day:'numeric' }),
@@ -739,6 +759,9 @@ const Profile: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* ─── ミッションカード ─── */}
+      <MissionCard userId={selectedId} />
 
       {/* ─── プロフィールカード ─── */}
       <div className={`relative overflow-hidden rounded-3xl bg-slate-900 border ${cardBorder}`}>
@@ -958,28 +981,136 @@ const Profile: React.FC = () => {
         </div>
       )}
 
-      {/* ─── ライバル分析（煽り文あり・本人専用） ─── */}
-      {(rivalStats.bestCustomer || rivalStats.nemeses) && (
-        <div className="bg-slate-900 border border-white/5 rounded-2xl p-4 space-y-3">
-          <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5"><Swords size={11}/> ライバル分析</div>
-          {rivalStats.bestCustomer && (
-            <div className="bg-green-900/20 p-3 rounded-xl border border-green-500/20">
-              <div className="text-[10px] text-green-400 font-black flex items-center gap-1 mb-1"><Crown size={10}/> お得意様</div>
-              <div className="font-black text-white text-sm">{rivalStats.bestCustomer.opponentName}</div>
-              <div className="text-xs text-slate-400">勝率 {Math.round(rivalStats.bestCustomer.winRate*100)}%（{rivalStats.bestCustomer.wins}勝{rivalStats.bestCustomer.losses}敗）</div>
-              <div className="text-[10px] text-green-300 mt-1 font-bold">「安定して勝ち越し中。このまま差を広げろ！」</div>
+      {/* ─── 因縁ボード（煽り文あり・本人専用） ─── */}
+      {(rivalStats.bestCustomer || rivalStats.nemeses || currentRival || allRivals.length > 0) && (() => {
+        // 連勝/連敗の動的メッセージ生成
+        const streak = user.currentStreak;
+        const lossStreak = user.lossStreak;
+        const streakMsg = streak >= 5
+          ? `🔥 現在${streak}連勝中！止まるな、このまま突き進め！`
+          : streak >= 3
+          ? `📈 ${streak}連勝中。勢いに乗っていこう！`
+          : lossStreak >= 5
+          ? `💀 ${lossStreak}連敗中…。崖っぷちだが、ここからが本当の勝負だ。`
+          : lossStreak >= 3
+          ? `😤 ${lossStreak}連敗中。このままでは終われないはずだ。`
+          : null;
+
+        // 今期ライバルの煽り文
+        const getRivalTaunt = (r: typeof currentRival) => {
+          if (!r) return null;
+          const diff = r.wins - r.losses;
+          if (diff >= 3) return `「${r.opponentName}には安定して勝ち越し中。この差をもっと広げろ！」`;
+          if (diff > 0) return `「${r.opponentName}に対してわずかにリード中。油断は禁物だ。」`;
+          if (diff === 0) return `「${r.opponentName}とは五分五分の互角。次の一戦が分岐点だ。」`;
+          if (diff >= -2) return `「${r.opponentName}に負け越し中…。そろそろ意地を見せろ！」`;
+          return `「${r.opponentName}に${Math.abs(diff)}差で完敗中。打倒ライバルへ向けて動け！」`;
+        };
+
+        // 対戦相手の煽り文（個別）
+        const getOpponentTaunt = (r: (typeof allRivals)[0]) => {
+          const diff = r.wins - r.losses;
+          if (diff >= 5) return '圧倒中 👑';
+          if (diff >= 2) return '優勢 📈';
+          if (diff === 0 && r.total >= 4) return '激戦区 ⚔️';
+          if (diff <= -5) return '完敗 💀';
+          if (diff <= -2) return '苦手 😤';
+          if (diff === 1 || diff === -1) return '拮抗 🤝';
+          return '';
+        };
+
+        return (
+          <div className="bg-slate-900 border border-white/5 rounded-2xl p-4 space-y-4">
+            <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
+              <Swords size={11}/> 因縁ボード
             </div>
-          )}
-          {rivalStats.nemeses && (
-            <div className="bg-red-900/20 p-3 rounded-xl border border-red-500/20">
-              <div className="text-[10px] text-red-400 font-black flex items-center gap-1 mb-1"><Skull size={10}/> 天敵</div>
-              <div className="font-black text-white text-sm">{rivalStats.nemeses.opponentName}</div>
-              <div className="text-xs text-slate-400">勝率 {Math.round(rivalStats.nemeses.winRate*100)}%（{rivalStats.nemeses.wins}勝{rivalStats.nemeses.losses}敗）</div>
-              <div className="text-[10px] text-red-300 mt-1 font-bold">「まだ諦めるな。いつかリベンジを果たせ！」</div>
-            </div>
-          )}
-        </div>
-      )}
+
+            {/* 動的メッセージ（連勝/連敗） */}
+            {streakMsg && (
+              <div className={`text-xs font-bold px-3 py-2 rounded-xl border ${
+                streak >= 3
+                  ? 'bg-orange-900/20 border-orange-500/30 text-orange-300'
+                  : 'bg-red-900/20 border-red-500/30 text-red-300'
+              }`}>
+                {streakMsg}
+              </div>
+            )}
+
+            {/* 今期ライバル（最多対局） */}
+            {currentRival && (
+              <div className="bg-indigo-900/20 p-3 rounded-xl border border-indigo-500/20 space-y-1">
+                <div className="text-[10px] text-indigo-400 font-black flex items-center gap-1">
+                  <Flame size={10}/> 今期ライバル（最多対局）
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="font-black text-white text-sm">{currentRival.opponentName}</div>
+                  <div className="text-[10px] font-bold text-slate-400">{currentRival.total}局</div>
+                </div>
+                <div className="text-[10px] text-slate-400">
+                  {currentRival.wins}勝 {currentRival.losses}敗{currentRival.draws > 0 ? ` ${currentRival.draws}分` : ''} · 勝率{Math.round(currentRival.winRate * 100)}%
+                </div>
+                <div className="text-[10px] text-indigo-300 font-bold mt-1">
+                  {getRivalTaunt(currentRival)}
+                </div>
+              </div>
+            )}
+
+            {/* お得意様 */}
+            {rivalStats.bestCustomer && rivalStats.bestCustomer.opponentId !== currentRival?.opponentId && (
+              <div className="bg-green-900/20 p-3 rounded-xl border border-green-500/20">
+                <div className="text-[10px] text-green-400 font-black flex items-center gap-1 mb-1"><Crown size={10}/> お得意様</div>
+                <div className="flex items-center justify-between">
+                  <div className="font-black text-white text-sm">{rivalStats.bestCustomer.opponentName}</div>
+                  <div className="text-[10px] font-bold text-green-400">勝率{Math.round(rivalStats.bestCustomer.winRate * 100)}%</div>
+                </div>
+                <div className="text-[9px] text-slate-400">{rivalStats.bestCustomer.wins}勝 {rivalStats.bestCustomer.losses}敗</div>
+                <div className="text-[10px] text-green-300 mt-1 font-bold">「安定して勝ち越し中。このまま差を広げろ！」</div>
+              </div>
+            )}
+
+            {/* 天敵 */}
+            {rivalStats.nemeses && (
+              <div className="bg-red-900/20 p-3 rounded-xl border border-red-500/20">
+                <div className="text-[10px] text-red-400 font-black flex items-center gap-1 mb-1"><Skull size={10}/> 天敵</div>
+                <div className="flex items-center justify-between">
+                  <div className="font-black text-white text-sm">{rivalStats.nemeses.opponentName}</div>
+                  <div className="text-[10px] font-bold text-red-400">勝率{Math.round(rivalStats.nemeses.winRate * 100)}%</div>
+                </div>
+                <div className="text-[9px] text-slate-400">{rivalStats.nemeses.wins}勝 {rivalStats.nemeses.losses}敗</div>
+                <div className="text-[10px] text-red-300 mt-1 font-bold">「まだ諦めるな。いつかリベンジを果たせ！」</div>
+              </div>
+            )}
+
+            {/* 全対戦相手リスト（煽り文付き） */}
+            {allRivals.filter(r => r.total >= 2).length > 0 && (
+              <div>
+                <div className="text-[10px] font-black text-slate-600 uppercase tracking-widest mb-2">対戦履歴</div>
+                <div className="space-y-1">
+                  {allRivals.filter(r => r.total >= 2).slice(0, 10).map(r => {
+                    const wr2 = Math.round(r.winRate * 100);
+                    const taunt = getOpponentTaunt(r);
+                    return (
+                      <div key={r.opponentId} className="flex items-center gap-2 py-1.5 border-b border-white/5 last:border-0">
+                        <div className={`w-1 h-6 rounded-full shrink-0 ${
+                          r.wins > r.losses ? 'bg-green-500' : r.wins < r.losses ? 'bg-red-500' : 'bg-slate-600'
+                        }`} />
+                        <div className="flex-1 min-w-0">
+                          <span className="text-xs font-black text-white truncate">{r.opponentName}</span>
+                          {taunt && <span className="ml-2 text-[9px] text-slate-500">{taunt}</span>}
+                        </div>
+                        <div className="text-right shrink-0">
+                          <div className={`text-xs font-black ${wr2 >= 50 ? 'text-green-400' : 'text-red-400'}`}>{wr2}%</div>
+                          <div className="text-[9px] text-slate-600">{r.wins}勝{r.losses}敗</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* ─── 四天王歴代記録 ─── */}
       {titleHistory.length > 0 && (

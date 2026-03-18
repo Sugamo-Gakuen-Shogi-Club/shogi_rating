@@ -34,7 +34,13 @@ const Admin: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [approvedDevices, setApprovedDevices] = useState<{token: string; label: string; approvedAt: string}[]>([]);
   const [newDeviceLabel, setNewDeviceLabel] = useState('部室iPad');
+  const [kojiPass, setKojiPass] = useState('');
+  const [kojiErr, setKojiErr] = useState(false);
   const [inactiveUsers, setInactiveUsers] = useState<User[]>([]);
+  const [activeEvent, setActiveEvent] = useState(false);
+  // DnD member order
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [dragOver, setDragOver] = useState<number | null>(null);
   const [activeEvent, setActiveEvent] = useState(false);
 
   // Sync state
@@ -104,7 +110,7 @@ const Admin: React.FC = () => {
   }, []);
 
   const handleLogin = () => {
-    if (pin === settings.adminPin) { setIsAuthenticated(true); refreshData(); }
+    if (pin === settings.adminPin) { setIsAuthenticated(true); refreshData(); setPin(''); }
     else { alert('PINが違います'); setPin(''); }
   };
 
@@ -489,17 +495,31 @@ const Admin: React.FC = () => {
   // LOGIN SCREEN
   // ──────────────────────────────────────────────────────────
   if (!isAuthenticated) {
+    const deviceOk = (() => { try { return require('./storage').isDeviceApproved(); } catch { return false; } })();
     return (
       <div className="flex items-center justify-center min-h-[60vh] p-4">
         <div className="glass-panel-dark w-full max-w-sm p-8 text-center space-y-6 rounded-3xl border border-white/10 shadow-2xl">
           <Settings className="mx-auto text-slate-500" size={48} />
           <h2 className="text-2xl font-bold text-white font-serif-jp">管理者ログイン</h2>
-          <div>
-            <input type="password" value={pin} readOnly placeholder="PIN"
-              className="w-full p-4 border border-slate-700 rounded-xl text-center text-2xl tracking-[1em] outline-none bg-slate-900 text-white font-mono" />
-            <NumPad value={pin} onChange={setPin} maxLength={4} />
+          {!deviceOk && (
+            <div className="bg-red-900/20 border border-red-700/30 rounded-xl px-4 py-3 text-xs text-red-300 font-bold text-left">
+              ⚠ このデバイスは未承認です。管理者機能（対局・出席）は承認済みデバイスからのみ使用できます。閲覧は可能です。
+            </div>
+          )}
+          <div className="space-y-3">
+            <input
+              type="password"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              value={pin}
+              onChange={e => setPin(e.target.value.replace(/\D/g,'').slice(0,6))}
+              placeholder="管理者PIN（6桁）"
+              className="w-full p-4 border border-slate-700 rounded-xl text-center text-2xl tracking-[0.5em] outline-none bg-slate-900 text-white font-mono focus:border-indigo-500 transition-colors"
+              maxLength={6}
+              onKeyDown={e => e.key === 'Enter' && pin.length === 6 && handleLogin()}
+            />
           </div>
-          <button onClick={handleLogin} disabled={pin.length < 4}
+          <button onClick={handleLogin} disabled={pin.length < 6}
             className="w-full bg-slate-200 disabled:bg-slate-700 disabled:text-slate-500 text-slate-900 py-3 rounded-xl font-bold active:scale-95 transition-transform shadow-lg">
             ログイン
           </button>
@@ -749,6 +769,49 @@ const Admin: React.FC = () => {
             </div>
           </Card>
 
+          {/* 部員表示順カスタム */}
+          <Card title="部員表示順（ドラッグで並び替え）" icon={<Users className="text-indigo-400" size={18} />}>
+            <div className="space-y-2">
+              <p className="text-xs text-slate-500 font-bold">上に表示されるほど、同率タイ時にランキングで上位になります。新入生を上に設定することを推奨。</p>
+              <div className="space-y-1">
+                {(() => {
+                  const order = settings.memberOrder ?? [];
+                  const sorted = [...users].sort((a, b) => {
+                    const ai = order.indexOf(a.id); const bi = order.indexOf(b.id);
+                    if (ai === -1 && bi === -1) return 0;
+                    if (ai === -1) return 1; if (bi === -1) return -1;
+                    return ai - bi;
+                  });
+                  return sorted.map((u, i) => (
+                    <div
+                      key={u.id}
+                      draggable
+                      onDragStart={() => setDragIdx(i)}
+                      onDragOver={e => { e.preventDefault(); setDragOver(i); }}
+                      onDrop={() => {
+                        if (dragIdx === null || dragIdx === i) return;
+                        const arr = [...sorted];
+                        const [moved] = arr.splice(dragIdx, 1);
+                        arr.splice(i, 0, moved);
+                        const newOrder = arr.map(x => x.id);
+                        setSettings(s => ({ ...s, memberOrder: newOrder }));
+                        saveSettings({ ...settings, memberOrder: newOrder });
+                        setDragIdx(null); setDragOver(null);
+                      }}
+                      onDragEnd={() => { setDragIdx(null); setDragOver(null); }}
+                      className={`flex items-center gap-3 px-3 py-2 rounded-xl border cursor-grab active:cursor-grabbing transition-all ${dragOver === i ? 'border-indigo-500 bg-indigo-900/20' : 'border-slate-700 bg-slate-800/40'} ${dragIdx === i ? 'opacity-40' : ''}`}
+                    >
+                      <span className="text-slate-600 font-black text-xs w-5 text-right shrink-0">{i + 1}</span>
+                      <span className="text-xs font-black text-white flex-1">{u.name}</span>
+                      {u.isNewMember && <span className="text-[9px] bg-green-900/40 text-green-400 border border-green-700/30 px-1.5 py-0.5 rounded font-bold">新入班員</span>}
+                      <span className="text-slate-600 text-xs">⠿</span>
+                    </div>
+                  ));
+                })()}
+              </div>
+            </div>
+          </Card>
+
           {/* ★ Inactive / Re-join panel */}
           {inactiveUsers.length > 0 && (
             <Card title={`休眠中の部員 (${inactiveUsers.length}名)`} icon={<UserX className="text-yellow-500" size={18} />}>
@@ -868,35 +931,39 @@ const Admin: React.FC = () => {
                 const attendanceLogs = getLogs()
                   .filter(l => l.type === ActivityType.ATTENDANCE)
                   .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-                  .slice(0, 20);
+                  .slice(0, 50);
                 if (attendanceLogs.length === 0) {
                   return <p className="text-slate-500 text-sm font-bold py-2">出席記録がありません。</p>;
                 }
-                return attendanceLogs.map(log => {
-                  const u = getUsers(true).find(u => u.id === log.userId);
-                  return (
-                    <div key={log.id} className="flex items-center justify-between gap-3 bg-slate-800/60 border border-slate-700/50 rounded-xl px-3 py-2">
-                      <div>
-                        <span className="text-green-300 font-bold text-sm">{u?.name ?? '不明'}</span>
-                        <span className="text-slate-400 text-xs ml-2">+{log.points}pt</span>
-                        <div className="text-[10px] text-slate-600 mt-0.5">
-                          {new Date(log.date).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                return (
+                  <div className="max-h-64 overflow-y-auto space-y-2 pr-1">
+                    {attendanceLogs.map(log => {
+                      const u = getUsers(true).find(u => u.id === log.userId);
+                      return (
+                        <div key={log.id} className="flex items-center justify-between gap-3 bg-slate-800/60 border border-slate-700/50 rounded-xl px-3 py-2">
+                          <div>
+                            <span className="text-green-300 font-bold text-sm">{u?.name ?? '不明'}</span>
+                            <span className="text-slate-400 text-xs ml-2">+{log.points}pt</span>
+                            <div className="text-[10px] text-slate-600 mt-0.5">
+                              {new Date(log.date).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => {
+                              if (!confirm(`${u?.name ?? '不明'} の出席記録を削除しますか？`)) return;
+                              const res = deleteAttendanceLog(log.id);
+                              alert(res.message);
+                              refreshData();
+                            }}
+                            className="flex items-center gap-1 bg-red-900/40 hover:bg-red-800/60 text-red-300 border border-red-700/40 px-3 py-1.5 rounded-lg font-black text-xs transition-all active:scale-[0.97] shrink-0"
+                          >
+                            <Trash2 size={12} /> 削除
+                          </button>
                         </div>
-                      </div>
-                      <button
-                        onClick={() => {
-                          if (!confirm(`${u?.name ?? '不明'} の出席記録を削除しますか？`)) return;
-                          const res = deleteAttendanceLog(log.id);
-                          alert(res.message);
-                          refreshData();
-                        }}
-                        className="flex items-center gap-1 bg-red-900/40 hover:bg-red-800/60 text-red-300 border border-red-700/40 px-3 py-1.5 rounded-lg font-black text-xs transition-all active:scale-[0.97] shrink-0"
-                      >
-                        <Trash2 size={12} /> 削除
-                      </button>
-                    </div>
-                  );
-                });
+                      );
+                    })}
+                  </div>
+                );
               })()}
             </div>
           </Card>
@@ -944,26 +1011,7 @@ const Admin: React.FC = () => {
           {/* Season & Titles */}
           <Card title="シーズン・称号" icon={<Crown className="text-yellow-500" />}>
             <div className="space-y-6">
-              <div>
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block mb-2">クラブ名</label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={settings.clubName ?? '将棋部'}
-                    onChange={e => setSettings(s => ({ ...s, clubName: e.target.value }))}
-                    className="flex-1 p-3 border border-slate-700 rounded-xl font-bold bg-slate-900 text-white focus:border-blue-500 outline-none"
-                    placeholder="例：将棋部"
-                  />
-                  <button
-                    onClick={() => { saveSettings(settings); alert('クラブ名を保存しました。'); }}
-                    className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-black text-sm transition-all"
-                  >
-                    保存
-                  </button>
-                </div>
-                <p className="text-[10px] text-slate-600 mt-1.5">公開ランキングページのフッターに表示されます</p>
-              </div>
-              <div className="border-t border-white/5 pt-4">
+              <div className="border-b border-white/5 pb-4">
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block mb-2">現在のシーズン</label>
                 <select className="w-full p-4 border border-slate-600 rounded-xl font-bold bg-slate-900 text-white appearance-none cursor-pointer"
                   value={settings.currentSeason} onChange={handleSeasonChange}>
@@ -1026,8 +1074,8 @@ const Admin: React.FC = () => {
           <Card title="個人ページPIN管理" icon={<KeyRound className="text-amber-400" size={18} />}>
             <div className="space-y-4">
               <p className="text-xs text-slate-400 font-bold leading-relaxed">
-                個人ページは部員ごとのPINで保護されています。<br/>
-                初期PINは <span className="text-white font-black">0000</span> です。
+                個人ページは部員ごとの6桁PINで保護されています。<br/>
+                初期PINは <span className="text-white font-black">000000</span> です。初期値のままの部員は対局できません。
               </p>
               {pinMsg && (
                 <div className={`flex items-center gap-2 p-3 rounded-xl border text-sm font-bold ${pinMsg.type === 'ok' ? 'bg-green-900/20 border-green-700/40 text-green-300' : 'bg-red-900/20 border-red-700/40 text-red-300'}`}>
@@ -1042,25 +1090,25 @@ const Admin: React.FC = () => {
               >
                 <option value="">部員を選択...</option>
                 {users.map(u => (
-                  <option key={u.id} value={u.id}>{u.name}（現在のPIN: {u.profilePin ?? '0000'}）</option>
+                  <option key={u.id} value={u.id}>{u.name}（現在のPIN: {u.profilePin ?? '000000'}）{(u.profilePin ?? '000000') === '000000' ? ' ⚠未変更' : ''}</option>
                 ))}
               </select>
               {pinTargetId && (
                 <>
                   <div>
-                    <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2">新しいPIN（4桁）</label>
+                    <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2">新しいPIN（6桁）</label>
                     <input
                       type="text"
                       value={newPin}
-                      onChange={e => setNewPin(e.target.value.replace(/\D/g,'').slice(0,4))}
-                      placeholder="0000"
-                      maxLength={4}
+                      onChange={e => setNewPin(e.target.value.replace(/\D/g,'').slice(0,6))}
+                      placeholder="000000"
+                      maxLength={6}
                       className="w-full p-3 border border-slate-700 rounded-xl font-mono text-2xl tracking-[0.5em] text-center bg-slate-800 text-white focus:border-amber-500 outline-none"
                     />
                   </div>
                   <button
                     onClick={handlePinChange}
-                    disabled={newPin.length < 4}
+                    disabled={newPin.length < 6}
                     className="w-full bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 disabled:text-slate-500 text-white py-3 rounded-xl font-black transition-all active:scale-[0.98]"
                   >
                     PINを変更する
@@ -1109,26 +1157,36 @@ const Admin: React.FC = () => {
             <div className="space-y-4">
               <p className="text-xs text-slate-400 font-bold">
                 出席登録・対局記録は承認済みデバイスからのみ操作できます。<br/>
-                このデバイスを承認するか、既存デバイスを管理してください。
+                このデバイスを承認するには、変更パスワードが必要です。
               </p>
 
               {/* このデバイスを承認 */}
               <div className="bg-slate-800/60 rounded-xl p-4 border border-slate-700 space-y-3">
                 <div className="text-xs font-black text-slate-300 uppercase tracking-widest">このデバイスを承認する</div>
-                <div className="flex gap-2">
+                <div className="space-y-2">
                   <input
                     value={newDeviceLabel}
                     onChange={e => setNewDeviceLabel(e.target.value)}
                     placeholder="デバイス名（例：部室iPad）"
-                    className="flex-1 bg-slate-700 text-white text-sm font-bold px-3 py-2 rounded-lg border border-slate-600 outline-none focus:border-yellow-500"
+                    className="w-full bg-slate-700 text-white text-sm font-bold px-3 py-2 rounded-lg border border-slate-600 outline-none focus:border-yellow-500"
                   />
+                  <input
+                    type="password"
+                    value={kojiPass}
+                    onChange={e => { setKojiPass(e.target.value); setKojiErr(false); }}
+                    placeholder="変更パスワード"
+                    className={`w-full bg-slate-700 text-white text-sm font-bold px-3 py-2 rounded-lg border outline-none focus:border-yellow-500 ${kojiErr ? 'border-red-500' : 'border-slate-600'}`}
+                  />
+                  {kojiErr && <p className="text-xs text-red-400 font-bold">パスワードが間違っています</p>}
                   <button
                     onClick={() => {
+                      if (kojiPass !== 'koji') { setKojiErr(true); return; }
                       approveThisDevice(newDeviceLabel || '未設定');
                       refreshData();
+                      setKojiPass('');
                       alert('✅ このデバイスを承認しました');
                     }}
-                    className="px-4 py-2 bg-yellow-500 hover:bg-yellow-400 text-slate-900 font-black rounded-lg text-sm transition-all active:scale-95"
+                    className="w-full px-4 py-2 bg-yellow-500 hover:bg-yellow-400 text-slate-900 font-black rounded-lg text-sm transition-all active:scale-95"
                   >
                     承認
                   </button>

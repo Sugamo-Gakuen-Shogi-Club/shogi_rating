@@ -134,6 +134,8 @@ export interface SystemTitleHistoryEntry {
   generation: number;        // 第何代
   awardedAt: string;         // ISO日時
   revokedAt?: string;        // 外れた日時（nullなら現役）
+  /** 選出時の基準値。MASTER=レート上昇幅, RISING_STAR=ポイント上昇幅, GRINDER=出席日数, GIANT_KILLER=格上撃破数 */
+  awardedScore?: number;
 }
 
 export interface SystemTitleSnapshot {
@@ -164,7 +166,11 @@ export interface SystemSettings {
   currentSeason: Season;
   lastMonthlyReset: string;
   lastTitleUpdate: string | null;
-  seasonEndsAt: string | null;    // シーズン終了予定日（管理者が設定）
+  seasonEndsAt: string | null;
+  /** 最終活動日（出席が1件でも記録された日） */
+  lastActivityDate: string | null;
+  /** 管理者が設定した部員表示順（userId の配列） */
+  memberOrder: string[];
 }
 
 export interface ActivityLog {
@@ -297,4 +303,37 @@ export interface UndoEntry {
     matches: MatchRecord[];
     logs: ActivityLog[];
   };
+}
+
+// ============================================================
+// Stage4: ミッション
+// ============================================================
+export type MissionType = 'DAILY' | 'WEEKLY';
+
+export interface MissionDef {
+  id: string;
+  type: MissionType;
+  label: string;
+  description: string;
+  target: number;                // 達成に必要な数
+  rewardPts: number;
+}
+
+/** ユーザーごとのミッション進捗（Firebaseに保存） */
+export interface MissionProgress {
+  userId: string;
+  missionId: string;
+  current: number;
+  completed: boolean;
+  rewardClaimed: boolean;
+  /** デイリー: 部活日（"YYYY-MM-DD"）/ ウィークリー: ISO週番号文字列 ("2025-W14") */
+  periodKey: string;
+}
+
+/** 対局後ポップアップに渡すミッション達成情報 */
+export interface MissionAchieved {
+  userId: string;
+  userName: string;
+  mission: MissionDef;
+  rewardPts: number;
 }

@@ -6,7 +6,8 @@ import {
   UndoEntry, UndoActionType,
   MaintenanceState,
   RankEntry, RankApplication,
-  SystemTitleHistoryEntry, SystemTitleSnapshot
+  SystemTitleHistoryEntry, SystemTitleSnapshot,
+  MissionDef, MissionProgress, MissionAchieved,
 } from './types';
 import { getAppCheckToken } from './appCheck';
 
@@ -36,8 +37,8 @@ const MAINTENANCE_SANDBOX_URL = `${FIREBASE_BASE}/maintenance_sandbox.json`;
 // DEFAULTS
 // ============================================================
 const DEFAULT_SETTINGS: SystemSettings = {
-  adminPin: '1123',
-  clubName: '将棋部',
+  adminPin: '112233',
+  clubName: '将棋班',
   eventName: null,
   eventType: EventType.STANDARD,
   eventEndsAt: null,
@@ -46,6 +47,8 @@ const DEFAULT_SETTINGS: SystemSettings = {
   lastMonthlyReset: new Date().toISOString(),
   lastTitleUpdate: null,
   seasonEndsAt: null,
+  lastActivityDate: null,
+  memberOrder: [],
 };
 
 // 初期レートは0（負けで減る仕様のため）
@@ -813,7 +816,13 @@ export const loadFromCloud = async (): Promise<LoadResult> => {
 export const getSettings = (): SystemSettings => {
   const s = localStorage.getItem(SETTINGS_KEY);
   if (!s) return DEFAULT_SETTINGS;
-  return { ...DEFAULT_SETTINGS, ...JSON.parse(s) };
+  const parsed = JSON.parse(s);
+  return {
+    ...DEFAULT_SETTINGS,
+    ...parsed,
+    lastActivityDate: parsed.lastActivityDate ?? null,
+    memberOrder: Array.isArray(parsed.memberOrder) ? parsed.memberOrder : [],
+  };
 };
 
 export const saveSettings = (settings: SystemSettings): void => {
@@ -864,7 +873,7 @@ const normalizeUser = (user: any): User => ({
   rateHistory:    Array.isArray(user.rateHistory) ? user.rateHistory
     : [{ date: new Date().toISOString(), rate: user.rate ?? INITIAL_RATE }],
   ranks:          Array.isArray(user.ranks) ? user.ranks : [],
-  profilePin:     user.profilePin ?? '0000',
+  profilePin:     user.profilePin ?? '000000',
   activeFrameId:  user.activeFrameId ?? 'FRAME_NONE',
   unlockedFrames: Array.isArray(user.unlockedFrames) ? user.unlockedFrames : ['FRAME_NONE', 'FRAME_DEFAULT'],
   earnedHonors:   Array.isArray(user.earnedHonors) ? user.earnedHonors : [],
@@ -960,7 +969,7 @@ const checkAchievementsAndIcons = (
       case 'POINTS':     met = totalPoints        >= a.threshold; break;
       case 'UPSET_WINS': met = upsetWins          >= a.threshold; break;
       case 'SPECIAL':
-        if (a.id === 'FACTION_GENERAL') met = !!user.isGeneral;
+        if (a.id === 'FACTION_GENERAL') met = false; // assignGenerals でのみ付与
         if (a.id === 'DUEL_VICTORY')    met = !!matchContext?.isDuelWin;
         // 連敗後勝利
         if (a.id === 'COMEBACK_3')  met = lossStreak >= 3  && (user.wins || 0) > 0 && user.currentStreak > 0;
@@ -1074,6 +1083,12 @@ export const recordAttendance = (userId: string): AttendanceResult => {
     description: '出席',
     date: new Date().toISOString(),
   }]);
+
+  // lastActivityDate を更新（その日に誰か出席したら活動日とみなす）
+  const currentSettings = getSettings();
+  if (currentSettings.lastActivityDate !== today) {
+    saveSettings({ ...currentSettings, lastActivityDate: today });
+  }
 
   return { success: true, newAchievements: res.newAchievements, newIcons: res.newIcons, message: `出席を記録しました！ (+${pts} pt)` };
 };
@@ -1284,7 +1299,14 @@ export const deleteMatch = (id: string): void => {
 // ============================================================
 // RIVAL STATS (← FIX: was returning constant null)
 // ============================================================
-export const getRivalryStats = (userId: string): { bestCustomer: RivalData | null; nemeses: RivalData | null } => {
+export const getRivalryStats = (userId: string): {
+  bestCustomer: RivalData | null;
+  nemeses: RivalData | null;
+  /** 1局以上対戦した全相手（対局数降順） */
+  allRivals: RivalData[];
+  /** 最多対局相手（今期ライバル） */
+  currentRival: RivalData | null;
+} => {
   const matches = getMatches();
   const users   = getRawUsers();
   const map: Record<string, { wins: number; losses: number; draws: number }> = {};
@@ -1305,7 +1327,7 @@ export const getRivalryStats = (userId: string): { bestCustomer: RivalData | nul
     }
   });
 
-  const rivals: RivalData[] = Object.entries(map).map(([oppId, s]) => ({
+  const allRivals: RivalData[] = Object.entries(map).map(([oppId, s]) => ({
     opponentId:   oppId,
     opponentName: users.find(u => u.id === oppId)?.name || 'Unknown',
     wins:    s.wins,
@@ -1313,17 +1335,29 @@ export const getRivalryStats = (userId: string): { bestCustomer: RivalData | nul
     draws:   s.draws,
     total:   s.wins + s.losses + s.draws,
     winRate: (s.wins + s.losses + s.draws) > 0 ? s.wins / (s.wins + s.losses + s.draws) : 0,
-  })).filter(r => r.total >= 2); // at least 2 matches to be a "rival"
+  })).sort((a, b) => b.total - a.total); // 対局数降順
 
-  if (rivals.length === 0) return { bestCustomer: null, nemeses: null };
+  // bestCustomer / nemeses は 2局以上を対象
+  const rivals = allRivals.filter(r => r.total >= 2);
 
-  const byWinDiff = [...rivals].sort((a, b) => (b.wins - b.losses) - (a.wins - a.losses));
-  const bestCustomer = byWinDiff[0]?.wins > byWinDiff[0]?.losses ? byWinDiff[0] : null;
+  const bestCustomer = rivals.length > 0
+    ? ([...rivals].sort((a, b) => (b.wins - b.losses) - (a.wins - a.losses))[0]?.wins >
+       [...rivals].sort((a, b) => (b.wins - b.losses) - (a.wins - a.losses))[0]?.losses
+       ? [...rivals].sort((a, b) => (b.wins - b.losses) - (a.wins - a.losses))[0]
+       : null)
+    : null;
 
-  const byLossDiff = [...rivals].sort((a, b) => (b.losses - b.wins) - (a.losses - a.wins));
-  const nemeses    = byLossDiff[0]?.losses > byLossDiff[0]?.wins ? byLossDiff[0] : null;
+  const nemeses = rivals.length > 0
+    ? ([...rivals].sort((a, b) => (b.losses - b.wins) - (a.losses - a.wins))[0]?.losses >
+       [...rivals].sort((a, b) => (b.losses - b.wins) - (a.losses - a.wins))[0]?.wins
+       ? [...rivals].sort((a, b) => (b.losses - b.wins) - (a.losses - a.wins))[0]
+       : null)
+    : null;
 
-  return { bestCustomer, nemeses };
+  // 今期ライバル = 最多対局相手（1局以上）
+  const currentRival = allRivals.length > 0 ? allRivals[0] : null;
+
+  return { bestCustomer, nemeses, allRivals, currentRival };
 };
 
 // ============================================================
@@ -1412,11 +1446,16 @@ export const awardSystemTitles = (): void => {
   grinderHolders.forEach(u => addTitle(u.id, 'GRINDER'));
   killerHolders.forEach(u  => addTitle(u.id, 'GIANT_KILLER'));
 
-  // 履歴記録
-  recordSystemTitleChange('MASTER',       masterHolders.map(u => u.id));
-  recordSystemTitleChange('RISING_STAR',  risingHolders.map(u => u.id));
-  recordSystemTitleChange('GRINDER',      grinderHolders.map(u => u.id));
-  recordSystemTitleChange('GIANT_KILLER', killerHolders.map(u => u.id));
+  // 履歴記録（選出時基準値も一緒に保存）
+  const masterScoreMap  = Object.fromEntries(masterHolders.map(u  => [u.id, u.rate - u.seasonStartRate]));
+  const risingScoreMap  = Object.fromEntries(risingHolders.map(u  => [u.id, u.totalPoints - u.seasonStartPoints]));
+  const grinderScoreMap = Object.fromEntries(grinderHolders.map(u => [u.id, u.activityDays]));
+  const killerScoreMap  = Object.fromEntries(killerHolders.map(u  => [u.id, upsetCount[u.id] || 0]));
+
+  recordSystemTitleChange('MASTER',       masterHolders.map(u  => u.id), masterScoreMap);
+  recordSystemTitleChange('RISING_STAR',  risingHolders.map(u  => u.id), risingScoreMap);
+  recordSystemTitleChange('GRINDER',      grinderHolders.map(u => u.id), grinderScoreMap);
+  recordSystemTitleChange('GIANT_KILLER', killerHolders.map(u  => u.id), killerScoreMap);
 
   // 特別アイコン解放（四天王選出者）
   const unlockEliteForTitle = (holders: User[], titleId: string) => {
@@ -1517,7 +1556,9 @@ export const clearSystemTitleHistory = (): void => {
 /** 四天王を更新し、履歴を記録する */
 export const recordSystemTitleChange = (
   titleId: string,
-  newHolderIds: string[]
+  newHolderIds: string[],
+  /** userId → 選出時基準値（任意） */
+  awardedScores: Record<string, number> = {}
 ): void => {
   const snap = getSystemTitleHistory();
   const now = new Date().toISOString();
@@ -1545,6 +1586,7 @@ export const recordSystemTitleChange = (
         userName: u?.name || '不明',
         generation: gen,
         awardedAt: now,
+        awardedScore: awardedScores[uid],
       });
       snap.nextGeneration[titleId] = gen + 1;
     }
@@ -1779,7 +1821,7 @@ const newUserBase = (name: string, reading?: string, isNewMember = false): User 
   activeIconId:     'DEFAULT_INITIAL',
   unlockedIcons:    [...DEFAULT_UNLOCKED_ICONS],
   ranks:            [],
-  profilePin:       '0000',
+  profilePin:       '000000',
   activeFrameId:    'FRAME_NONE',
   unlockedFrames:   ['FRAME_NONE', 'FRAME_DEFAULT'],
   earnedHonors:     [],
@@ -2081,10 +2123,10 @@ export const deleteAttendanceLog = (logId: string): { success: boolean; message:
 
 /**
  * 管理者が個人ページPINを変更する
- * 4桁数字のみ許可
+ * 6桁数字のみ許可
  */
 export const updateProfilePin = (userId: string, newPin: string): { success: boolean; error?: string } => {
-  if (!/^\d{4}$/.test(newPin)) return { success: false, error: '4桁の数字で入力してください' };
+  if (!/^\d{6}$/.test(newPin)) return { success: false, error: '6桁の数字で入力してください' };
   const all = getRawUsers();
   const u = all.find(x => x.id === userId);
   if (!u) return { success: false, error: 'ユーザーが見つかりません' };
@@ -2117,3 +2159,219 @@ export const playSound  = (_type: any): void => {};
 export const vibrate    = (_p: any): void => {};
 export const balanceFactions = (u: any) => u;
 export const toggleGeneral   = (_id: any): void => {};
+
+// ============================================================
+// Stage4: ミッション定義 & Firebase保存
+// ============================================================
+export const MISSIONS_DATA: MissionDef[] = [
+  // ── デイリー ─────────────────────────────────────────────
+  { id: 'D_PLAY_1',    type: 'DAILY',  label: '一局入魂',      description: '本日1局対局する',            target: 1,  rewardPts: 5  },
+  { id: 'D_WIN_1',     type: 'DAILY',  label: '今日の一勝',    description: '本日1勝する',                target: 1,  rewardPts: 8  },
+  { id: 'D_PLAY_3',    type: 'DAILY',  label: 'トリプルプレイ', description: '本日3局対局する',           target: 3,  rewardPts: 12 },
+  { id: 'D_RANDOM',    type: 'DAILY',  label: 'ランダム対局',  description: '初対面 or 少ない対戦相手と対局', target: 1, rewardPts: 10 },
+  { id: 'D_UPSET',     type: 'DAILY',  label: '格上挑戦',      description: '格上（+50以上）に挑戦する（勝敗問わず）', target: 1, rewardPts: 8 },
+  // ── ウィークリー ──────────────────────────────────────────
+  { id: 'W_PLAY_5',    type: 'WEEKLY', label: '五番勝負',      description: '今週5局対局する',            target: 5,  rewardPts: 20 },
+  { id: 'W_RIVAL_WIN', type: 'WEEKLY', label: 'ライバル撃破',  description: '最多対戦相手（ライバル）に勝利する', target: 1, rewardPts: 25 },
+  { id: 'W_UPSET_3',   type: 'WEEKLY', label: '三体の巨人',    description: '今週3人の格上を撃破する',    target: 3,  rewardPts: 30 },
+  { id: 'W_ATTEND_2',  type: 'WEEKLY', label: '二日皆勤',      description: '今週2日以上出席する',        target: 2,  rewardPts: 15 },
+  { id: 'W_WINRATE',   type: 'WEEKLY', label: '半分以上',      description: '今週の勝率50%以上（3局以上）', target: 1, rewardPts: 20 },
+];
+
+const missionsUrl = (userId: string) =>
+  `${FIREBASE_BASE}/missions/${userId}.json`;
+
+/** 現在のデイリー期間キー（部活日 = 今日の日付） */
+export const getDailyKey = (): string => getLocalDateString();
+
+/** 現在のウィークリー期間キー（ISO週番号） */
+export const getWeeklyKey = (): string => {
+  const now = new Date();
+  const startOfYear = new Date(now.getFullYear(), 0, 1);
+  const weekNum = Math.ceil(
+    ((now.getTime() - startOfYear.getTime()) / 86400000 + startOfYear.getDay() + 1) / 7
+  );
+  return `${now.getFullYear()}-W${String(weekNum).padStart(2, '0')}`;
+};
+
+/** Firebase からユーザーのミッション進捗を取得 */
+export const getMissionProgress = async (userId: string): Promise<MissionProgress[]> => {
+  try {
+    const res = await fetch(`${missionsUrl(userId)}?nocache=${Date.now()}`);
+    if (!res.ok) return [];
+    const data: Record<string, MissionProgress> | null = await res.json();
+    return data ? Object.values(data) : [];
+  } catch { return []; }
+};
+
+/** Firebase にミッション進捗を保存（1件） */
+const saveMissionProgress = async (p: MissionProgress): Promise<void> => {
+  try {
+    await fetch(
+      `${FIREBASE_BASE}/missions/${p.userId}/${p.missionId}_${p.periodKey.replace(/[^a-zA-Z0-9]/g, '_')}.json`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(p),
+      }
+    );
+  } catch { /* silent */ }
+};
+
+/**
+ * 対局後にミッション進捗を更新する。
+ * processMatch 完了後に呼ぶ。
+ * @returns 新規達成したミッションのリスト（ポップアップ表示用）
+ */
+export const updateMissionsAfterMatch = async (
+  player: { id: string; name: string; rate: number; wins: number; losses: number },
+  opponent: { id: string; rate: number },
+  playerWon: boolean,
+  allMatches: ReturnType<typeof getMatches>
+): Promise<MissionAchieved[]> => {
+  const dailyKey  = getDailyKey();
+  const weeklyKey = getWeeklyKey();
+  const existing  = await getMissionProgress(player.id);
+  const achieved: MissionAchieved[] = [];
+
+  const getOrCreate = (missionId: string, type: 'DAILY' | 'WEEKLY'): MissionProgress => {
+    const key = type === 'DAILY' ? dailyKey : weeklyKey;
+    const found = existing.find(p => p.missionId === missionId && p.periodKey === key);
+    return found ?? { userId: player.id, missionId, current: 0, completed: false, rewardClaimed: false, periodKey: key };
+  };
+
+  const today = dailyKey;
+  const weekStart = new Date(); weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+  const weekStartStr = getLocalDateString(weekStart);
+
+  // 今日の対局数
+  const todayMatches = allMatches.filter(m =>
+    (m.player1Id === player.id || m.player2Id === player.id) &&
+    getLocalDateString(m.date) === today
+  );
+
+  // 今週の対局
+  const weekMatches = allMatches.filter(m =>
+    (m.player1Id === player.id || m.player2Id === player.id) &&
+    getLocalDateString(m.date) >= weekStartStr
+  );
+
+  const weekWins = weekMatches.filter(m =>
+    (m.player1Id === player.id && m.result === 'PLAYER1_WIN') ||
+    (m.player2Id === player.id && m.result === 'PLAYER2_WIN')
+  ).length;
+
+  // 格上かどうか
+  const isUpsetChallenge = opponent.rate - player.rate >= 50;
+  const wonUpset = playerWon && opponent.rate - player.rate >= 100;
+
+  // ライバル（最多対戦相手）
+  const matchCounts: Record<string, number> = {};
+  allMatches.forEach(m => {
+    if (m.player1Id === player.id) matchCounts[m.player2Id] = (matchCounts[m.player2Id] || 0) + 1;
+    if (m.player2Id === player.id) matchCounts[m.player1Id] = (matchCounts[m.player1Id] || 0) + 1;
+  });
+  const rivalId = Object.entries(matchCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
+  const wonRival = playerWon && opponent.id === rivalId;
+
+  // ランダム対局（対戦が少ない = 2回以下）
+  const prevMatchesWithOpponent = allMatches.filter(m =>
+    (m.player1Id === player.id && m.player2Id === opponent.id) ||
+    (m.player2Id === player.id && m.player1Id === opponent.id)
+  ).length;
+  const isRandomOpponent = prevMatchesWithOpponent <= 2;
+
+  // 今週のアップセット数（対局履歴から計算）
+  const weekUpsets = weekMatches.filter(m => {
+    const iP1 = m.player1Id === player.id;
+    const oppRate = iP1 ? (getUsers().find(u => u.id === m.player2Id)?.rate ?? 0) : (getUsers().find(u => u.id === m.player1Id)?.rate ?? 0);
+    const won = iP1 ? m.result === 'PLAYER1_WIN' : m.result === 'PLAYER2_WIN';
+    return won && oppRate - player.rate >= 100;
+  }).length + (wonUpset ? 1 : 0);
+
+  // 今週の出席日数（activityDaysはシーズン累計なので allLogsから計算）
+  const allLogs = getLogs();
+  const weekAttendDays = new Set(
+    allLogs
+      .filter(l => l.userId === player.id && l.type === ActivityType.ATTENDANCE && getLocalDateString(l.date) >= weekStartStr)
+      .map(l => getLocalDateString(l.date))
+  ).size;
+
+  const updates: MissionProgress[] = [];
+
+  const tryComplete = (missionId: string, type: 'DAILY' | 'WEEKLY', newCurrent: number) => {
+    const def = MISSIONS_DATA.find(d => d.id === missionId);
+    if (!def) return;
+    const prog = getOrCreate(missionId, type);
+    if (prog.completed) return;
+    const updated: MissionProgress = { ...prog, current: newCurrent };
+    if (newCurrent >= def.target) {
+      updated.completed = true;
+      achieved.push({ userId: player.id, userName: player.name, mission: def, rewardPts: def.rewardPts });
+    }
+    updates.push(updated);
+  };
+
+  // デイリーミッション更新
+  tryComplete('D_PLAY_1', 'DAILY', todayMatches.length);
+  tryComplete('D_WIN_1',  'DAILY', todayMatches.filter(m => (m.player1Id === player.id && m.result === 'PLAYER1_WIN') || (m.player2Id === player.id && m.result === 'PLAYER2_WIN')).length);
+  tryComplete('D_PLAY_3', 'DAILY', todayMatches.length);
+  if (isRandomOpponent) tryComplete('D_RANDOM', 'DAILY', 1);
+  if (isUpsetChallenge) tryComplete('D_UPSET', 'DAILY', 1);
+
+  // ウィークリーミッション更新
+  tryComplete('W_PLAY_5',    'WEEKLY', weekMatches.length);
+  if (wonRival) tryComplete('W_RIVAL_WIN', 'WEEKLY', 1);
+  tryComplete('W_UPSET_3',   'WEEKLY', Math.min(weekUpsets, 3));
+  tryComplete('W_ATTEND_2',  'WEEKLY', weekAttendDays);
+  // 勝率50%以上（今週3局以上）
+  if (weekMatches.length >= 3) {
+    const rate50 = weekWins / weekMatches.length >= 0.5 ? 1 : 0;
+    tryComplete('W_WINRATE', 'WEEKLY', rate50);
+  }
+
+  // 達成したミッションのポイントを付与
+  for (const ach of achieved) {
+    manualPointAdjustment(player.id, ach.rewardPts, `ミッション達成: ${ach.mission.label}`);
+  }
+
+  // Firebaseに保存（並列）
+  await Promise.all(updates.map(p => saveMissionProgress(p)));
+
+  return achieved;
+};
+
+/**
+ * 出席記録後にウィークリーミッション W_ATTEND_2 を更新
+ */
+export const updateMissionsAfterAttendance = async (userId: string, userName: string): Promise<MissionAchieved[]> => {
+  const weeklyKey = getWeeklyKey();
+  const existing  = await getMissionProgress(userId);
+  const allLogs   = getLogs();
+  const weekStart = new Date(); weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+  const weekStartStr = getLocalDateString(weekStart);
+
+  const weekAttendDays = new Set(
+    allLogs
+      .filter(l => l.userId === userId && l.type === ActivityType.ATTENDANCE && getLocalDateString(l.date) >= weekStartStr)
+      .map(l => getLocalDateString(l.date))
+  ).size;
+
+  const def = MISSIONS_DATA.find(d => d.id === 'W_ATTEND_2')!;
+  const prog = existing.find(p => p.missionId === 'W_ATTEND_2' && p.periodKey === weeklyKey)
+    ?? { userId, missionId: 'W_ATTEND_2', current: 0, completed: false, rewardClaimed: false, periodKey: weeklyKey };
+
+  if (prog.completed) return [];
+
+  const updated: MissionProgress = { ...prog, current: weekAttendDays };
+  const achieved: MissionAchieved[] = [];
+
+  if (weekAttendDays >= def.target) {
+    updated.completed = true;
+    achieved.push({ userId, userName, mission: def, rewardPts: def.rewardPts });
+    manualPointAdjustment(userId, def.rewardPts, `ミッション達成: ${def.label}`);
+  }
+
+  await saveMissionProgress(updated);
+  return achieved;
+};

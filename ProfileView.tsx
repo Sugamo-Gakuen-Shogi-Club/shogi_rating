@@ -84,21 +84,10 @@ const ProfileView: React.FC = () => {
   const rivalStats   = getRivalryStats(userId!);
   const titleHistory = getUserSystemTitleHistory(userId!);
 
-  // ライバル（5局以上対戦した相手）
-  const rivalMap: Record<string, { name: string; wins: number; losses: number; draws: number }> = {};
-  matches.forEach(m => {
-    const isP1 = m.player1Id === userId;
-    const isP2 = m.player2Id === userId;
-    if (!isP1 && !isP2) return;
-    const oppId   = isP1 ? m.player2Id : m.player1Id;
-    const oppName = users.find(u => u.id === oppId)?.name ?? '?';
-    if (!rivalMap[oppId]) rivalMap[oppId] = { name: oppName, wins: 0, losses: 0, draws: 0 };
-    if (m.result === 'DRAW') { rivalMap[oppId].draws++; }
-    else if ((isP1 && m.result === 'PLAYER1_WIN') || (isP2 && m.result === 'PLAYER2_WIN')) { rivalMap[oppId].wins++; }
-    else { rivalMap[oppId].losses++; }
-  });
-  const rivals = Object.values(rivalMap).filter(r => r.wins + r.losses + r.draws >= 5)
-    .sort((a, b) => (b.wins + b.losses + b.draws) - (a.wins + a.losses + a.draws)).slice(0, 4);
+  // allRivals から表示用データを組み立て（getRivalryStats が計算済み）
+  const allRivals = rivalStats.allRivals;
+  // 公開画面では 2局以上対戦した相手を一覧表示（最大8件）
+  const rivals = allRivals.filter(r => r.total >= 2).slice(0, 8);
 
   // 最近の対局（5件）
   const recentMatches = matches.filter(m => m.player1Id === userId || m.player2Id === userId).slice(0, 5);
@@ -217,19 +206,41 @@ const ProfileView: React.FC = () => {
         </div>
       </div>
 
-      {/* ライバル認定（5局以上）*/}
+      {/* 対戦相手一覧（因縁ボード・公開） */}
       {rivals.length > 0 && (
         <div className="bg-slate-900 border border-white/5 rounded-2xl p-4">
-          <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-1.5"><Swords size={11} /> 対戦相手</div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+            <Swords size={11} /> 対戦相手一覧
+            <span className="ml-auto text-[9px] text-slate-600 font-bold normal-case">2局以上</span>
+          </div>
+          <div className="space-y-1.5">
             {rivals.map(r => {
-              const total = r.wins + r.losses + r.draws;
-              const rwr   = total > 0 ? Math.round((r.wins / total) * 100) : 0;
+              const wr = r.total > 0 ? Math.round(r.winRate * 100) : 0;
+              const diff = r.wins - r.losses;
               return (
-                <div key={r.name} className="bg-slate-800/60 rounded-xl p-2.5 border border-white/5">
-                  <div className="text-xs font-black text-white truncate">{r.name}</div>
-                  <div className="text-[10px] text-slate-400 mt-0.5">{total}局 · {rwr}%</div>
-                  <div className="text-[9px] text-slate-500">{r.wins}勝{r.losses}敗{r.draws}分</div>
+                <div key={r.opponentId} className="flex items-center gap-3 py-2 border-b border-white/5 last:border-0">
+                  {/* 勝敗インジケーター */}
+                  <div className={`w-1.5 h-8 rounded-full shrink-0 ${
+                    diff > 0 ? 'bg-green-500' : diff < 0 ? 'bg-red-500' : 'bg-slate-600'
+                  }`} />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-black text-white truncate">{r.opponentName}</div>
+                    <div className="text-[9px] text-slate-500 mt-0.5">
+                      {r.wins}勝 {r.losses}敗{r.draws > 0 ? ` ${r.draws}分` : ''} · 計{r.total}局
+                    </div>
+                  </div>
+                  {/* 勝率バー */}
+                  <div className="flex flex-col items-end gap-1 shrink-0">
+                    <span className={`text-xs font-black ${wr >= 50 ? 'text-green-400' : 'text-red-400'}`}>
+                      {wr}%
+                    </span>
+                    <div className="w-16 h-1 bg-slate-700 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full ${wr >= 50 ? 'bg-green-500' : 'bg-red-500'}`}
+                        style={{ width: `${wr}%` }}
+                      />
+                    </div>
+                  </div>
                 </div>
               );
             })}

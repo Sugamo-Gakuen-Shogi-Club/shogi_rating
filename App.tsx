@@ -153,7 +153,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         </nav>
         <SyncIndicator />
         <div className="px-6 pb-6 text-[10px] text-slate-500 text-center border-t border-white/5 pt-4">
-          <div className="font-bold text-slate-400">巣鴨学園 将棋部</div>
+          <div className="font-bold text-slate-400">巣鴨学園将棋班</div>
           <div className="mt-1 opacity-50">©秀村 紘嗣</div>
         </div>
       </aside>
