@@ -708,10 +708,10 @@ const Admin: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
 
-        {/* ── 左列 ── */}
-        <div className="space-y-8">
+        {/* ── 列1 ── */}
+        <div className="space-y-6">
           {/* Active Member List */}
           <Card title="在籍部員" icon={<Users />}>
             <div className="space-y-4">
@@ -835,8 +835,8 @@ const Admin: React.FC = () => {
           )}
         </div>
 
-        {/* ── 右列 ── */}
-        <div className="space-y-8">
+        {/* ── 列2 ── */}
+        <div className="space-y-6">
           {/* ── ランク申請承認 ── */}
           <Card title={`段位・級位の申請 ${rankApps.length > 0 ? `(${rankApps.length}件待ち)` : ''}`} icon={<Medal className="text-purple-400" size={18} />}>
             <div className="space-y-3">
@@ -1067,6 +1067,11 @@ const Admin: React.FC = () => {
             </div>
           </Card>
 
+        </div>{/* ── 列2 終 ── */}
+
+        {/* ── 列3 ── */}
+        <div className="space-y-6">
+
           {/* PIN Management */}
           <Card title="個人ページPIN管理" icon={<KeyRound className="text-amber-400" size={18} />}>
             <div className="space-y-4">
@@ -1267,7 +1272,7 @@ const Admin: React.FC = () => {
 
           {/* Maintenance Mode */}
           <MaintenancePanel onModeChange={setMaintActive} />
-        </div>
+        </div>{/* ── 列3 終 ── */}
       </div>
     </div>
   );

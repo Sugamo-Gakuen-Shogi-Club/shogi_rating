@@ -274,23 +274,114 @@ const ProfileView: React.FC = () => {
 
       {/* 四天王歴代記録 */}
       {titleHistory.length > 0 && (
-        <div className="bg-slate-900 border border-yellow-500/20 rounded-2xl p-4 space-y-2">
+        <div className="bg-slate-900 border border-yellow-500/20 rounded-2xl p-4 space-y-3">
           <div className="text-[10px] font-black text-yellow-400 uppercase tracking-widest flex items-center gap-1.5"><Crown size={11} fill="currentColor" /> 四天王の記録</div>
           {titleHistory.map(h => {
             const def    = SYSTEM_TITLES.find(t => t.id === h.titleId);
             const active = !h.revokedAt;
             const icons: Record<string, string> = { MASTER:'⚔️', RISING_STAR:'🌟', GRINDER:'🛡️', GIANT_KILLER:'💀' };
             const fmt = (d: string) => new Date(d).toLocaleDateString('ja-JP', { year:'numeric', month:'numeric', day:'numeric' });
+            const days = h.revokedAt
+              ? Math.ceil((new Date(h.revokedAt).getTime() - new Date(h.awardedAt).getTime()) / 86400000)
+              : Math.ceil((Date.now() - new Date(h.awardedAt).getTime()) / 86400000);
+            const scoreLabel: Record<string, string> = {
+              MASTER: 'レート上昇', RISING_STAR: 'ポイント上昇', GRINDER: '出席日数', GIANT_KILLER: '格上撃破',
+            };
+            const scoreUnit: Record<string, string> = {
+              MASTER: 'pt', RISING_STAR: 'pt', GRINDER: '日', GIANT_KILLER: '回',
+            };
+
+            // 在位期間中の戦績を matches から計算
+            const tenureMatches = matches.filter(m => {
+              if (m.player1Id !== userId && m.player2Id !== userId) return false;
+              const md = m.date;
+              if (md < h.awardedAt) return false;
+              if (h.revokedAt && md > h.revokedAt) return false;
+              return true;
+            });
+            const tw = tenureMatches.filter(m =>
+              (m.player1Id === userId && m.result === 'PLAYER1_WIN') ||
+              (m.player2Id === userId && m.result === 'PLAYER2_WIN')
+            ).length;
+            const tl = tenureMatches.filter(m =>
+              (m.player1Id === userId && m.result === 'PLAYER2_WIN') ||
+              (m.player2Id === userId && m.result === 'PLAYER1_WIN')
+            ).length;
+            const td = tenureMatches.filter(m => m.result === 'DRAW').length;
+            const tTotal = tenureMatches.length;
+            const tWr = tTotal > 0 ? Math.round((tw / tTotal) * 100) : 0;
+
+            // 在位中のレート変動（最初と最後の rateHistory から概算）
+            const rateAtStart = users.find(u => u.id === userId)?.rateHistory
+              ?.filter(r => r.date >= h.awardedAt)
+              ?.sort((a, b) => a.date.localeCompare(b.date))[0]?.rate ?? null;
+            const rateAtEnd = h.revokedAt
+              ? (users.find(u => u.id === userId)?.rateHistory
+                ?.filter(r => r.date <= h.revokedAt!)
+                ?.sort((a, b) => b.date.localeCompare(a.date))[0]?.rate ?? null)
+              : (users.find(u => u.id === userId)?.rate ?? null);
+            const rateDelta = (rateAtStart !== null && rateAtEnd !== null)
+              ? Math.round(rateAtEnd - rateAtStart) : null;
+
+            // 在位中の最大連勝・格上撃破
+            let maxStreak = 0; let curStreak = 0; let upsets = 0;
+            const rateMap: Record<string, number> = {};
+            users.forEach(u => { rateMap[u.id] = u.rate; });
+            tenureMatches.sort((a, b) => a.date.localeCompare(b.date)).forEach(m => {
+              const won = (m.player1Id === userId && m.result === 'PLAYER1_WIN') ||
+                          (m.player2Id === userId && m.result === 'PLAYER2_WIN');
+              const oppId = m.player1Id === userId ? m.player2Id : m.player1Id;
+              const oppRate = rateMap[oppId] ?? 0;
+              const myRate  = rateMap[userId!] ?? 0;
+              if (won) {
+                curStreak++; if (curStreak > maxStreak) maxStreak = curStreak;
+                if (oppRate - myRate >= 100) upsets++;
+              } else { curStreak = 0; }
+            });
+
             return (
-              <div key={h.id} className={`flex items-center gap-3 p-3 rounded-xl border ${active ? 'bg-yellow-900/20 border-yellow-500/30' : 'bg-slate-800/60 border-slate-700/50'}`}>
-                <span className="text-xl shrink-0">{icons[h.titleId] ?? '🏆'}</span>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-black text-yellow-300 text-sm">第{h.generation}代 {def?.name ?? h.titleId}</span>
-                    {active && <span className="text-[9px] bg-yellow-500/20 text-yellow-300 border border-yellow-500/30 px-2 py-0.5 rounded-full font-black animate-pulse">現役</span>}
+              <div key={h.id} className={`p-3 rounded-xl border space-y-2 ${active ? 'bg-yellow-900/20 border-yellow-500/30' : 'bg-slate-800/60 border-slate-700/50'}`}>
+                {/* ヘッダー */}
+                <div className="flex items-start gap-3">
+                  <span className="text-xl shrink-0">{icons[h.titleId] ?? '🏆'}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-black text-yellow-300 text-sm">第{h.generation}代 {def?.name ?? h.titleId}</span>
+                      {active && <span className="text-[9px] bg-yellow-500/20 text-yellow-300 border border-yellow-500/30 px-2 py-0.5 rounded-full font-black animate-pulse">現役</span>}
+                    </div>
+                    <div className="text-[10px] text-slate-400 mt-0.5">
+                      {fmt(h.awardedAt)} 〜 {h.revokedAt ? fmt(h.revokedAt) : '現在'}
+                      <span className="ml-1.5 text-slate-500">（{days}日間）</span>
+                    </div>
+                    {h.awardedScore !== undefined && (
+                      <div className="text-[10px] text-yellow-600 font-bold">
+                        選出時 {scoreLabel[h.titleId]}：{h.titleId === 'MASTER' && h.awardedScore >= 0 ? '+' : ''}{h.awardedScore}{scoreUnit[h.titleId]}
+                      </div>
+                    )}
                   </div>
-                  <div className="text-[10px] text-slate-400">{fmt(h.awardedAt)} 〜 {h.revokedAt ? fmt(h.revokedAt) : '現在'}</div>
                 </div>
+                {/* 在位中戦績 */}
+                {tTotal > 0 && (
+                  <div className="grid grid-cols-4 gap-1.5 pt-1 border-t border-white/5">
+                    {[
+                      { label: '戦績',   val: `${tw}勝${tl}敗${td > 0 ? td+'分' : ''}`, color: 'text-white' },
+                      { label: '勝率',   val: `${tWr}%`,  color: tWr >= 50 ? 'text-green-400' : 'text-red-400' },
+                      { label: '最大連勝', val: `${maxStreak}`, color: 'text-orange-400' },
+                      { label: '格上撃破', val: `${upsets}回`, color: 'text-rose-400' },
+                    ].map(s => (
+                      <div key={s.label} className="bg-black/20 rounded-lg p-1.5 text-center">
+                        <div className={`text-sm font-black ${s.color}`}>{s.val}</div>
+                        <div className="text-[8px] text-slate-500 font-bold">{s.label}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {/* レート変動 */}
+                {rateDelta !== null && (
+                  <div className="text-[10px] font-bold text-slate-400">
+                    在位中レート変動：<span className={rateDelta >= 0 ? 'text-blue-400' : 'text-red-400'}>{rateDelta >= 0 ? '+' : ''}{rateDelta}pt</span>
+                  </div>
+                )}
               </div>
             );
           })}

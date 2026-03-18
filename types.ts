@@ -123,6 +123,8 @@ export interface User {
   unlockedFrames?: string[];
   // ★ 永続称号（「第n代 覇者」など、退任後も保持）
   earnedHonors?: string[];
+  /** 未確認のミッション達成ラベル（Profile開時にポップアップ → 確認後クリア） */
+  pendingMissionAlert?: string[];
 }
 
 

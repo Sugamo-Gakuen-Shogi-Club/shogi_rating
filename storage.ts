@@ -877,6 +877,7 @@ const normalizeUser = (user: any): User => ({
   activeFrameId:  user.activeFrameId ?? 'FRAME_NONE',
   unlockedFrames: Array.isArray(user.unlockedFrames) ? user.unlockedFrames : ['FRAME_NONE', 'FRAME_DEFAULT'],
   earnedHonors:   Array.isArray(user.earnedHonors) ? user.earnedHonors : [],
+  pendingMissionAlert: Array.isArray(user.pendingMissionAlert) ? user.pendingMissionAlert : [],
 });
 
 /** All users including inactive (internal use / admin) */
@@ -1825,6 +1826,7 @@ const newUserBase = (name: string, reading?: string, isNewMember = false): User 
   activeFrameId:    'FRAME_NONE',
   unlockedFrames:   ['FRAME_NONE', 'FRAME_DEFAULT'],
   earnedHonors:     [],
+  pendingMissionAlert: [],
 });
 
 export const bulkAddUsers = (stubs: Partial<User>[]): void => {
@@ -2125,6 +2127,15 @@ export const deleteAttendanceLog = (logId: string): { success: boolean; message:
  * 管理者が個人ページPINを変更する
  * 6桁数字のみ許可
  */
+/** Profile 開時にミッション通知を確認済みにする */
+export const clearPendingMissionAlert = (userId: string): void => {
+  const all = getRawUsers();
+  const u = all.find(x => x.id === userId);
+  if (!u) return;
+  u.pendingMissionAlert = [];
+  saveUsers(all);
+};
+
 export const updateProfilePin = (userId: string, newPin: string): { success: boolean; error?: string } => {
   if (!/^\d{6}$/.test(newPin)) return { success: false, error: '6桁の数字で入力してください' };
   const all = getRawUsers();
@@ -2330,9 +2341,29 @@ export const updateMissionsAfterMatch = async (
     tryComplete('W_WINRATE', 'WEEKLY', rate50);
   }
 
-  // 達成したミッションのポイントを付与
-  for (const ach of achieved) {
-    manualPointAdjustment(player.id, ach.rewardPts, `ミッション達成: ${ach.mission.label}`);
+  // 達成したミッションのポイントを付与 + pendingMissionAlert に積む
+  if (achieved.length > 0) {
+    const allUsers = getRawUsers();
+    const u = allUsers.find(x => x.id === player.id);
+    if (u) {
+      for (const ach of achieved) {
+        manualPointAdjustment(player.id, ach.rewardPts, `ミッション達成: ${ach.mission.label}`);
+      }
+      // 最新のユーザーデータを再取得してアラートを追記
+      const allUsers2 = getRawUsers();
+      const u2 = allUsers2.find(x => x.id === player.id);
+      if (u2) {
+        u2.pendingMissionAlert = [
+          ...(u2.pendingMissionAlert ?? []),
+          ...achieved.map(a => `${a.mission.label}（+${a.rewardPts}pt）`),
+        ];
+        saveUsers(allUsers2);
+      }
+    }
+  } else {
+    for (const ach of achieved) {
+      manualPointAdjustment(player.id, ach.rewardPts, `ミッション達成: ${ach.mission.label}`);
+    }
   }
 
   // Firebaseに保存（並列）

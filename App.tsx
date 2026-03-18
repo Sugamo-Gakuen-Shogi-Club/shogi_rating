@@ -13,6 +13,7 @@ import ProfileView  from './ProfileView';
 import Admin        from './Admin';
 import { Guide }    from './Guide';
 import { Screensaver } from './Screensaver';
+import { Tutorial, isTutorialDone } from './Tutorial';
 import UndoPanel    from './UndoPanel';
 import FourKingsHistory from './FourKingsHistory';
 
@@ -175,9 +176,9 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         ))}
       </div>
 
-      <main className="flex-1 flex flex-col relative overflow-hidden pt-[70px] md:pt-0">
-        <div className="flex-1 overflow-y-auto p-4 md:p-10 scrollbar-hide">
-          <div className="max-w-6xl mx-auto h-full pb-24 md:pb-0">{children}</div>
+      <main className="flex-1 flex flex-col relative overflow-hidden pt-[70px] md:pt-0 bg-transparent">
+        <div className="flex-1 overflow-y-auto p-4 md:p-10 scrollbar-hide min-h-screen">
+          <div className="max-w-6xl mx-auto pb-24 md:pb-16">{children}</div>
         </div>
       </main>
     </div>
@@ -207,6 +208,7 @@ const App: React.FC = () => {
   const [isIdle, setIsIdle] = useState(false);
   const [initStatus, setInitStatus] = useState<InitStatus>('LOADING');
   const [initMessage, setInitMessage] = useState('クラウドデータを取得中...');
+  const [showTutorial, setShowTutorial] = useState(false);
   const timerRef = useRef<number | null>(null);
   const IDLE_TIMEOUT = 45000;
 
@@ -242,6 +244,8 @@ const App: React.FC = () => {
         }
       }
       setInitStatus('SUCCESS');
+      // 初回のみチュートリアルを表示
+      if (!isTutorialDone()) setShowTutorial(true);
     };
 
     initialize();
@@ -273,7 +277,8 @@ const App: React.FC = () => {
   return (
     <HashRouter>
       <MaintenanceBanner />
-      {isIdle && <Screensaver onDismiss={resetTimer} />}
+      {showTutorial && <Tutorial onDone={() => setShowTutorial(false)} />}
+      {isIdle && !showTutorial && <Screensaver onDismiss={resetTimer} />}
       <Layout>
         <Routes>
           <Route path="/"                   element={<Dashboard />} />

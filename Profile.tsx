@@ -11,7 +11,7 @@ import {
   getUsers, getMatches, ACHIEVEMENTS_DATA, updateUserTitle, getRivalryStats,
   ICONS_DATA, FRAMES_DATA, updateUserIcon, updateUserFrame, getUserAvatarChar,
   getLogs, getSettings, isEventActive, getUserFrameDef, SYSTEM_TITLES,
-  submitRankApplication, getUserSystemTitleHistory,
+  submitRankApplication, getUserSystemTitleHistory, clearPendingMissionAlert,
 } from './storage';
 import { User, MatchRecord, ActivityLog, ActivityType, RankEntry, EventType, SystemSettings } from './types';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -616,6 +616,7 @@ const Profile: React.FC = () => {
   const [pinErr, setPinErr]         = useState(false);
   const [modal, setModal] = useState<'icon'|'frame'|'title'|'titleColl'|'rank'|null>(null);
   const [showSelector, setShowSelector] = useState(false);
+  const [pendingAlerts, setPendingAlerts] = useState<string[]>([]);
 
   useEffect(() => {
     const load = () => { setUsers(getUsers()); setMatches(getMatches()); setLogs(getLogs()); };
@@ -652,7 +653,15 @@ const Profile: React.FC = () => {
   if (!authenticated) {
     const handlePin = (v?: string) => {
       const p = v ?? pin;
-      if (p === (user.profilePin ?? '0000')) { setAuth(true); setPinErr(false); setPin(''); }
+      if (p === (user.profilePin ?? '000000')) {
+        setAuth(true); setPinErr(false); setPin('');
+        // 未確認ミッション通知を拾ってポップアップ
+        const alerts = user.pendingMissionAlert ?? [];
+        if (alerts.length > 0) {
+          setPendingAlerts(alerts);
+          clearPendingMissionAlert(user.id);
+        }
+      }
       else { setPinErr(true); setPin(''); setTimeout(() => setPinErr(false), 1500); }
     };
     return (
@@ -666,18 +675,18 @@ const Profile: React.FC = () => {
             <p className="text-sm text-slate-400 font-bold mt-2">個人ページ（編集）</p>
           </div>
           <div className="px-8 pb-2">
-            <label className="block text-xs font-black text-slate-500 uppercase tracking-widest text-center mb-3">PINコードを入力</label>
-            <input type="password" value={pin} readOnly placeholder="••••"
-              className={`w-full p-4 border rounded-xl text-center text-3xl tracking-[1em] outline-none bg-slate-800 text-white font-mono ${pinErr ? 'border-red-500 bg-red-900/20 animate-bounce' : 'border-slate-700'}`}/>
+            <label className="block text-xs font-black text-slate-500 uppercase tracking-widest text-center mb-3">PINコードを入力（6桁）</label>
+            <input type="password" value={pin} readOnly placeholder="••••••"
+              className={`w-full p-4 border rounded-xl text-center text-3xl tracking-[0.5em] outline-none bg-slate-800 text-white font-mono ${pinErr ? 'border-red-500 bg-red-900/20 animate-bounce' : 'border-slate-700'}`}/>
             {pinErr && <p className="text-red-400 text-xs font-black text-center mt-2">PINが正しくありません</p>}
           </div>
-          <NumPad value={pin} onChange={(v) => { setPin(v); if (v.length === 4) setTimeout(() => handlePin(v), 50); }} maxLength={4} />
+          <NumPad value={pin} onChange={(v) => { setPin(v); if (v.length === 6) setTimeout(() => handlePin(v), 50); }} maxLength={6} />
           <div className="px-8 pb-8 pt-2">
-            <button onClick={() => handlePin()} disabled={pin.length < 4}
+            <button onClick={() => handlePin()} disabled={pin.length < 6}
               className="w-full bg-slate-200 disabled:bg-slate-700 disabled:text-slate-500 text-slate-900 py-3 rounded-xl font-black active:scale-95 transition-all">
               開く
             </button>
-            <p className="text-center text-[11px] text-slate-600 font-bold mt-3">初期PINは <span className="text-slate-400">0000</span></p>
+            <p className="text-center text-[11px] text-slate-600 font-bold mt-3">初期PINは <span className="text-slate-400">000000</span>（管理者に変更を依頼）</p>
           </div>
         </div>
       </div>
@@ -730,6 +739,33 @@ const Profile: React.FC = () => {
 
   return (
     <div className="space-y-4 pb-20 animate-in fade-in duration-200">
+      {/* ── ミッション達成通知ポップアップ ── */}
+      {pendingAlerts.length > 0 && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-sm bg-slate-900 border border-indigo-500/40 rounded-3xl shadow-2xl overflow-hidden">
+            <div className="bg-gradient-to-r from-indigo-900/60 to-purple-900/40 px-5 py-4 border-b border-indigo-500/20 flex items-center gap-2">
+              <span className="text-xl">🎯</span>
+              <span className="font-black text-white uppercase tracking-wider text-sm">ミッション達成！</span>
+            </div>
+            <div className="px-5 py-4 space-y-2">
+              {pendingAlerts.map((a, i) => (
+                <div key={i} className="flex items-center gap-3 bg-indigo-900/20 border border-indigo-700/30 rounded-xl px-3 py-2.5">
+                  <span className="text-lg shrink-0">✅</span>
+                  <span className="text-sm font-bold text-white">{a}</span>
+                </div>
+              ))}
+              <p className="text-[10px] text-slate-500 font-bold text-center pt-1">対局中に達成したミッションです</p>
+            </div>
+            <div className="px-5 pb-5">
+              <button onClick={() => setPendingAlerts([])}
+                className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-black rounded-xl transition-all active:scale-95">
+                確認
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* モーダル */}
       {modal === 'icon'      && <IconModal user={user} onClose={() => setModal(null)} onSelect={(id) => { updateUserIcon(selectedId, id); refresh(); setModal(null); }}/>}
       {modal === 'frame'     && <FrameModal user={user} onClose={() => setModal(null)} onSelect={(id) => { updateUserFrame(selectedId, id); refresh(); setModal(null); }}/>}

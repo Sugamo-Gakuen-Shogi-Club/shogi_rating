@@ -8,6 +8,7 @@ import {
   Smartphone, LayoutGrid, Layers, ToggleRight, Minus, Plus,
   Monitor, Cloud, Hash, Cpu
 } from 'lucide-react';
+import { Tutorial, isTutorialDone, markTutorialDone } from './Tutorial';
 
 // ─── シンプル/詳細 トグルコンテキスト ────────────────────────
 const ModeCtx = React.createContext<boolean>(false);
@@ -666,10 +667,14 @@ const CONTENT: Record<TabKey, React.ReactNode> = {
 export const Guide: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabKey>('intro');
   const [simple, setSimple] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(false);
   const activeTabDef = TABS.find(t => t.key === activeTab)!;
 
   return (
     <ModeCtx.Provider value={simple}>
+      {showTutorial && (
+        <Tutorial onDone={() => { setShowTutorial(false); }} />
+      )}
       <div className="space-y-4 animate-in fade-in duration-300 pb-20">
 
         {/* ─── ヘッダー ─── */}
@@ -682,18 +687,24 @@ export const Guide: React.FC = () => {
               </div>
               <p className="text-slate-500 text-xs font-bold">Club Rivals の全機能リファレンス</p>
             </div>
-            {/* 簡易/詳細 トグル */}
-            <button
-              onClick={() => setSimple(s => !s)}
-              className={`flex items-center gap-2 px-3 py-2 rounded-xl border font-black text-xs transition-all shrink-0 ${
-                simple
-                  ? 'bg-blue-600 border-blue-500 text-white'
-                  : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'
-              }`}
-            >
-              {simple ? <Minus size={13}/> : <Plus size={13}/>}
-              {simple ? '簡易版 表示中' : '詳細版 表示中'}
-            </button>
+            <div className="flex items-center gap-2 shrink-0">
+              {/* チュートリアル再表示ボタン */}
+              <button
+                onClick={() => { markTutorialDone(); setShowTutorial(true); }}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-700 bg-slate-800 text-slate-400 hover:bg-slate-700 font-black text-xs transition-all"
+                title="チュートリアルを再表示"
+              >
+                <RotateCcw size={12}/> チュートリアル
+              </button>
+              {/* 簡易/詳細 トグル */}
+              <button
+                onClick={() => setSimple(s => !s)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-xl border font-black text-xs transition-all ${ simple ? 'bg-blue-600 border-blue-500 text-white' : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700' }`}
+              >
+                {simple ? <Minus size={13}/> : <Plus size={13}/>}
+                {simple ? '簡易版 表示中' : '詳細版 表示中'}
+              </button>
+            </div>
           </div>
 
           {/* モード説明バー */}
