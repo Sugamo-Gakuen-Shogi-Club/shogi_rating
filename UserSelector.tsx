@@ -28,6 +28,13 @@ const GOJUUON = [
     ['わ', '', 'を', '', 'ん']
 ];
 
+/** selectedChar からその行の有効文字一覧を返す（例: 'た' → 'た・ち・つ・て・と'） */
+const getRowLabel = (char: string): string => {
+  const row = GOJUUON.find(r => r.includes(char));
+  if (!row) return char;
+  return row.filter(c => c !== '').join('・');
+};
+
 const matchesKana = (reading: string | undefined, char: string) => {
     if (!reading) return false;
     const firstChar = reading.charAt(0);
@@ -98,7 +105,7 @@ export const UserSelector: React.FC<UserSelectorProps> = ({
           >
             <span className="flex items-center gap-2">
               <Filter size={14} />
-              {selectedChar ? `「${selectedChar}」行でフィルター中` : 'あ行で絞り込む（任意）'}
+              {selectedChar ? `頭文字[${selectedChar}]でフィルター中` : '頭文字で絞り込む（任意）'}
             </span>
             <div className="flex items-center gap-2">
               {selectedChar && (
@@ -133,7 +140,7 @@ export const UserSelector: React.FC<UserSelectorProps> = ({
           {/* PCのみ左サイドに五十音キーボード */}
           <div className="hidden md:flex w-[40%] bg-slate-800 border-r border-slate-700 flex-col">
             <div className="p-3 border-b border-slate-700 flex items-center justify-between shrink-0">
-              <span className="font-bold text-slate-300 text-sm">{selectedChar ? `「${selectedChar}」行を選択中` : 'フィルタなし'}</span>
+              <span className="font-bold text-slate-300 text-sm">{selectedChar ? `頭文字[${selectedChar}]で絞り込み中` : 'フィルタなし'}</span>
               {selectedChar && (
                 <button onClick={() => setSelectedChar(null)} className="text-xs bg-slate-700 hover:bg-slate-600 text-slate-200 px-3 py-1.5 rounded-full font-bold flex items-center gap-1">
                   <RefreshCw size={12} /> 解除
@@ -171,7 +178,7 @@ export const UserSelector: React.FC<UserSelectorProps> = ({
           <div className="flex-1 bg-slate-900/50 flex flex-col overflow-hidden">
             <div className="p-3 bg-slate-900/80 border-b border-slate-800 flex items-center justify-between shrink-0 text-sm sticky top-0 z-10">
               <span className="font-bold text-slate-400">
-                {selectedChar ? <span className="text-blue-400">「{selectedChar}」行</span> : '全員'}
+                {selectedChar ? <span className="text-blue-400">頭文字[{selectedChar}]</span> : '全員'}
               </span>
               <span className="bg-slate-800 text-slate-300 px-3 py-1 rounded-full text-xs font-bold border border-slate-700">{filteredUsers.length}名</span>
             </div>
