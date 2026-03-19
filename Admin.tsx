@@ -633,7 +633,7 @@ const Admin: React.FC = () => {
 
       {/* ── 四天王更新確認モーダル ───────────────────────────── */}
       {kingsConfirm && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/95 backdrop-blur-md p-4">
+        <div className="fixed inset-0 z-[600] flex items-center justify-center bg-slate-950/95 backdrop-blur-md p-4">
           <div className="bg-slate-900 w-full max-w-lg rounded-3xl shadow-2xl border border-yellow-500/30 overflow-hidden">
             <div className="bg-gradient-to-r from-yellow-900/60 to-amber-900/40 p-6 border-b border-yellow-500/20">
               <h3 className="text-xl font-black text-yellow-300 flex items-center gap-2"><Crown size={22}/> 四天王 更新確認</h3>
@@ -671,7 +671,7 @@ const Admin: React.FC = () => {
 
       {/* CSV Preview Modal */}
       {csvPreview && (
-        <div className="fixed inset-0 z-[160] flex items-center justify-center bg-slate-950/95 backdrop-blur-md p-4">
+        <div className="fixed inset-0 z-[600] flex items-center justify-center bg-slate-950/95 backdrop-blur-md p-4">
           <div className="bg-slate-900 w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] border border-white/10">
             <div className="bg-slate-800 text-white p-6 flex justify-between items-center border-b border-white/10">
               <h3 className="text-xl font-black flex items-center gap-2"><FileUp size={24} className="text-blue-400" /> 一括登録の確認</h3>
@@ -708,7 +708,7 @@ const Admin: React.FC = () => {
 
       {/* Event Wizard */}
       {isEventWizardOpen && (
-        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-950/90 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-[600] flex items-center justify-center bg-slate-950/90 backdrop-blur-sm p-4">
           <div className="bg-slate-900 w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[95vh] border border-white/10">
             <div className="bg-slate-800 text-white p-6 flex justify-between items-center border-b border-white/10">
               <h3 className="text-xl font-black flex items-center gap-2"><Calendar /> イベント設定</h3>

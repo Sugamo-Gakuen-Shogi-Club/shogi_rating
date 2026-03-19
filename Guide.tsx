@@ -6,7 +6,7 @@ import {
   AlertTriangle, CheckCircle, ArrowRight, Users, RotateCcw,
   Flame, Snowflake, Eye, FileText, Database, RefreshCw,
   Smartphone, LayoutGrid, Layers, ToggleRight, Minus, Plus,
-  Monitor, Cloud, Hash, Cpu
+  Monitor, Cloud, Hash, Cpu, Target,
 } from 'lucide-react';
 import { Tutorial, isTutorialDone, markTutorialDone } from './Tutorial';
 
@@ -157,12 +157,12 @@ const TabIntro = () => (
     {/* 機能カード */}
     <div className="grid grid-cols-2 gap-3">
       {[
-        { icon: <PlusCircle size={18}/>, label: '対局記録',   desc: 'Eloレートを自動計算', color: 'text-red-400',    bg: 'bg-red-900/20 border-red-700/20' },
-        { icon: <Trophy size={18}/>,     label: 'ランキング', desc: '4軸＋四天王で比較',   color: 'text-amber-400',  bg: 'bg-amber-900/20 border-amber-700/20' },
-        { icon: <Star size={18}/>,       label: '称号・実績', desc: '活動で自動解放',       color: 'text-yellow-400', bg: 'bg-yellow-900/20 border-yellow-700/20' },
-        { icon: <Swords size={18}/>,     label: 'イベント',   desc: '紅白戦・ポイントマッチ', color: 'text-rose-400', bg: 'bg-rose-900/20 border-rose-700/20' },
-        { icon: <Medal size={18}/>,      label: '段位登録',   desc: 'ウォーズ等の棋力を申請', color: 'text-purple-400', bg: 'bg-purple-900/20 border-purple-700/20' },
-        { icon: <Globe size={18}/>,      label: '公開ページ', desc: 'URL共有で外部閲覧',    color: 'text-cyan-400',   bg: 'bg-cyan-900/20 border-cyan-700/20' },
+        { icon: <PlusCircle size={18}/>, label: '対局記録',   desc: 'Eloレートを自動計算',       color: 'text-red-400',    bg: 'bg-red-900/20 border-red-700/20' },
+        { icon: <Trophy size={18}/>,     label: 'ランキング', desc: '12軸＋四天王で多角比較',    color: 'text-amber-400',  bg: 'bg-amber-900/20 border-amber-700/20' },
+        { icon: <Star size={18}/>,       label: '称号・実績', desc: '活動で自動解放',             color: 'text-yellow-400', bg: 'bg-yellow-900/20 border-yellow-700/20' },
+        { icon: <Target size={18}/>,     label: 'ミッション', desc: 'デイリー/ウィークリーでPt',  color: 'text-indigo-400', bg: 'bg-indigo-900/20 border-indigo-700/20' },
+        { icon: <Swords size={18}/>,     label: 'イベント',   desc: '紅白戦・ポイントマッチ',     color: 'text-rose-400',   bg: 'bg-rose-900/20 border-rose-700/20' },
+        { icon: <Medal size={18}/>,      label: '段位登録',   desc: 'ウォーズ等の棋力を申請',     color: 'text-purple-400', bg: 'bg-purple-900/20 border-purple-700/20' },
       ].map(item => (
         <div key={item.label} className={`${item.bg} border rounded-2xl p-4`}>
           <span className={item.color}>{item.icon}</span>
@@ -177,12 +177,11 @@ const TabIntro = () => (
       <H icon={<LayoutGrid size={16}/>}>画面一覧</H>
       <Table rows={[
         ['🏠 ホーム',      '出席記録・イベント状況・四天王'],
-        ['⊕ 対局記録',    '結果入力（管理者PIN必要）'],
-        ['🏆 ランキング',  '全班員の順位・四天王基準'],
-        ['👤 個人データ',  'レート推移・称号・ライバル（PIN必要）'],
+        ['⊕ 対局記録',    '結果入力（本人PINで確認）'],
+        ['🏆 ランキング',  '全班員の順位・まとめ・四天王'],
+        ['👤 個人データ',  'レート推移・ミッション・因縁ボード（PIN必要）'],
         ['📖 ガイド',      'このページ'],
-        ['⚙️ 管理画面',   '班員管理・各種設定（管理者専用）'],
-        ['🌐 /board',     'URL共有の閲覧専用ページ'],
+        ['⚙️ 管理画面',   '班員管理・各種設定（承認済みデバイスのみ）'],
       ]} />
     </div>
 
@@ -190,10 +189,10 @@ const TabIntro = () => (
     <div className="space-y-3">
       <H icon={<Key size={16}/>}>PINコード</H>
       <Table rows={[
-        ['管理者PIN', '対局登録・管理画面の操作に必要'],
-        ['個人PIN',   '個人ページの閲覧に必要。初期値 000000'],
+        ['管理者PIN（6桁）', '管理画面・Undoの操作に必要'],
+        ['個人PIN（6桁）',   '対局時の本人確認・個人ページ閲覧に必要。初期値 000000'],
       ]} />
-      <Tip type="warn">管理者PINは他の班員に見られないよう管理してください。</Tip>
+      <Tip type="warn">初期PIN（000000）のままでは対局に参加できません。管理者に変更してもらいましょう。</Tip>
     </div>
 
     {/* 基本の流れ */}
@@ -201,9 +200,9 @@ const TabIntro = () => (
       <H icon={<ArrowRight size={16}/>}>基本の流れ</H>
       <div className="space-y-3">
         <Step n={1} title="出席を記録する">ホームで自分の名前をタップ → 出席ポイントが付与される</Step>
-        <Step n={2} title="対局を記録する">対局記録ページで相手・結果・管理者PINを入力して送信</Step>
+        <Step n={2} title="対局を記録する">対局記録ページでP1・P2が各自PINを入力 → 勝者を選んで送信</Step>
         <Step n={3} title="結果を確認する">ランキングや個人ページでレートとポイントの変動を確認</Step>
-        <Step n={4} title="称号を集める">対局・出席を重ねると称号やアイコンが自動解放される</Step>
+        <Step n={4} title="称号・ミッションを集める">対局・出席を重ねると称号やミッションボーナスが解放される</Step>
       </div>
     </div>
 
@@ -230,9 +229,9 @@ const TabMatch = () => (
     <SimpleOnly>
       <div className="space-y-3">
         <QCard icon={<PlusCircle size={18}/>} title="対局の記録手順" color="text-red-400"
-          desc="① 対局記録ページを開く → ② P1・P2を選択 → ③ 勝者カードをタップ → ④ 管理者PIN入力 → 送信" />
+          desc="① 対局記録ページを開く → ② P1を選んでPIN入力 → ③ P2を選んでPIN入力 → ④ 勝者を選んで送信" />
         <QCard icon={<RotateCcw size={18}/>} title="取り消したいとき" color="text-amber-400"
-          desc="画面右下の「↩」ボタンからUNDOパネルを開き「直前に戻す」を押す。直近10件まで対応。" />
+          desc="画面右下の「↩」ボタンからUNDOパネルを開き「直前に戻す」を押す。直近10件まで対応。管理者PINが必要。" />
         <div className="grid grid-cols-2 gap-3">
           <div className="bg-slate-900 border border-white/5 rounded-2xl p-4 text-center">
             <div className="text-2xl font-black text-green-400">勝ち</div>
@@ -253,27 +252,30 @@ const TabMatch = () => (
         <div className="space-y-3">
           <Step n={1} title="「対局記録」ページを開く">下部ナビの ⊕ ボタンから</Step>
           <Step n={2} title="Player 1 を選ぶ">班員リストからタップして選択</Step>
-          <Step n={3} title="Player 1 の PIN を入力">本人が自分のPINを入力（他の人に見せない）。初期値（000000）のままだと対局できない。</Step>
+          <Step n={3} title="Player 1 が PIN を入力">本人が自分の6桁PINを入力。初期値（000000）のままでは対局できない</Step>
           <Step n={4} title="Player 2 を選ぶ">同様に選択。同じ人は選べない</Step>
-          <Step n={5} title="Player 2 の PIN を入力">同様に本人が入力</Step>
-          <Step n={6} title="勝者を選んで送信">勝者ボタン or 引き分けを選択 → 「記録する」を押す（管理者PIN不要）</Step>
+          <Step n={5} title="Player 2 が PIN を入力">同様に本人が入力</Step>
+          <Step n={6} title="勝者を選んで送信">勝者ボタン or 引き分けを選択 → 「記録する」を押す</Step>
         </div>
+        <Tip type="warn">管理者PINは不要。各自の個人PINで本人確認を行う。</Tip>
       </div>
 
       <div className="space-y-3">
         <H icon={<Eye size={16}/>}>結果画面の見方</H>
         <Table rows={[
-          ['Rate変動',   '今回の対局でレートがいくら変わったか（+/−）'],
-          ['Points獲得', '今回の対局で得たポイント（負けても最低1pt）'],
-          ['ポイント内訳', 'ベース・連勝ボーナス・新入生ボーナス・イベント倍率など'],
-          ['新着称号',   '今回の対局で新たに解放された称号があれば表示'],
+          ['Rate変動',    '今回の対局でレートがいくら変わったか（+/−）'],
+          ['Points獲得',  '今回の対局で得たポイント（負けても最低1pt）'],
+          ['ポイント内訳', 'ベース・連勝ボーナス・新入班員ボーナス・イベント倍率など'],
+          ['連戦補正',    '同じ相手と繰り返すとポイント獲得が減る（スパム防止）'],
+          ['新着称号',    '今回の対局で新たに解放された称号があれば表示'],
+          ['ミッション',  '達成したミッションがあれば個人ページ開時に通知'],
         ]} />
       </div>
 
       <div className="space-y-3">
         <H icon={<Smartphone size={16}/>}>デバイス承認について</H>
-        <p className="text-sm text-slate-400 font-medium">出席記録には「承認済みデバイス」からの操作が必要。管理画面 → デバイス管理から承認できる。</p>
-        <Tip type="info">対局記録は管理者PINで保護されているため、デバイス承認は不要。出席のみ承認が必要。</Tip>
+        <p className="text-sm text-slate-400 font-medium">対局記録・出席記録は「承認済みデバイス」からの操作が必要。未承認デバイスでは管理者ページ自体にアクセスできない。</p>
+        <Tip type="info">承認手順：管理画面 → 変更パスワード入力 → 管理者PIN入力 → デバイス名を入力して承認。</Tip>
       </div>
 
       <Acc title="引き分けの仕組み">
@@ -499,15 +501,45 @@ const TabProfile = () => (
     <div className="space-y-3">
       <H icon={<UserIcon size={16}/>}>個人ページでできること</H>
       <Table rows={[
-        ['プロフィール確認', 'レート・ポイント・勝敗・活動日数'],
-        ['レート推移グラフ', '対局のたびに記録される折れ線グラフ'],
-        ['称号変更',         '解放済み称号から表示するものを選ぶ'],
-        ['アイコン変更',     '解放済み将棋駒アイコンを選ぶ'],
-        ['フレーム変更',     '解放済みフレームを選ぶ'],
-        ['ライバル分析',     'お得意様（最も勝ち越した相手）と天敵（最も負け越した相手）'],
-        ['段位・級位',       '承認済みランクの確認と新規申請'],
-        ['対局履歴',         '直近の対局結果とレート変動'],
+        ['プロフィール確認',   'レート・ポイント・勝敗・活動日数'],
+        ['ランキング順位',     '12軸すべての現在順位を一覧確認'],
+        ['レート推移グラフ',  '対局のたびに記録される折れ線グラフ'],
+        ['ミッション確認',    'デイリー/ウィークリーの達成状況・報酬Pt'],
+        ['因縁ボード',        'ライバル・お得意様・天敵を煽り文付きで表示'],
+        ['称号変更',          '解放済み称号から表示するものを選ぶ'],
+        ['アイコン変更',      '解放済み将棋駒アイコンを選ぶ'],
+        ['フレーム変更',      '解放済みフレームを選ぶ'],
+        ['段位・級位',        '承認済みランクの確認と新規申請'],
+        ['対局履歴',          '直近の対局結果とレート変動'],
       ]} />
+    </div>
+
+    <div className="space-y-3">
+      <H icon={<Target size={16}/>}>ミッション</H>
+      <p className="text-sm text-slate-400 font-medium">達成するとポイントボーナスがもらえる。個人ページ上部に常時表示。</p>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="bg-indigo-900/20 border border-indigo-700/30 rounded-2xl p-4">
+          <div className="font-black text-indigo-300 text-sm mb-2">デイリー（部活ごとリセット）</div>
+          <ul className="text-[11px] text-slate-400 space-y-1">
+            <li>• 1局対局する</li>
+            <li>• 1勝する</li>
+            <li>• 3局対局する</li>
+            <li>• ランダム相手と対局</li>
+            <li>• 格上に挑戦</li>
+          </ul>
+        </div>
+        <div className="bg-purple-900/20 border border-purple-700/30 rounded-2xl p-4">
+          <div className="font-black text-purple-300 text-sm mb-2">ウィークリー</div>
+          <ul className="text-[11px] text-slate-400 space-y-1">
+            <li>• 5局対局する</li>
+            <li>• ライバルに勝利</li>
+            <li>• 格上3人撃破</li>
+            <li>• 出席2日以上</li>
+            <li>• 勝率50%以上</li>
+          </ul>
+        </div>
+      </div>
+      <Tip type="info">対局後にミッションを達成した場合、次回個人ページを開いたときに通知が表示される。</Tip>
     </div>
 
     <div className="space-y-3">
@@ -518,16 +550,19 @@ const TabProfile = () => (
         ['変更権限',   '管理者のみ変更できる'],
         ['ロック',     'プロフィール内の「ロック」ボタンを押すと即ロック'],
       ]} />
+      <Tip type="warn">初期PINのままでは対局に参加できない。</Tip>
     </div>
 
     <DetailOnly>
-      <Acc title="ライバル分析の計算方法">
+      <Acc title="因縁ボードの仕組み">
+        <p><strong className="text-white">今期ライバル</strong>：今シーズン最も多く対局した相手</p>
         <p><strong className="text-white">お得意様</strong>：対局した相手のうち、勝率が最も高い相手</p>
         <p><strong className="text-white">天敵</strong>：対局した相手のうち、勝率が最も低い相手</p>
-        <Tip type="info">最低3局以上の対局がある相手のみ対象。</Tip>
+        <p><strong className="text-white">全因縁履歴</strong>：2局以上対戦した相手を勝率バー付きで一覧表示</p>
+        <Tip type="info">因縁ボードは個人ページ（編集）にのみ表示。公開ページには対戦相手一覧（勝率のみ）が表示される。</Tip>
       </Acc>
-      <Acc title="公開ページからも個人ページを見れる？">
-        <p>見られる。公開ページのランキング行をタップ → PIN入力で閲覧可能。PINを知らない人には見せられない。</p>
+      <Acc title="ランキング順位の見方">
+        <p>個人ページの「現在の各ランキング順位」セクションに12軸すべての現在順位が表示される。1〜3位はゴールドハイライト。</p>
       </Acc>
     </DetailOnly>
   </div>
@@ -543,21 +578,30 @@ const TabAdmin = () => (
       <H icon={<Settings size={16}/>}>管理画面でできること</H>
       <Table rows={[
         ['部員管理',           '追加・退班・再入班（データは保持）・CSV一括追加'],
-        ['対局管理',           '直近の対局の削除'],
+        ['部員表示順',         'ドラッグ&ドロップで表示順をカスタマイズ（同率タイ時の順位にも影響）'],
         ['出席・ポイント調整', '手動でポイントを加減算'],
-        ['レート調整',         '手動でレートを変更'],
         ['シーズン管理',       '基準値のスナップショット・月次リセット'],
         ['四天王の更新',       'システム称号を現在の成績で再計算'],
         ['イベント管理',       '作成・チーム編成・大将任命'],
         ['段位申請の承認',     '班員からの申請を承認・却下'],
-        ['PIN管理',            '個人ページPINの変更'],
-        ['デバイス管理',       '出席操作を許可するデバイスの承認・取り消し'],
-        ['公開URL管理',        '/board ページのURLをコピー・開く'],
+        ['PIN管理',            '個人ページPINの変更（6桁）'],
+        ['デバイス管理',       '対局・出席操作を許可するデバイスの承認・取り消し'],
         ['クラウド同期',       '手動でFirebaseと同期'],
         ['バックアップ管理',   '自動バックアップの確認・手動復元'],
         ['メンテナンスモード', 'データ整備のための安全なサンドボックス'],
-        ['UNDO操作',           '直近10件の操作を取り消せるパネル'],
+        ['UNDO操作',           '直近10件の操作を取り消せるパネル（管理者PIN必要）'],
       ]} />
+      <Tip type="info">管理画面の各カードをタップするとフルスクリーンで詳細が開く。</Tip>
+    </div>
+
+    <div className="space-y-3">
+      <H icon={<Lock size={16}/>}>アクセス制限</H>
+      <Table rows={[
+        ['管理者PIN（6桁）', '管理画面ログイン・Undo操作に必要'],
+        ['承認済みデバイス', '対局記録・出席記録はこのデバイスからのみ操作可能'],
+        ['デバイス承認手順', '変更パスワード入力 → 管理者PIN入力 → デバイス名登録'],
+      ]} />
+      <Tip type="warn">未承認デバイスからは管理者ページへのログイン自体ができない。</Tip>
     </div>
 
     <DetailOnly>
@@ -568,8 +612,9 @@ const TabAdmin = () => (
           山田太郎,やまだたろう<br/>
           鈴木一郎,すずきいちろう
         </div>
-        <Step n={1} title="管理画面 → 「CSVで一括追加」を開く" />
+        <Step n={1} title="管理画面 → 「在籍部員」→「CSVで一括追加」を開く" />
         <Step n={2} title="CSVファイルを選択 → 「追加する」を押す" />
+        <Step n={3} title="確認モーダルで内容を確認して「追加を実行」" />
       </Acc>
 
       <Acc title="メンテナンスモードとは">
@@ -590,7 +635,7 @@ const TabAdmin = () => (
       </Acc>
 
       <Acc title="UNDOパネルの使い方">
-        <p>画面右下の「↩」ボタンでUNDOパネルを開く。対局・出席・ポイント/レート調整・退部・再入班の操作に対応。直近10件まで保存。</p>
+        <p>画面右下の「↩」ボタンでUNDOパネルを開く。管理者PINの入力後に操作できる。対局・出席・ポイント/レート調整・退班・再入班の操作に対応。直近10件まで保存。</p>
       </Acc>
     </DetailOnly>
   </div>

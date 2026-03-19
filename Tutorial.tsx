@@ -140,7 +140,7 @@ const SLIDES: Slide[] = [
           </div>
           <ul className="text-[11px] text-slate-400 space-y-1 pl-5 list-disc">
             <li>班員の追加・削除・PIN変更</li>
-            <li>デバイスの承認（変更パスワード「koji」が必要）</li>
+            <li>デバイスの承認（変更パスワードが必要）</li>
             <li>四天王の更新・シーズンリセット</li>
             <li>ポイント手動調整・出席取り消し</li>
           </ul>
