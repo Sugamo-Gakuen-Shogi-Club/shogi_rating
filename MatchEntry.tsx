@@ -10,7 +10,6 @@ import { AchievementPopup } from './AchievementPopup';
 import { UserSelector } from './UserSelector';
 import { MissionPopup } from './MissionPopup';
 import { ShogiPiece } from './ShogiPiece';
-import { NumPad } from './NumPad';
 
 declare const confetti: any;
 
@@ -47,54 +46,49 @@ const PinForm: React.FC<{ user: User; label: string; onSuccess: () => void; onBa
   const isDefault = (user.profilePin ?? DEFAULT_PIN) === DEFAULT_PIN;
 
   const handleChange = (v: string) => {
-    setPin(v); setErr(false);
-    if (v.length === 6) {
-      if (v === user.profilePin) { onSuccess(); }
-      else { setErr(true); setShake(true); setTimeout(() => { setShake(false); setErr(false); setPin(''); }, 600); }
+    const digits = v.replace(/\D/g, '').slice(0, 6);
+    setPin(digits); setErr(false);
+    if (digits.length === 6) {
+      if (isDefault) { setErr(true); setShake(true); setTimeout(() => setShake(false), 600); setPin(''); return; }
+      if (digits === user.profilePin) { onSuccess(); }
+      else { setErr(true); setShake(true); setTimeout(() => { setShake(false); setErr(false); }, 600); setPin(''); }
     }
   };
 
   return (
     <div className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-950/90 backdrop-blur-md p-4 animate-in fade-in duration-200">
-      <div className={`w-full max-w-sm bg-slate-900 border ${err ? 'border-red-500' : isDefault ? 'border-orange-700/50' : 'border-white/10'} rounded-3xl shadow-2xl overflow-hidden transition-all ${shake ? 'translate-x-[-4px]' : ''}`}>
+      <div className={`w-full max-w-sm bg-slate-900 border ${err ? 'border-red-500' : 'border-white/10'} rounded-3xl shadow-2xl overflow-hidden transition-all ${shake ? 'translate-x-[-4px]' : ''}`}>
         <div className="p-6 text-center border-b border-white/5">
           <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">{label}</p>
           <div className="flex justify-center mb-3"><AvatarIcon user={user} size="lg" /></div>
           <h2 className="text-xl font-black text-white">{user.name}</h2>
-        </div>
-
-        {isDefault ? (
-          /* 初期PIN のままはブロック — NumPad は表示しない */
-          <div className="px-6 py-6 space-y-4">
-            <div className="bg-orange-900/20 border border-orange-700/40 rounded-2xl px-4 py-4 space-y-2">
-              <p className="text-orange-300 font-black text-sm text-center">⚠ PIN未設定</p>
-              <p className="text-orange-200/80 text-xs text-center leading-relaxed">
-                初期PIN（{DEFAULT_PIN}）のままです。<br/>
-                管理者にPIN変更を依頼してから対局してください。
-              </p>
+          {isDefault ? (
+            <div className="mt-3 text-xs text-red-400 font-bold bg-red-900/20 border border-red-700/30 rounded-xl px-3 py-2 leading-relaxed">
+              PINが初期値（{DEFAULT_PIN}）のままです。<br/>管理者画面でPINを変更してから対局できます。
             </div>
-            <button onClick={onBack}
-              className="w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 font-black text-sm transition-all active:scale-95">
-              戻る
-            </button>
-          </div>
-        ) : (
-          /* 通常PIN入力 */
-          <div className="px-6 py-4 space-y-3">
-            <p className="text-xs text-slate-500 text-center">あなたのPINを入力してください<br/><span className="text-yellow-600 font-bold">（他の人に見せないで）</span></p>
-            <div className="flex justify-center gap-2">
+          ) : (
+            <p className="text-xs text-slate-500 mt-2">あなたのPINを入力してください<br/><span className="text-yellow-600 font-bold">（他の人に見せないで）</span></p>
+          )}
+        </div>
+        {!isDefault && (
+          <div className="px-6 py-5 space-y-3">
+            <div className="flex justify-center gap-3">
               {[0,1,2,3,4,5].map(i => (
                 <div key={i} className={`w-4 h-4 rounded-full border-2 transition-all ${i < pin.length ? err ? 'bg-red-500 border-red-500' : 'bg-white border-white' : 'bg-transparent border-slate-600'}`} />
               ))}
             </div>
+            <input
+              type="password" inputMode="numeric" pattern="[0-9]*" autoFocus
+              value={pin} onChange={e => handleChange(e.target.value)} maxLength={6}
+              className="w-full text-center text-2xl tracking-[0.5em] font-mono py-3 px-4 bg-slate-800 border border-slate-600 rounded-xl text-white outline-none focus:border-indigo-500 transition-colors"
+              placeholder="——————"
+            />
             {err && <p className="text-center text-red-400 text-xs font-bold">PINが間違っています</p>}
-            <NumPad value={pin} onChange={handleChange} maxLength={6} />
-            <button onClick={onBack}
-              className="w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 font-black text-sm transition-all active:scale-95">
-              戻る
-            </button>
           </div>
         )}
+        <div className="px-6 pb-6">
+          <button onClick={onBack} className="w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 font-black text-sm transition-all active:scale-95">戻る</button>
+        </div>
       </div>
     </div>
   );

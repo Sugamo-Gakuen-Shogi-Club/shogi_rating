@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { RotateCcw, X, Clock, Trash2, Lock } from 'lucide-react';
-import { getUndoStack, undoLastAction, clearUndoStack, getSettings } from './storage';
+import { RotateCcw, X, Clock, Trash2, Lock, ShieldAlert } from 'lucide-react';
+import { getUndoStack, undoLastAction, clearUndoStack, getSettings, isDeviceApproved } from './storage';
 import { UndoEntry, UndoActionType } from './types';
 import { NumPad } from './NumPad';
 
@@ -39,7 +39,7 @@ const UndoPanel: React.FC = () => {
 
   // ─── PIN 認証 ──────────────────────────────────────────────
   const handlePinCheck = (value: string) => {
-    if (value.length < 6) return;
+    if (value.length < 4) return;
     const settings = getSettings();
     if (value === settings.adminPin) {
       setPinAuthed(true);
@@ -85,11 +85,12 @@ const UndoPanel: React.FC = () => {
 
   const isEmpty = stack.length === 0;
   const latest  = stack[0];
+  const deviceApproved = isDeviceApproved();
 
   return (
     <>
       {/* PIN 入力モーダル */}
-      {showPin && (
+      {showPin && deviceApproved && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/90 backdrop-blur-sm p-4">
           <div className="bg-slate-900 w-full max-w-xs rounded-3xl shadow-2xl border border-white/10 overflow-hidden">
             <div className="flex items-center justify-between px-5 py-4 bg-slate-800 border-b border-white/5">
@@ -105,8 +106,8 @@ const UndoPanel: React.FC = () => {
               <p className="text-xs text-slate-400 font-bold text-center">
                 操作を取り消すには管理者PINが必要です
               </p>
-              <div className={`flex justify-center gap-2 py-3 transition-all ${pinErr ? 'animate-bounce' : ''}`}>
-                {[0,1,2,3,4,5].map(i => (
+              <div className={`flex justify-center gap-3 py-3 transition-all ${pinErr ? 'animate-bounce' : ''}`}>
+                {[0,1,2,3].map(i => (
                   <div key={i} className={`w-4 h-4 rounded-full border-2 ${
                     i < pin.length
                       ? pinErr ? 'bg-red-500 border-red-500' : 'bg-blue-500 border-blue-500'
@@ -114,7 +115,7 @@ const UndoPanel: React.FC = () => {
                   }`} />
                 ))}
               </div>
-              <NumPad value={pin} onChange={(v) => { setPin(v); handlePinCheck(v); }} maxLength={6} />
+              <NumPad value={pin} onChange={(v) => { setPin(v); handlePinCheck(v); }} maxLength={4} />
               {pinErr && <p className="text-red-400 text-xs font-bold text-center">PINが違います</p>}
             </div>
           </div>
@@ -130,7 +131,7 @@ const UndoPanel: React.FC = () => {
         )}
 
         {/* 履歴パネル */}
-        {open && !isEmpty && (
+        {open && !isEmpty && deviceApproved && (
           <div className="w-80 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-3">
             <div className="flex items-center justify-between px-4 py-3 bg-slate-800 border-b border-white/5">
               <div className="flex items-center gap-2 font-black text-white">
@@ -189,7 +190,8 @@ const UndoPanel: React.FC = () => {
         {/* メインボタン（常に表示） */}
         <button
           onClick={() => {
-            if (isEmpty) return;           // スタックが空なら何もしない
+            if (!deviceApproved) return;    // 未承認デバイスは操作不可
+            if (isEmpty) return;
             if (open) {
               handleClose();
             } else {
@@ -197,15 +199,23 @@ const UndoPanel: React.FC = () => {
               setOpen(true);
             }
           }}
+          title={!deviceApproved ? 'このデバイスは承認されていません' : undefined}
           className={`flex items-center gap-2 border border-white/10 px-4 py-3 rounded-2xl shadow-xl font-black text-sm transition-all active:scale-95 ${
-            isEmpty
-              ? 'bg-slate-900 text-slate-600 cursor-default'   // スタック空: グレーアウト
-              : 'bg-slate-800 hover:bg-slate-700 text-white'   // 通常: 白
+            !deviceApproved
+              ? 'bg-slate-900 text-slate-600 cursor-not-allowed'   // 未承認: 操作不可
+              : isEmpty
+              ? 'bg-slate-900 text-slate-600 cursor-default'       // スタック空: グレーアウト
+              : 'bg-slate-800 hover:bg-slate-700 text-white'       // 通常: 白
           }`}
         >
-          <RotateCcw size={18} className={isEmpty ? 'text-slate-700' : 'text-blue-400'} />
-          <span>{isEmpty ? '取り消す履歴なし' : (open ? '閉じる' : '取り消す')}</span>
-          {!isEmpty && !open && <Lock size={12} className="text-slate-500" />}
+          {!deviceApproved
+            ? <ShieldAlert size={18} className="text-red-700" />
+            : <RotateCcw size={18} className={isEmpty ? 'text-slate-700' : 'text-blue-400'} />
+          }
+          <span>
+            {!deviceApproved ? '未承認デバイス' : isEmpty ? '取り消す履歴なし' : (open ? '閉じる' : '取り消す')}
+          </span>
+          {deviceApproved && !isEmpty && !open && <Lock size={12} className="text-slate-500" />}
         </button>
       </div>
     </>

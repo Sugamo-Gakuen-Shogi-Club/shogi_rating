@@ -28,7 +28,7 @@ interface Slide {
 const SLIDES: Slide[] = [
   {
     icon: <Trophy size={56} className="text-yellow-400 drop-shadow-[0_0_16px_rgba(251,191,36,0.7)]" />,
-    title: 'ようこそ、巣鴨学園将棋班',
+    title: 'ようこそ、Club-rivalsへ!',
     accent: 'from-yellow-900/40 to-amber-900/20',
     body: (
       <div className="space-y-3 text-slate-300 text-sm leading-relaxed">
@@ -54,7 +54,7 @@ const SLIDES: Slide[] = [
   },
   {
     icon: <Users size={56} className="text-blue-400 drop-shadow-[0_0_16px_rgba(59,130,246,0.7)]" />,
-    title: '対局の記録手順',
+    title: '対局の記録手順(部室iPadからのみ)',
     accent: 'from-blue-900/40 to-indigo-900/20',
     body: (
       <div className="space-y-2 text-sm">
@@ -140,7 +140,6 @@ const SLIDES: Slide[] = [
           </div>
           <ul className="text-[11px] text-slate-400 space-y-1 pl-5 list-disc">
             <li>班員の追加・削除・PIN変更</li>
-            <li>デバイスの承認（変更パスワードが必要）</li>
             <li>四天王の更新・シーズンリセット</li>
             <li>ポイント手動調整・出席取り消し</li>
           </ul>
@@ -154,7 +153,7 @@ const SLIDES: Slide[] = [
         </div>
         <div className="bg-indigo-900/20 border border-indigo-700/30 rounded-xl p-3">
           <p className="text-xs font-bold text-indigo-300 flex items-center gap-1.5">
-            <Target size={12}/> 準備完了！部活を楽しんでください 🎉
+            <Target size={12}/> 準備完了！楽しい活動を!! 🎉
           </p>
         </div>
       </div>
