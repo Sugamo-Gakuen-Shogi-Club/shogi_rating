@@ -13,14 +13,15 @@ import {
   getUserFrameDef, getUserIconDef, updateUserIcon, updateUserFrame,
   updateUserTitle, ACHIEVEMENTS_DATA, getLocalDateString,
 } from './storage';
-import { User, MatchRecord, IconDef, FrameDef } from './types';
+import { User } from './types';
 import {
-  User as UserIcon, ArrowLeft, Lock, Check, Star, Trophy,
+  User as UserIcon, ArrowLeft, Check, Star, Trophy,
   TrendingUp, Calendar, Flame, Swords, Shield, ChevronRight,
   Smile, Layers, Award, RefreshCw,
 } from 'lucide-react';
 import { ShogiPiece } from './ShogiPiece';
 import { NumPad } from './NumPad';
+import { UserSelector } from './UserSelector';
 
 const DEFAULT_PIN = '000000';
 
@@ -112,60 +113,6 @@ const PinForm: React.FC<{ user: User; onSuccess: () => void; onBack: () => void 
   );
 };
 
-// ─── ユーザー選択リスト ────────────────────────────────────────
-const UserPickList: React.FC<{ onSelect: (u: User) => void }> = ({ onSelect }) => {
-  const [query, setQuery] = useState('');
-  const users = getUsers().filter(u => u.isActive !== false);
-  const filtered = query
-    ? users.filter(u => u.name.includes(query) || (u.reading || '').includes(query))
-    : users;
-
-  return (
-    <div className="max-w-md mx-auto space-y-4">
-      <div className="text-center pt-4 pb-2">
-        <UserIcon size={32} className="mx-auto text-blue-400 mb-2" />
-        <h2 className="text-xl font-black text-white">自分の名前を選択</h2>
-        <p className="text-xs text-slate-500 font-bold mt-1">PIN認証後に個人ページが開きます</p>
-      </div>
-      <input
-        type="text"
-        placeholder="名前で検索..."
-        value={query}
-        onChange={e => setQuery(e.target.value)}
-        className="w-full px-4 py-3 rounded-2xl bg-slate-800 border border-slate-700 text-white font-bold text-sm outline-none focus:border-blue-500 transition-colors"
-      />
-      <div className="space-y-2">
-        {filtered.map(u => {
-          const iconDef  = ICONS_DATA.find(i => i.id === u.activeIconId);
-          const isShogi  = iconDef?.category === 'SHOGI';
-          const frameDef = getUserFrameDef(u.activeFrameId);
-          return (
-            <button
-              key={u.id}
-              onClick={() => onSelect(u)}
-              className="w-full flex items-center gap-4 px-4 py-3 bg-slate-900 border border-white/10 rounded-2xl hover:bg-slate-800 active:scale-[0.98] transition-all text-left"
-            >
-              {isShogi && iconDef
-                ? <div className={`w-10 h-10 flex items-center justify-center shrink-0 ${frameDef.glowClass || ''}`}><ShogiPiece char={iconDef.char} scale={0.38} /></div>
-                : <div className={`w-10 h-10 rounded-full ${u.avatarColor} p-0.5 shrink-0 ${frameDef.ringClass} ${frameDef.glowClass || ''}`}>
-                    <div className="w-full h-full rounded-full bg-slate-900/80 flex items-center justify-center text-white font-serif-jp font-black text-sm">
-                      {iconDef && iconDef.category !== 'DEFAULT' ? iconDef.char : getUserAvatarChar(u)}
-                    </div>
-                  </div>
-              }
-              <div className="flex-1 min-w-0">
-                <div className="font-black text-white text-sm truncate">{u.name}</div>
-                <div className="text-[10px] text-slate-500 font-bold">Rate {u.rate} · {u.wins}勝{u.losses}敗</div>
-              </div>
-              <ChevronRight size={16} className="text-slate-600 shrink-0" />
-            </button>
-          );
-        })}
-        {filtered.length === 0 && <p className="text-center text-slate-500 text-sm py-8">部員が見つかりません</p>}
-      </div>
-    </div>
-  );
-};
 
 // ─── 対局履歴（直近10件） ─────────────────────────────────────
 const RecentMatches: React.FC<{ user: User }> = ({ user }) => {
@@ -596,7 +543,17 @@ const Profile: React.FC = () => {
     setPhase('SELECT');
   };
 
-  if (phase === 'SELECT') return <UserPickList onSelect={handleSelectUser} />;
+  if (phase === 'SELECT') return (
+    <UserSelector
+      users={getUsers()}
+      onSelect={id => {
+        const u = getUsers(true).find(x => x.id === id);
+        if (u) handleSelectUser(u);
+      }}
+      title="自分の名前を選択"
+      mode="SIMPLE"
+    />
+  );
   if (phase === 'PIN' && selectedUser) {
     return <PinForm user={selectedUser} onSuccess={handlePinSuccess} onBack={handleLogout} />;
   }
