@@ -300,3 +300,33 @@ export interface UndoEntry {
     logs: ActivityLog[];
   };
 }
+
+// ============================================================
+// MISSION SYSTEM (Stage4)
+// ============================================================
+export type MissionType = 'DAILY' | 'WEEKLY';
+
+export interface MissionDef {
+  id: string;
+  type: MissionType;
+  label: string;
+  description: string;
+  target: number;       // 達成に必要な数
+  rewardPts: number;    // 達成時ポイント
+  /** 進捗カウント方法 */
+  metric: 'MATCHES' | 'WINS' | 'ATTENDANCE' | 'DRAWS';
+}
+
+export interface MissionProgress {
+  missionId: string;
+  periodKey: string;    // getDailyKey() or getWeeklyKey()
+  current: number;
+  completed: boolean;
+  completedAt?: string;
+}
+
+export interface MissionAchieved {
+  userName: string;
+  mission: MissionDef;
+  rewardPts: number;
+}

@@ -39,7 +39,7 @@ const UndoPanel: React.FC = () => {
 
   // ─── PIN 認証 ──────────────────────────────────────────────
   const handlePinCheck = (value: string) => {
-    if (value.length < 4) return;
+    if (value.length < 6) return;
     const settings = getSettings();
     if (value === settings.adminPin) {
       setPinAuthed(true);
@@ -107,7 +107,7 @@ const UndoPanel: React.FC = () => {
                 操作を取り消すには管理者PINが必要です
               </p>
               <div className={`flex justify-center gap-3 py-3 transition-all ${pinErr ? 'animate-bounce' : ''}`}>
-                {[0,1,2,3].map(i => (
+                {[0,1,2,3,4,5].map(i => (
                   <div key={i} className={`w-4 h-4 rounded-full border-2 ${
                     i < pin.length
                       ? pinErr ? 'bg-red-500 border-red-500' : 'bg-blue-500 border-blue-500'
@@ -115,7 +115,7 @@ const UndoPanel: React.FC = () => {
                   }`} />
                 ))}
               </div>
-              <NumPad value={pin} onChange={(v) => { setPin(v); handlePinCheck(v); }} maxLength={4} />
+              <NumPad value={pin} onChange={(v) => { setPin(v); handlePinCheck(v); }} maxLength={6} />
               {pinErr && <p className="text-red-400 text-xs font-bold text-center">PINが違います</p>}
             </div>
           </div>

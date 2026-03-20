@@ -6,7 +6,8 @@ import {
   UndoEntry, UndoActionType,
   MaintenanceState,
   RankEntry, RankApplication,
-  SystemTitleHistoryEntry, SystemTitleSnapshot
+  SystemTitleHistoryEntry, SystemTitleSnapshot,
+  MissionDef, MissionProgress, MissionAchieved,
 } from './types';
 import { getAppCheckToken } from './appCheck';
 
@@ -36,7 +37,7 @@ const MAINTENANCE_SANDBOX_URL = `${FIREBASE_BASE}/maintenance_sandbox.json`;
 // DEFAULTS
 // ============================================================
 const DEFAULT_SETTINGS: SystemSettings = {
-  adminPin: '1123',
+  adminPin: '112233',
   clubName: '将棋部',
   eventName: null,
   eventType: EventType.STANDARD,
@@ -931,7 +932,7 @@ const normalizeUser = (user: any): User => ({
   rateHistory:    Array.isArray(user.rateHistory) ? user.rateHistory
     : [{ date: new Date().toISOString(), rate: user.rate ?? INITIAL_RATE }],
   ranks:          Array.isArray(user.ranks) ? user.ranks : [],
-  profilePin:     user.profilePin ?? '0000',
+  profilePin:     user.profilePin ?? '000000',
   activeFrameId:  user.activeFrameId ?? 'FRAME_NONE',
   unlockedFrames: Array.isArray(user.unlockedFrames) ? user.unlockedFrames : ['FRAME_NONE', 'FRAME_DEFAULT'],
   earnedHonors:   Array.isArray(user.earnedHonors) ? user.earnedHonors : [],
@@ -1846,7 +1847,7 @@ const newUserBase = (name: string, reading?: string, isNewMember = false): User 
   activeIconId:     'DEFAULT_INITIAL',
   unlockedIcons:    [...DEFAULT_UNLOCKED_ICONS],
   ranks:            [],
-  profilePin:       '0000',
+  profilePin:       '000000',
   activeFrameId:    'FRAME_NONE',
   unlockedFrames:   ['FRAME_NONE', 'FRAME_DEFAULT'],
   earnedHonors:     [],
@@ -2148,10 +2149,10 @@ export const deleteAttendanceLog = (logId: string): { success: boolean; message:
 
 /**
  * 管理者が個人ページPINを変更する
- * 4桁数字のみ許可
+ * 6桁数字のみ許可
  */
 export const updateProfilePin = (userId: string, newPin: string): { success: boolean; error?: string } => {
-  if (!/^\d{4}$/.test(newPin)) return { success: false, error: '4桁の数字で入力してください' };
+  if (!/^\d{6}$/.test(newPin)) return { success: false, error: '6桁の数字で入力してください' };
   const all = getRawUsers();
   const u = all.find(x => x.id === userId);
   if (!u) return { success: false, error: 'ユーザーが見つかりません' };
@@ -2184,3 +2185,160 @@ export const playSound  = (_type: any): void => {};
 export const vibrate    = (_p: any): void => {};
 export const balanceFactions = (u: any) => u;
 export const toggleGeneral   = (_id: any): void => {};
+
+// ============================================================
+// MISSION SYSTEM (Stage4)
+// ============================================================
+const MISSION_PROGRESS_KEY = 'club_rivals_mission_progress';
+
+export const MISSIONS_DATA: MissionDef[] = [
+  // ── デイリー ──────────────────────────────────────────
+  { id: 'D_PLAY1',    type: 'DAILY',  label: '今日の一局',       description: '本日1局対戦する',         target: 1,  rewardPts: 3,  metric: 'MATCHES'    },
+  { id: 'D_PLAY3',    type: 'DAILY',  label: '三番勝負',         description: '本日3局対戦する',         target: 3,  rewardPts: 8,  metric: 'MATCHES'    },
+  { id: 'D_WIN1',     type: 'DAILY',  label: '今日の白星',       description: '本日1勝する',             target: 1,  rewardPts: 5,  metric: 'WINS'       },
+  { id: 'D_WIN2',     type: 'DAILY',  label: '連勝スタート',     description: '本日2勝する',             target: 2,  rewardPts: 10, metric: 'WINS'       },
+  { id: 'D_ATTEND',   type: 'DAILY',  label: '出席ボーナス',     description: '本日出席する',            target: 1,  rewardPts: 5,  metric: 'ATTENDANCE' },
+  // ── ウィークリー ──────────────────────────────────────
+  { id: 'W_PLAY5',    type: 'WEEKLY', label: '週5局',            description: '今週5局対戦する',         target: 5,  rewardPts: 15, metric: 'MATCHES'    },
+  { id: 'W_PLAY10',   type: 'WEEKLY', label: '週10局',           description: '今週10局対戦する',        target: 10, rewardPts: 30, metric: 'MATCHES'    },
+  { id: 'W_WIN3',     type: 'WEEKLY', label: '今週3勝',          description: '今週3勝する',             target: 3,  rewardPts: 20, metric: 'WINS'       },
+  { id: 'W_WIN5',     type: 'WEEKLY', label: '今週5勝',          description: '今週5勝する',             target: 5,  rewardPts: 35, metric: 'WINS'       },
+  { id: 'W_ATTEND3',  type: 'WEEKLY', label: '今週3日出席',      description: '今週3日出席する',         target: 3,  rewardPts: 20, metric: 'ATTENDANCE' },
+  { id: 'W_DRAW1',    type: 'WEEKLY', label: '引き分け職人',     description: '今週1回引き分ける',       target: 1,  rewardPts: 10, metric: 'DRAWS'      },
+];
+
+/** 本日のキー（JST） */
+export const getDailyKey = (): string => getLocalDateString();
+
+/** 今週のキー（JST月曜起点） */
+export const getWeeklyKey = (): string => {
+  const now = new Date();
+  const jstOffset = 9 * 60;
+  const jst = new Date(now.getTime() + (now.getTimezoneOffset() + jstOffset) * 60000);
+  const day = jst.getDay(); // 0=日曜
+  const diff = (day === 0 ? -6 : 1 - day);
+  const monday = new Date(jst);
+  monday.setDate(jst.getDate() + diff);
+  return `${monday.getFullYear()}-${String(monday.getMonth()+1).padStart(2,'0')}-${String(monday.getDate()).padStart(2,'0')}`;
+};
+
+const getMissionProgressAll = (): MissionProgress[] => {
+  try {
+    const raw = localStorage.getItem(MISSION_PROGRESS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+};
+
+const saveMissionProgressAll = (list: MissionProgress[]): void => {
+  localStorage.setItem(MISSION_PROGRESS_KEY, JSON.stringify(list));
+};
+
+/** ユーザーの全ミッション進捗を取得 */
+export const getMissionProgress = async (userId: string): Promise<MissionProgress[]> => {
+  const all = getMissionProgressAll();
+  return all.filter(p => (p as any).userId === userId);
+};
+
+/**
+ * 対局後にミッション進捗を更新し、達成したミッションを返す
+ * MatchEntry.tsx から呼ばれる
+ */
+export const updateMissionsAfterMatch = async (
+  player: { id: string; name: string; rate: number; wins: number; losses: number },
+  opponent: { id: string; rate: number },
+  playerWon: boolean,
+  allMatches: MatchRecord[],
+): Promise<MissionAchieved[]> => {
+  const dailyKey  = getDailyKey();
+  const weeklyKey = getWeeklyKey();
+  const today     = dailyKey;
+
+  // 本日のこのユーザーの対局数・勝数・引き分け数
+  const todayMatches = allMatches.filter(
+    m => (m.player1Id === player.id || m.player2Id === player.id) &&
+         getLocalDateString(m.date) === today
+  );
+  const todayWins  = todayMatches.filter(m =>
+    (m.player1Id === player.id && m.result === 'PLAYER1_WIN') ||
+    (m.player2Id === player.id && m.result === 'PLAYER2_WIN')
+  ).length;
+  const todayDraws = todayMatches.filter(m => m.result === 'DRAW').length;
+
+  // 今週の集計（月曜〜今日）
+  const weekStart = weeklyKey;
+  const weekMatches = allMatches.filter(m =>
+    (m.player1Id === player.id || m.player2Id === player.id) &&
+    getLocalDateString(m.date) >= weekStart
+  );
+  const weekWins = weekMatches.filter(m =>
+    (m.player1Id === player.id && m.result === 'PLAYER1_WIN') ||
+    (m.player2Id === player.id && m.result === 'PLAYER2_WIN')
+  ).length;
+  const weekDraws = weekMatches.filter(m => m.result === 'DRAW').length;
+
+  const getCount = (metric: MissionDef['metric'], type: 'DAILY' | 'WEEKLY'): number => {
+    if (type === 'DAILY') {
+      if (metric === 'MATCHES')    return todayMatches.length;
+      if (metric === 'WINS')       return todayWins;
+      if (metric === 'DRAWS')      return todayDraws;
+      if (metric === 'ATTENDANCE') return 0; // 出席は recordAttendance 側で処理
+    } else {
+      if (metric === 'MATCHES')    return weekMatches.length;
+      if (metric === 'WINS')       return weekWins;
+      if (metric === 'DRAWS')      return weekDraws;
+      if (metric === 'ATTENDANCE') return 0;
+    }
+    return 0;
+  };
+
+  const all = getMissionProgressAll();
+  const achieved: MissionAchieved[] = [];
+
+  for (const def of MISSIONS_DATA) {
+    if (def.metric === 'ATTENDANCE') continue; // 出席ミッションはスキップ
+    const periodKey = def.type === 'DAILY' ? dailyKey : weeklyKey;
+    const idx = all.findIndex(p => (p as any).userId === player.id && p.missionId === def.id && p.periodKey === periodKey);
+    const current = getCount(def.metric, def.type);
+    const completed = current >= def.target;
+
+    if (idx >= 0) {
+      const prev = all[idx];
+      if (!prev.completed && completed) {
+        // 今回達成
+        all[idx] = { ...prev, current, completed: true, completedAt: new Date().toISOString() };
+        achieved.push({ userName: player.name, mission: def, rewardPts: def.rewardPts });
+        // ポイント付与
+        const users = getRawUsers();
+        const u = users.find(x => x.id === player.id);
+        if (u) {
+          u.totalPoints   = (u.totalPoints   || 0) + def.rewardPts;
+          u.monthlyPoints = (u.monthlyPoints || 0) + def.rewardPts;
+          u.pointsSpecial = (u.pointsSpecial || 0) + def.rewardPts;
+          saveUsers(users);
+        }
+      } else {
+        all[idx] = { ...prev, current };
+      }
+    } else {
+      const entry: MissionProgress & { userId: string } = {
+        userId: player.id, missionId: def.id, periodKey, current, completed,
+        ...(completed ? { completedAt: new Date().toISOString() } : {}),
+      };
+      if (completed) {
+        achieved.push({ userName: player.name, mission: def, rewardPts: def.rewardPts });
+        const users = getRawUsers();
+        const u = users.find(x => x.id === player.id);
+        if (u) {
+          u.totalPoints   = (u.totalPoints   || 0) + def.rewardPts;
+          u.monthlyPoints = (u.monthlyPoints || 0) + def.rewardPts;
+          u.pointsSpecial = (u.pointsSpecial || 0) + def.rewardPts;
+          saveUsers(users);
+        }
+      }
+      all.push(entry as any);
+    }
+  }
+
+  saveMissionProgressAll(all);
+  return achieved;
+};
