@@ -254,6 +254,7 @@ const Admin: React.FC = () => {
     if (result.success) {
       setPinMsg({ type: 'ok', text: `PINを変更しました` });
       setNewPin('');
+      refreshData(); // ★ ドロップダウンの表示を即時更新
       setTimeout(() => setPinMsg(null), 3000);
     } else {
       setPinMsg({ type: 'err', text: result.error || '変更失敗' });
