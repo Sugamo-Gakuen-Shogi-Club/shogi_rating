@@ -786,15 +786,13 @@ const Admin: React.FC = () => {
         </div>
       )}
       {wSelectingTarget && (
-        // z-[700]: イベントウィザード(z-[600])より上に表示するためラッパーで引き上げる
-        <div className="relative z-[700]">
-          <UserSelector
-            users={wSimData ? (wSelectingTarget === 'RED' ? wSimData.redUsers : wSimData.whiteUsers) : users}
-            onSelect={id => { if (wSelectingTarget === 'RED') setWRedGeneral(id); else setWWhiteGeneral(id); setWSelectingTarget(null); }}
-            onClose={() => setWSelectingTarget(null)}
-            title={`${wSelectingTarget === 'RED' ? '紅組' : '白組'}大将を選択`}
-          />
-        </div>
+        <UserSelector
+          users={wSimData ? (wSelectingTarget === 'RED' ? wSimData.redUsers : wSimData.whiteUsers) : users}
+          onSelect={id => { if (wSelectingTarget === 'RED') setWRedGeneral(id); else setWWhiteGeneral(id); setWSelectingTarget(null); }}
+          onClose={() => setWSelectingTarget(null)}
+          title={`${wSelectingTarget === 'RED' ? '紅組' : '白組'}大将を選択`}
+          zIndex={700}
+        />
       )}
 
       {/* Header */}

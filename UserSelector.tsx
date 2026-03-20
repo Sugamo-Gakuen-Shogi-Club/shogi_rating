@@ -13,6 +13,8 @@ interface UserSelectorProps {
   excludeIds?: string[];
   mode?: 'ATTENDANCE' | 'SIMPLE' | 'MATCH_SELECT';
   title?: string;
+  /** モーダルのz-index（デフォルト200）。上位モーダルの上に出す場合は大きい値を指定 */
+  zIndex?: number;
 }
 
 const GOJUUON = [
@@ -50,7 +52,7 @@ const matchesKana = (reading: string | undefined, char: string) => {
 };
 
 export const UserSelector: React.FC<UserSelectorProps> = ({
-    users, onSelect, onClose, excludeIds = [], mode = 'SIMPLE', title = '班員を選択'
+    users, onSelect, onClose, excludeIds = [], mode = 'SIMPLE', title = '班員を選択', zIndex = 200
 }) => {
   const [selectedChar, setSelectedChar] = useState<string | null>(null);
   const [kanaOpen, setKanaOpen] = useState(false); // スマホでは折りたたみ
@@ -78,7 +80,7 @@ export const UserSelector: React.FC<UserSelectorProps> = ({
   const today = getLocalDateString();
 
   const content = (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-2 md:p-4 animate-in fade-in duration-200">
+    <div className="fixed inset-0 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-2 md:p-4 animate-in fade-in duration-200" style={{ zIndex }}>
       <div className="bg-slate-900 w-full max-w-5xl rounded-3xl shadow-2xl overflow-hidden flex flex-col h-[92vh] max-h-[800px] border border-white/10 relative z-[51]">
         {/* ヘッダー */}
         <div className={`p-4 text-white flex items-center justify-between shrink-0 shadow-lg ${
