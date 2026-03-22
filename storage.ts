@@ -936,6 +936,7 @@ const normalizeUser = (user: any): User => ({
   activeFrameId:  user.activeFrameId ?? 'FRAME_NONE',
   unlockedFrames: Array.isArray(user.unlockedFrames) ? user.unlockedFrames : ['FRAME_NONE', 'FRAME_DEFAULT'],
   earnedHonors:   Array.isArray(user.earnedHonors) ? user.earnedHonors : [],
+  pendingMissionAlert: Array.isArray(user.pendingMissionAlert) ? user.pendingMissionAlert : [],
 });
 
 /** All users including inactive (internal use / admin) */
@@ -1352,7 +1353,7 @@ export const deleteMatch = (id: string): void => {
 // ============================================================
 // RIVAL STATS (← FIX: was returning constant null)
 // ============================================================
-export const getRivalryStats = (userId: string): { bestCustomer: RivalData | null; nemeses: RivalData | null } => {
+export const getRivalryStats = (userId: string): { bestCustomer: RivalData | null; nemeses: RivalData | null; allRivals: RivalData[]; currentRival: RivalData | null } => {
   const matches = getMatches();
   const users   = getRawUsers();
   const map: Record<string, { wins: number; losses: number; draws: number }> = {};
@@ -1373,7 +1374,7 @@ export const getRivalryStats = (userId: string): { bestCustomer: RivalData | nul
     }
   });
 
-  const rivals: RivalData[] = Object.entries(map).map(([oppId, s]) => ({
+  const allRivals: RivalData[] = Object.entries(map).map(([oppId, s]) => ({
     opponentId:   oppId,
     opponentName: users.find(u => u.id === oppId)?.name || 'Unknown',
     wins:    s.wins,
@@ -1381,9 +1382,11 @@ export const getRivalryStats = (userId: string): { bestCustomer: RivalData | nul
     draws:   s.draws,
     total:   s.wins + s.losses + s.draws,
     winRate: (s.wins + s.losses + s.draws) > 0 ? s.wins / (s.wins + s.losses + s.draws) : 0,
-  })).filter(r => r.total >= 2); // at least 2 matches to be a "rival"
+  })).sort((a, b) => b.total - a.total);
 
-  if (rivals.length === 0) return { bestCustomer: null, nemeses: null };
+  const rivals = allRivals.filter(r => r.total >= 2);
+
+  if (rivals.length === 0) return { bestCustomer: null, nemeses: null, allRivals, currentRival: null };
 
   const byWinDiff = [...rivals].sort((a, b) => (b.wins - b.losses) - (a.wins - a.losses));
   const bestCustomer = byWinDiff[0]?.wins > byWinDiff[0]?.losses ? byWinDiff[0] : null;
@@ -1391,7 +1394,9 @@ export const getRivalryStats = (userId: string): { bestCustomer: RivalData | nul
   const byLossDiff = [...rivals].sort((a, b) => (b.losses - b.wins) - (a.losses - a.wins));
   const nemeses    = byLossDiff[0]?.losses > byLossDiff[0]?.wins ? byLossDiff[0] : null;
 
-  return { bestCustomer, nemeses };
+  const currentRival = allRivals[0] ?? null;
+
+  return { bestCustomer, nemeses, allRivals, currentRival };
 };
 
 // ============================================================
@@ -2341,4 +2346,13 @@ export const updateMissionsAfterMatch = async (
 
   saveMissionProgressAll(all);
   return achieved;
+};
+
+/** 個人ページログイン時に表示済みのミッション通知をクリア */
+export const clearPendingMissionAlert = (userId: string): void => {
+  const all = getRawUsers();
+  const u = all.find(x => x.id === userId);
+  if (!u) return;
+  u.pendingMissionAlert = [];
+  saveUsers(all);
 };

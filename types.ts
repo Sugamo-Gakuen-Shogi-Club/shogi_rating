@@ -123,6 +123,8 @@ export interface User {
   unlockedFrames?: string[];
   // ★ 永続称号（「第n代 覇者」など、退任後も保持）
   earnedHonors?: string[];
+  /** ★ ミッション達成通知（次回個人ページログイン時に表示） */
+  pendingMissionAlert?: string[];
 }
 
 
@@ -302,7 +304,7 @@ export interface UndoEntry {
 }
 
 // ============================================================
-// MISSION SYSTEM (Stage4)
+// MISSION SYSTEM
 // ============================================================
 export type MissionType = 'DAILY' | 'WEEKLY';
 
@@ -311,15 +313,14 @@ export interface MissionDef {
   type: MissionType;
   label: string;
   description: string;
-  target: number;       // 達成に必要な数
-  rewardPts: number;    // 達成時ポイント
-  /** 進捗カウント方法 */
+  target: number;
+  rewardPts: number;
   metric: 'MATCHES' | 'WINS' | 'ATTENDANCE' | 'DRAWS';
 }
 
 export interface MissionProgress {
   missionId: string;
-  periodKey: string;    // getDailyKey() or getWeeklyKey()
+  periodKey: string;
   current: number;
   completed: boolean;
   completedAt?: string;

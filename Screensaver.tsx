@@ -157,44 +157,36 @@ export const Screensaver: React.FC<Props> = ({ onDismiss }) => {
 
   const current = activeSlides[slideIdx];
 
-  // ─── 紅白戦スライド ───────────────────────────────────────
+  // ─── 紅白戦スライド（s16演出）────────────────────────────
   if (current === 'FACTION_WAR') {
-    const leader = factionPts.red > factionPts.white ? 'RED' : factionPts.white > factionPts.red ? 'WHITE' : null;
     return (
-      <div className="fixed inset-0 z-50 bg-black flex flex-col items-center justify-center text-white cursor-pointer overflow-hidden" onClick={onDismiss}>
+      <div className="fixed inset-0 z-50 bg-black flex flex-col items-center justify-center text-white cursor-pointer overflow-hidden font-serif-jp" onClick={onDismiss}>
         <div className="absolute inset-0">
-          <div className="absolute inset-0 bg-gradient-to-r from-red-950/80 via-black to-blue-950/80" />
-          <div className={`absolute top-0 left-0 w-1/2 h-full bg-red-600/10 transition-all duration-1000 ${factionPts.red > factionPts.white ? 'opacity-100' : 'opacity-50'}`} />
-          <div className={`absolute top-0 right-0 w-1/2 h-full bg-blue-600/10 transition-all duration-1000 ${factionPts.white > factionPts.red ? 'opacity-100' : 'opacity-50'}`} />
+          <div className="absolute top-[-50%] left-[-20%] w-[100%] h-[200%] bg-gradient-to-b from-red-600/30 to-transparent rotate-[30deg] animate-[spotlight_4s_infinite_alternate]" />
+          <div className="absolute top-[-50%] right-[-20%] w-[100%] h-[200%] bg-gradient-to-b from-blue-600/30 to-transparent rotate-[-30deg] animate-[spotlight_4s_infinite_alternate-reverse]" />
         </div>
-        <div className="relative z-10 w-full max-w-4xl px-8 flex flex-col items-center gap-10">
-          <div className="text-center">
-            <div className="text-[10px] font-black text-slate-500 uppercase tracking-[0.4em] mb-2">巣鴨学園将棋班</div>
-            <h1 className="text-5xl md:text-7xl font-black tracking-tight text-white drop-shadow-[0_0_20px_rgba(255,255,255,0.5)] animate-pulse">
-              {settings.eventName || '紅白対抗戦'}
-            </h1>
-          </div>
-          <div className="w-full flex items-center justify-center gap-8 md:gap-16">
-            <div className={`text-center transition-all duration-500 ${leader === 'RED' ? 'scale-110' : 'scale-95 opacity-70'}`}>
-              <div className="text-red-400 font-black text-[10px] uppercase tracking-[0.3em] mb-2">RED</div>
-              <div className="text-7xl md:text-9xl font-black text-red-400 drop-shadow-[0_0_24px_rgba(239,68,68,0.8)] font-mono">{factionPts.red}</div>
-              <div className="text-red-600 font-bold text-sm mt-1">pt</div>
-            </div>
-            <div className="text-5xl font-black text-slate-600 italic">VS</div>
-            <div className={`text-center transition-all duration-500 ${leader === 'WHITE' ? 'scale-110' : 'scale-95 opacity-70'}`}>
-              <div className="text-blue-400 font-black text-[10px] uppercase tracking-[0.3em] mb-2">WHITE</div>
-              <div className="text-7xl md:text-9xl font-black text-blue-400 drop-shadow-[0_0_24px_rgba(96,165,250,0.8)] font-mono">{factionPts.white}</div>
-              <div className="text-blue-600 font-bold text-sm mt-1">pt</div>
-            </div>
-          </div>
-          {leader && (
-            <div className={`text-sm font-black uppercase tracking-widest px-6 py-2 rounded-full border ${leader === 'RED' ? 'text-red-300 border-red-700 bg-red-900/20' : 'text-blue-300 border-blue-700 bg-blue-900/20'}`}>
-              {leader === 'RED' ? '紅組リード' : '白組リード'}
-            </div>
-          )}
-          {!leader && <div className="text-slate-400 font-black text-sm uppercase tracking-widest">同点</div>}
+        <div className="relative z-20 mb-12 px-12 py-6 border-y-4 border-white/20 bg-slate-900/60 backdrop-blur-md transform skew-x-[-10deg] flex flex-col items-center">
+          <h2 className="text-5xl md:text-7xl font-black text-white tracking-[0.2em] animate-pulse skew-x-[10deg] drop-shadow-[0_0_15px_rgba(255,255,255,0.8)]">
+            {settings.eventName || '紅白戦開催中'}
+          </h2>
         </div>
-        <div className="absolute bottom-8 text-slate-600 text-xs font-mono animate-pulse tracking-widest">TAP TO CONTINUE</div>
+        <div className="relative z-10 w-full max-w-6xl flex items-center justify-center gap-12">
+          <div className="text-center transform animate-[slideInLeft_0.5s_ease-out]">
+            <div className="text-red-500 font-black text-9xl drop-shadow-[0_0_20px_rgba(239,68,68,0.8)]">{factionPts.red}</div>
+            <div className="text-4xl font-black text-red-200 uppercase tracking-widest mt-4 border-t-4 border-red-600 pt-2">RED</div>
+          </div>
+          <div className="text-8xl font-black italic text-white drop-shadow-[0_0_30px_rgba(255,255,255,0.8)] animate-pulse pr-6">VS</div>
+          <div className="text-center transform animate-[slideInRight_0.5s_ease-out]">
+            <div className="text-blue-400 font-black text-9xl drop-shadow-[0_0_20px_rgba(96,165,250,0.8)]">{factionPts.white}</div>
+            <div className="text-4xl font-black text-blue-200 uppercase tracking-widest mt-4 border-t-4 border-blue-500 pt-2">WHITE</div>
+          </div>
+        </div>
+        <div className="absolute bottom-12 text-slate-400 font-mono animate-pulse">TAP TO RESUME</div>
+        <style>{`
+          @keyframes spotlight { 0% { transform: rotate(20deg) translateX(-10%); opacity: 0.5; } 100% { transform: rotate(40deg) translateX(10%); opacity: 0.8; } }
+          @keyframes slideInLeft { from { transform: translateX(-100px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+          @keyframes slideInRight { from { transform: translateX(100px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        `}</style>
       </div>
     );
   }
