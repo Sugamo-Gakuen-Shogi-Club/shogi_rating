@@ -19,12 +19,15 @@ import {
   ArrowLeft, Tag, Star, Crown, Swords, Search, Skull, Smile, Lock,
   Grid, Shield, Medal, Plus, Check, X as XIcon, Award, TrendingUp,
   Calendar, ChevronRight, Edit3, List, Flame, Snowflake, ChevronUp, ChevronDown,
+  LogIn, LogOut,
 } from 'lucide-react';
 import { UserSelector } from './UserSelector';
 import { useNavigate } from 'react-router-dom';
 import { ShogiPiece } from './ShogiPiece';
 import { NumPad } from './NumPad';
 import { MissionCard } from './MissionCard';
+import { auth, signInWithGoogle, signOutGoogle, getProfileAccess, onAuthChanged } from './firebase';
+import type { User as FirebaseUser } from 'firebase/auth';
 
 // ─── 四天王設定 ───────────────────────────────────────────────
 const FK_CFG: Record<string, { gradient: string; glow: string; icon: string; label: string }> = {
@@ -611,9 +614,9 @@ const Profile: React.FC = () => {
   const [matches, setMatches] = useState<MatchRecord[]>([]);
   const [logs, setLogs]       = useState<ActivityLog[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [authenticated, setAuth]    = useState(false);
-  const [pin, setPin]               = useState('');
-  const [pinErr, setPinErr]         = useState(false);
+  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
   const [modal, setModal] = useState<'icon'|'frame'|'title'|'titleColl'|'rank'|null>(null);
   const [showSelector, setShowSelector] = useState(false);
   const [pendingAlerts, setPendingAlerts] = useState<string[]>([]);
@@ -629,15 +632,64 @@ const Profile: React.FC = () => {
     };
   }, []);
 
+  // Firebase Auth 状態監視
+  useEffect(() => {
+    const unsub = onAuthChanged(u => { setFirebaseUser(u); setAuthLoading(false); });
+    return () => unsub();
+  }, []);
+
   const refresh = () => setUsers(getUsers());
+
+  const handleGoogleLogin = async () => {
+    setAuthError(null);
+    const u = await signInWithGoogle();
+    if (!u) setAuthError('ログインできませんでした。sugamo.ed.jpのアカウントでログインしてください。');
+  };
+
+  // ── ログイン画面 ──────────────────────────────────────────
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-slate-400 font-bold animate-pulse">読み込み中...</div>
+      </div>
+    );
+  }
+
+  if (!firebaseUser) {
+    return (
+      <div className="flex items-center justify-center min-h-[70vh] p-4">
+        <div className="w-full max-w-sm bg-slate-900 border border-white/10 rounded-3xl shadow-2xl overflow-hidden p-8 text-center space-y-6">
+          <Lock size={48} className="mx-auto text-slate-500" />
+          <div>
+            <h2 className="text-xl font-black text-white">個人ページ</h2>
+            <p className="text-sm text-slate-400 mt-2">sugamo.ed.jpのGoogleアカウントでログインしてください</p>
+          </div>
+          {authError && (
+            <div className="bg-red-900/20 border border-red-700/40 text-red-300 text-xs font-bold p-3 rounded-xl">{authError}</div>
+          )}
+          <button
+            onClick={handleGoogleLogin}
+            className="w-full flex items-center justify-center gap-3 bg-white text-slate-900 py-3 rounded-xl font-black text-sm active:scale-95 transition-all shadow-lg"
+          >
+            <LogIn size={18} /> Googleでログイン
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // ── ユーザー選択 ──────────────────────────────────────────
   if (!selectedId) {
     return (
       <div className="space-y-6 animate-in fade-in duration-300">
+        <div className="flex justify-end px-2 pt-2">
+          <button onClick={() => signOutGoogle()} className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-white font-bold transition-colors">
+            <LogOut size={14}/> ログアウト
+          </button>
+        </div>
         <UserSelector
           users={users}
-          onSelect={(id) => { setSelectedId(id); setAuth(false); setPin(''); }}
+          onSelect={(id) => { setSelectedId(id); }}
           onClose={() => navigate('/')}
           title="個人ページ（部員を選択）"
           mode="SIMPLE"
@@ -649,49 +701,36 @@ const Profile: React.FC = () => {
   const user = users.find(u => u.id === selectedId);
   if (!user) return null;
 
-  // ── PIN認証 ───────────────────────────────────────────────
-  if (!authenticated) {
-    const handlePin = (v?: string) => {
-      const p = v ?? pin;
-      if (p === (user.profilePin ?? '000000')) {
-        setAuth(true); setPinErr(false); setPin('');
-        // 未確認ミッション通知を拾ってポップアップ
-        const alerts = user.pendingMissionAlert ?? [];
-        if (alerts.length > 0) {
-          setPendingAlerts(alerts);
-          clearPendingMissionAlert(user.id);
-        }
-      }
-      else { setPinErr(true); setPin(''); setTimeout(() => setPinErr(false), 1500); }
-    };
+  // アクセス権判定
+  const access: ProfileAccess = getProfileAccess(firebaseUser, user.studentId);
+
+  // DENIED → エラー表示
+  if (access === 'DENIED') {
     return (
       <div className="flex items-center justify-center min-h-[70vh] p-4">
-        <div className="w-full max-w-sm bg-slate-900 border border-white/10 rounded-3xl shadow-2xl overflow-hidden">
-          <div className="p-8 pb-4 text-center relative">
-            <button onClick={() => setSelectedId(null)} className="absolute top-5 left-5 text-slate-500 hover:text-white p-1"><ArrowLeft size={20}/></button>
-            <div className="flex justify-center mb-4"><Avatar user={user} size="lg"/></div>
-            <h2 className={`text-xl font-black ${user.systemTitle.length > 0 ? 'text-transparent bg-clip-text bg-gradient-to-b from-yellow-200 to-yellow-500' : 'text-white'}`}>{user.name}</h2>
-            <div className="flex flex-wrap justify-center gap-1 mt-2">{user.systemTitle.map(tid => <FKBadge key={tid} id={tid} size="sm"/>)}</div>
-            <p className="text-sm text-slate-400 font-bold mt-2">個人ページ（編集）</p>
-          </div>
-          <div className="px-8 pb-2">
-            <label className="block text-xs font-black text-slate-500 uppercase tracking-widest text-center mb-3">PINコードを入力（6桁）</label>
-            <input type="password" value={pin} readOnly placeholder="••••••"
-              className={`w-full p-4 border rounded-xl text-center text-3xl tracking-[0.5em] outline-none bg-slate-800 text-white font-mono ${pinErr ? 'border-red-500 bg-red-900/20 animate-bounce' : 'border-slate-700'}`}/>
-            {pinErr && <p className="text-red-400 text-xs font-black text-center mt-2">PINが正しくありません</p>}
-          </div>
-          <NumPad value={pin} onChange={(v) => { setPin(v); if (v.length === 6) setTimeout(() => handlePin(v), 50); }} maxLength={6} />
-          <div className="px-8 pb-8 pt-2">
-            <button onClick={() => handlePin()} disabled={pin.length < 6}
-              className="w-full bg-slate-200 disabled:bg-slate-700 disabled:text-slate-500 text-slate-900 py-3 rounded-xl font-black active:scale-95 transition-all">
-              開く
-            </button>
-            <p className="text-center text-[11px] text-slate-600 font-bold mt-3">初期PINは <span className="text-slate-400">000000</span>（管理者に変更を依頼）</p>
-          </div>
+        <div className="w-full max-w-sm bg-slate-900 border border-red-700/40 rounded-3xl p-8 text-center space-y-4">
+          <Lock size={48} className="mx-auto text-red-400" />
+          <h2 className="text-xl font-black text-white">アクセス権がありません</h2>
+          <p className="text-sm text-slate-400">このプロフィールを閲覧する権限がありません。</p>
+          <button onClick={() => setSelectedId(null)} className="w-full py-3 bg-slate-800 rounded-xl font-black text-slate-300 active:scale-95">戻る</button>
         </div>
       </div>
     );
   }
+
+  // 閲覧のみか編集可能かのフラグ
+  const canEdit = access === 'ADMIN' || access === 'OWNER';
+
+  // ミッション通知（編集可能時のみ）
+  useEffect(() => {
+    if (!canEdit) return;
+    const alerts = user.pendingMissionAlert ?? [];
+    if (alerts.length > 0) {
+      setPendingAlerts(alerts);
+      clearPendingMissionAlert(user.id);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId, canEdit]);
 
   // ── 編集画面（認証済み） ──────────────────────────────────
   const settings     = getSettings();
@@ -766,16 +805,16 @@ const Profile: React.FC = () => {
         </div>
       )}
 
-      {/* モーダル */}
-      {modal === 'icon'      && <IconModal user={user} onClose={() => setModal(null)} onSelect={(id) => { updateUserIcon(selectedId, id); refresh(); setModal(null); }}/>}
-      {modal === 'frame'     && <FrameModal user={user} onClose={() => setModal(null)} onSelect={(id) => { updateUserFrame(selectedId, id); refresh(); setModal(null); }}/>}
-      {modal === 'title'     && <TitleModal user={user} onClose={() => setModal(null)} onChange={(id) => { updateUserTitle(selectedId, id === 'NONE' ? null : id); refresh(); setModal(null); }}/>}
-      {modal === 'titleColl' && <TitleCollectionModal user={user} onClose={() => setModal(null)}/>}
-      {modal === 'rank'      && <RankModal userId={selectedId} user={user} onClose={() => setModal(null)} onRefresh={refresh}/>}
+      {/* モーダル（編集権限がある場合のみ） */}
+      {canEdit && modal === 'icon'      && <IconModal user={user} onClose={() => setModal(null)} onSelect={(id) => { updateUserIcon(selectedId, id); refresh(); setModal(null); }}/>}
+      {canEdit && modal === 'frame'     && <FrameModal user={user} onClose={() => setModal(null)} onSelect={(id) => { updateUserFrame(selectedId, id); refresh(); setModal(null); }}/>}
+      {canEdit && modal === 'title'     && <TitleModal user={user} onClose={() => setModal(null)} onChange={(id) => { updateUserTitle(selectedId, id === 'NONE' ? null : id); refresh(); setModal(null); }}/>}
+      {canEdit && modal === 'titleColl' && <TitleCollectionModal user={user} onClose={() => setModal(null)}/>}
+      {canEdit && modal === 'rank'      && <RankModal userId={selectedId} user={user} onClose={() => setModal(null)} onRefresh={refresh}/>}
 
       {showSelector && (
         <UserSelector users={users}
-          onSelect={(id) => { setSelectedId(id); setAuth(false); setPin(''); setShowSelector(false); }}
+          onSelect={(id) => { setSelectedId(id); setShowSelector(false); }}
           onClose={() => setShowSelector(false)}
           title="別の部員を選択"
         />
@@ -786,12 +825,15 @@ const Profile: React.FC = () => {
         <button onClick={() => setSelectedId(null)} className="p-2 rounded-full bg-slate-800 border border-slate-700 hover:bg-slate-700 transition-colors">
           <ArrowLeft size={18} className="text-slate-300"/>
         </button>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
+          {!canEdit && (
+            <span className="text-[10px] bg-slate-800 border border-slate-700 text-slate-500 px-2 py-1 rounded-full font-black">👁 閲覧のみ</span>
+          )}
           <button onClick={() => setShowSelector(true)} className="flex items-center gap-1.5 bg-slate-800 px-3 py-2 rounded-lg border border-slate-700 text-xs font-bold text-slate-400 hover:bg-slate-700">
             <Search size={13}/> 切替
           </button>
-          <button onClick={() => { setAuth(false); setPin(''); }} className="flex items-center gap-1.5 bg-slate-800 px-3 py-2 rounded-lg border border-slate-700 text-xs font-bold text-slate-400 hover:bg-slate-700">
-            <Lock size={13}/> ロック
+          <button onClick={() => signOutGoogle()} className="flex items-center gap-1.5 bg-slate-800 px-3 py-2 rounded-lg border border-slate-700 text-xs font-bold text-slate-400 hover:bg-slate-700">
+            <LogOut size={13}/> ログアウト
           </button>
         </div>
       </div>
@@ -816,20 +858,26 @@ const Profile: React.FC = () => {
         <div className="relative p-5 flex items-start gap-5">
           {/* アバター */}
           <div className="flex flex-col items-center gap-2 shrink-0">
-            <button onClick={() => setModal('icon')} className="group relative">
+            {canEdit ? (
+              <button onClick={() => setModal('icon')} className="group relative">
+                <Avatar user={user} size="lg"/>
+                <div className="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                  <Edit3 size={20} className="text-white"/>
+                </div>
+              </button>
+            ) : (
               <Avatar user={user} size="lg"/>
-              <div className="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                <Edit3 size={20} className="text-white"/>
+            )}
+            {canEdit && (
+              <div className="flex gap-1">
+                <button onClick={() => setModal('icon')} className="text-[9px] font-black bg-slate-800/80 text-slate-400 px-2 py-1 rounded-lg border border-slate-700 flex items-center gap-1 hover:bg-slate-700">
+                  <Smile size={9}/> アイコン
+                </button>
+                <button onClick={() => setModal('frame')} className="text-[9px] font-black bg-slate-800/80 text-slate-400 px-2 py-1 rounded-lg border border-slate-700 flex items-center gap-1 hover:bg-slate-700">
+                  <Crown size={9}/> フレーム
+                </button>
               </div>
-            </button>
-            <div className="flex gap-1">
-              <button onClick={() => setModal('icon')} className="text-[9px] font-black bg-slate-800/80 text-slate-400 px-2 py-1 rounded-lg border border-slate-700 flex items-center gap-1 hover:bg-slate-700">
-                <Smile size={9}/> アイコン
-              </button>
-              <button onClick={() => setModal('frame')} className="text-[9px] font-black bg-slate-800/80 text-slate-400 px-2 py-1 rounded-lg border border-slate-700 flex items-center gap-1 hover:bg-slate-700">
-                <Crown size={9}/> フレーム
-              </button>
-            </div>
+            )}
           </div>
 
           {/* テキスト情報 */}
@@ -889,6 +937,7 @@ const Profile: React.FC = () => {
       </div>
 
       {/* ─── カスタマイズ 3列グリッド ─── */}
+      {canEdit ? (
       <div className="space-y-2">
         <div className="text-[10px] font-black text-slate-600 uppercase tracking-widest px-1">カスタマイズ</div>
         <div className="grid grid-cols-3 gap-3">
@@ -904,6 +953,7 @@ const Profile: React.FC = () => {
           </div>
         </div>
       </div>
+      ) : null}
 
       {/* ─── ヒートマップ ─── */}
       <div className="bg-slate-900 border border-white/5 rounded-2xl p-4">

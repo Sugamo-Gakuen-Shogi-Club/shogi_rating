@@ -1814,8 +1814,8 @@ export const parseUserCSV = (csv: string): Partial<User>[] =>
   csv.split('\n')
     .filter(line => line.trim())
     .map(line => {
-      const [name, reading, isNew] = line.split(',').map(s => s.trim());
-      return { name: name || '名称未設定', reading: reading || '', isNewMember: isNew === '1' };
+      const [name, reading, isNew, studentId] = line.split(',').map(s => s.trim());
+      return { name: name || '名称未設定', reading: reading || '', isNewMember: isNew === '1', ...(studentId ? { studentId } : {}) };
     });
 
 const newUserBase = (name: string, reading?: string, isNewMember = false): User => ({
@@ -1853,6 +1853,7 @@ const newUserBase = (name: string, reading?: string, isNewMember = false): User 
   unlockedIcons:    [...DEFAULT_UNLOCKED_ICONS],
   ranks:            [],
   profilePin:       '000000',
+  studentId:        undefined,
   activeFrameId:    'FRAME_NONE',
   unlockedFrames:   ['FRAME_NONE', 'FRAME_DEFAULT'],
   earnedHonors:     [],
@@ -1860,7 +1861,7 @@ const newUserBase = (name: string, reading?: string, isNewMember = false): User 
 
 export const bulkAddUsers = (stubs: Partial<User>[]): void => {
   const all = getRawUsers();
-  const added = stubs.map(s => newUserBase(s.name || '名称未設定', s.reading, !!s.isNewMember));
+  const added = stubs.map(s => ({ ...newUserBase(s.name || '名称未設定', s.reading, !!s.isNewMember), ...(s.studentId ? { studentId: s.studentId } : {}) }));
   saveUsers([...all, ...added]);
 };
 

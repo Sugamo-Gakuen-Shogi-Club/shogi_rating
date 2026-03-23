@@ -118,6 +118,8 @@ export interface User {
   ranks: RankEntry[];
   // ★ 個人ページPIN（初期値 "0000"）
   profilePin: string;
+  // ★ 学籍番号（Googleログイン連携用）
+  studentId?: string;
   // ★ アイコンフレーム
   activeFrameId?: string;
   unlockedFrames?: string[];

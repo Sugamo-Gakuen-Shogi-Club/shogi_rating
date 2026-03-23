@@ -65,6 +65,11 @@ const Admin: React.FC = () => {
   const [newPin, setNewPin] = useState('');
   const [pinMsg, setPinMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
 
+  // Admin PIN change
+  const [newAdminPin, setNewAdminPin] = useState('');
+  const [newAdminPinConfirm, setNewAdminPinConfirm] = useState('');
+  const [adminPinMsg, setAdminPinMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+
   // Auto backups
   const [autoBackups, setAutoBackups] = useState<AutoBackupEntry[]>([]);
   const [restoringKey, setRestoringKey] = useState<string | null>(null);
@@ -259,6 +264,18 @@ const Admin: React.FC = () => {
     } else {
       setPinMsg({ type: 'err', text: result.error || '変更失敗' });
     }
+  };
+
+  const handleAdminPinChange = () => {
+    if (newAdminPin.length !== 6) { setAdminPinMsg({ type: 'err', text: '6桁で入力してください' }); return; }
+    if (newAdminPin !== newAdminPinConfirm) { setAdminPinMsg({ type: 'err', text: '確認PINが一致しません' }); return; }
+    const updated = { ...settings, adminPin: newAdminPin };
+    saveSettings(updated);
+    setSettings(updated);
+    setNewAdminPin('');
+    setNewAdminPinConfirm('');
+    setAdminPinMsg({ type: 'ok', text: '管理者PINを変更しました' });
+    setTimeout(() => setAdminPinMsg(null), 3000);
   };
 
   const toggleNewMember = (id: string) => {
@@ -683,13 +700,14 @@ const Admin: React.FC = () => {
               <div className="bg-slate-950 rounded-2xl border border-white/5 overflow-hidden">
                 <table className="w-full text-left text-sm">
                   <thead className="bg-slate-800 text-slate-400 font-bold">
-                    <tr><th className="px-4 py-3">名前</th><th className="px-4 py-3">読み</th><th className="px-4 py-3 text-center">区分</th></tr>
+                    <tr><th className="px-4 py-3">名前</th><th className="px-4 py-3">読み</th><th className="px-4 py-3">学籍番号</th><th className="px-4 py-3 text-center">区分</th></tr>
                   </thead>
                   <tbody className="divide-y divide-white/5">
                     {csvPreview.map((p, i) => (
                       <tr key={i} className="text-slate-300">
                         <td className="px-4 py-3 font-bold">{p.name}</td>
                         <td className="px-4 py-3 font-mono text-xs">{p.reading}</td>
+                        <td className="px-4 py-3 font-mono text-xs">{(p as any).studentId || <span className="text-slate-600">未設定</span>}</td>
                         <td className="px-4 py-3 text-center">
                           {p.isNewMember ? <span className="text-[10px] bg-green-900/40 text-green-400 px-2 py-0.5 rounded border border-green-800">新入</span> : <span className="text-[10px] text-slate-600">一般</span>}
                         </td>
@@ -1219,6 +1237,51 @@ const Admin: React.FC = () => {
                   </button>
                 </>
               )}
+            </div>
+          </Card>
+
+          {/* Admin PIN Change */}
+          <Card title="管理者PIN変更" icon={<Lock className="text-red-400" size={18} />}>
+            <div className="space-y-4">
+              <p className="text-xs text-slate-400 font-bold leading-relaxed">
+                管理者ログインに使用するPINを変更します。<br/>
+                <span className="text-red-400">変更後は新しいPINでしかログインできません。</span>
+              </p>
+              {adminPinMsg && (
+                <div className={`flex items-center gap-2 p-3 rounded-xl border text-sm font-bold ${adminPinMsg.type === 'ok' ? 'bg-green-900/20 border-green-700/40 text-green-300' : 'bg-red-900/20 border-red-700/40 text-red-300'}`}>
+                  {adminPinMsg.type === 'ok' ? <Check size={14}/> : <X size={14}/>}
+                  {adminPinMsg.text}
+                </div>
+              )}
+              <div>
+                <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2">新しい管理者PIN（6桁）</label>
+                <input
+                  type="password"
+                  value={newAdminPin}
+                  onChange={e => setNewAdminPin(e.target.value.replace(/\D/g,'').slice(0,6))}
+                  placeholder="000000"
+                  maxLength={6}
+                  className="w-full p-3 border border-slate-700 rounded-xl font-mono text-2xl tracking-[0.5em] text-center bg-slate-800 text-white focus:border-red-500 outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2">確認（もう一度入力）</label>
+                <input
+                  type="password"
+                  value={newAdminPinConfirm}
+                  onChange={e => setNewAdminPinConfirm(e.target.value.replace(/\D/g,'').slice(0,6))}
+                  placeholder="000000"
+                  maxLength={6}
+                  className="w-full p-3 border border-slate-700 rounded-xl font-mono text-2xl tracking-[0.5em] text-center bg-slate-800 text-white focus:border-red-500 outline-none"
+                />
+              </div>
+              <button
+                onClick={handleAdminPinChange}
+                disabled={newAdminPin.length < 6 || newAdminPinConfirm.length < 6}
+                className="w-full bg-red-700 hover:bg-red-600 disabled:bg-slate-700 disabled:text-slate-500 text-white py-3 rounded-xl font-black transition-all active:scale-[0.98]"
+              >
+                管理者PINを変更する
+              </button>
             </div>
           </Card>
 
