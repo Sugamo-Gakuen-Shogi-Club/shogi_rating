@@ -635,12 +635,23 @@ const Profile: React.FC = () => {
     };
   }, []);
 
-  // 未承認デバイスのみFirebase Auth監視
+  // Firebase Auth監視（未承認デバイスのみ必要だが常に監視して確実に取得）
   useEffect(() => {
     if (deviceApproved) { setAuthLoading(false); return; }
     const unsub = onAuthChanged(u => { setFirebaseUser(u); setAuthLoading(false); });
     return () => unsub();
   }, [deviceApproved]);
+
+  // 未承認デバイス+ログイン済み：studentIdが一致するユーザーを自動選択
+  useEffect(() => {
+    if (deviceApproved) return;
+    if (!firebaseUser) return;
+    if (selectedId) return;
+    if (users.length === 0) return; // usersがロードされるまで待つ
+    const myStudentId = getStudentIdFromEmail(firebaseUser.email ?? '');
+    const myUser = users.find(u => u.studentId === myStudentId);
+    if (myUser) setSelectedId(myUser.id);
+  }, [deviceApproved, firebaseUser, users, selectedId]);
 
   const refresh = () => setUsers(getUsers());
 
@@ -683,11 +694,12 @@ const Profile: React.FC = () => {
     );
   }
 
-  // ── 未承認デバイス：studentIdで自動選択 ──────────────────
+  // ── 未承認デバイス+ログイン済み：selectedId確定待ち or 部員未登録 ──
   if (!deviceApproved && firebaseUser && !selectedId) {
     const myStudentId = getStudentIdFromEmail(firebaseUser.email ?? '');
     const myUser = users.find(u => u.studentId === myStudentId);
-    if (!myUser) {
+    if (users.length > 0 && !myUser) {
+      // usersはロード済みだが一致する部員なし → エラー表示
       return (
         <div className="flex items-center justify-center min-h-[70vh] p-4">
           <div className="w-full max-w-sm bg-slate-900 border border-red-700/40 rounded-3xl p-8 text-center space-y-4">
@@ -701,10 +713,7 @@ const Profile: React.FC = () => {
         </div>
       );
     }
-    // 自分のページに自動遷移
-    if (selectedId !== myUser.id) {
-      setTimeout(() => setSelectedId(myUser.id), 0);
-    }
+    // usersロード中 or selectedId設定中 → ローディング
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="text-slate-400 font-bold animate-pulse">読み込み中...</div>
