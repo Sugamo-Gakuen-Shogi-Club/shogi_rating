@@ -289,6 +289,12 @@ const Admin: React.FC = () => {
     setUsers(users.map(u => u.id === id ? { ...u, reading } : u));
   };
 
+  const handleStudentIdChange = (id: string, studentId: string) => {
+    const all = getUsers(true);
+    saveUsers(all.map(u => u.id === id ? { ...u, studentId: studentId.trim() || undefined } : u));
+    setUsers(prev => prev.map(u => u.id === id ? { ...u, studentId: studentId.trim() || undefined } : u));
+  };
+
   // ──────────────────────────────────────────────────────────
   // EVENT WIZARD
   // ──────────────────────────────────────────────────────────
@@ -879,6 +885,11 @@ const Admin: React.FC = () => {
                       <Languages size={14} className="text-slate-500 shrink-0" />
                       <input type="text" value={u.reading || ''} onChange={e => handleReadingChange(u.id, e.target.value)} placeholder="読みを入力..."
                         className={`flex-1 bg-slate-900/50 border ${u.reading ? 'border-slate-700 text-slate-300' : 'border-orange-500/50 text-orange-200'} rounded-lg px-3 py-1.5 text-xs font-bold focus:border-blue-500 outline-none`} />
+                    </div>
+                    <div className="flex items-center gap-2 pl-2">
+                      <KeyRound size={14} className="text-slate-500 shrink-0" />
+                      <input type="text" value={u.studentId || ''} onChange={e => handleStudentIdChange(u.id, e.target.value)} placeholder="学籍番号（例: 125010）"
+                        className={`flex-1 bg-slate-900/50 border ${u.studentId ? 'border-slate-700 text-slate-300' : 'border-yellow-500/40 text-yellow-200/70'} rounded-lg px-3 py-1.5 text-xs font-bold focus:border-indigo-500 outline-none`} />
                     </div>
                   </div>
                 ))}
