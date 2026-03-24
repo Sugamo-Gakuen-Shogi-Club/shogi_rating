@@ -661,6 +661,28 @@ const Profile: React.FC = () => {
 
   const refresh = () => setUsers(getUsers());
 
+  // ミッション通知（selectedId確定後に処理）
+  useEffect(() => {
+    if (!selectedId) return;
+    const allUsers = getUsers();
+    const target = allUsers.find(u => u.id === selectedId);
+    if (!target) return;
+    // canEditの判定をここで再計算
+    const approved = isDeviceApproved();
+    const fbUser = auth.currentUser;
+    const editable = approved || (
+      !!fbUser && !!target.studentId &&
+      getStudentIdFromEmail(fbUser.email ?? '') === target.studentId
+    );
+    if (!editable) return;
+    const alerts = target.pendingMissionAlert ?? [];
+    if (alerts.length > 0) {
+      setPendingAlerts(alerts);
+      clearPendingMissionAlert(target.id);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId]);
+
   const handleGoogleLogin = async () => {
     setAuthError(null);
     const u = await signInWithGoogle();
@@ -754,16 +776,7 @@ const Profile: React.FC = () => {
     getStudentIdFromEmail(firebaseUser.email ?? '') === user.studentId
   );
 
-  // ミッション通知
-  useEffect(() => {
-    if (!canEdit) return;
-    const alerts = user.pendingMissionAlert ?? [];
-    if (alerts.length > 0) {
-      setPendingAlerts(alerts);
-      clearPendingMissionAlert(user.id);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedId, canEdit]);
+  // ミッション通知はuseEffect(selectedId)で処理
 
   // ── 編集画面（認証済み） ──────────────────────────────────
   const settings     = getSettings();
