@@ -22,15 +22,23 @@ import {
   CheckCircle, Shuffle, Users, Crown, ChevronRight, X,
   RefreshCw, Languages, FileUp, Upload, Swords, Cloud,
   CloudOff, AlertCircle, Loader, UserCheck, UserX, RotateCcw,
-  Wrench, Medal, Check, KeyRound, Star, Lock
+  Wrench, Medal, Check, KeyRound, Star, Lock, LogOut
 } from 'lucide-react';
 import { UserSelector } from './UserSelector';
 import MaintenancePanel from './MaintenancePanel';
+import { signOutGoogle, onAuthChanged } from './firebase';
+import type { User as FirebaseUser } from 'firebase/auth';
 
 const Admin: React.FC = () => {
   const [pin, setPin] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [settings, setSettings] = useState<SystemSettings>(getSettings());
+  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
+
+  useEffect(() => {
+    const unsub = onAuthChanged(u => setFirebaseUser(u));
+    return () => unsub();
+  }, []);
   const [users, setUsers] = useState<User[]>([]);
   const [approvedDevices, setApprovedDevices] = useState<{token: string; label: string; approvedAt: string}[]>([]);
   const [newDeviceLabel, setNewDeviceLabel] = useState('部室iPad');
@@ -826,7 +834,12 @@ const Admin: React.FC = () => {
           <div className="flex items-center gap-3 mb-2"><Settings size={32} className="text-white" /><h2 className="text-3xl font-black text-white font-serif-jp">管理パネル</h2></div>
           <p className="text-slate-400 font-bold">部員の管理とイベント設定</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
+          {firebaseUser && (
+            <button onClick={() => signOutGoogle()} className="flex items-center gap-1.5 bg-slate-800 px-3 py-2 rounded-lg border border-slate-700 text-xs font-bold text-slate-400 hover:bg-slate-700 transition-colors">
+              <LogOut size={13}/> Googleログアウト
+            </button>
+          )}
           <button onClick={openEventWizard} className={`px-6 py-3 rounded-xl font-bold text-white shadow-lg ${activeEvent ? 'bg-orange-600' : 'bg-blue-600'}`}>
             {activeEvent ? 'イベント変更' : 'イベント開始'}
           </button>

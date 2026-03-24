@@ -27,6 +27,7 @@ import { ShogiPiece } from './ShogiPiece';
 import { NumPad } from './NumPad';
 import { MissionCard } from './MissionCard';
 import { auth, signInWithGoogle, signOutGoogle, getProfileAccess, onAuthChanged } from './firebase';
+import type { ProfileAccess } from './firebase';
 import type { User as FirebaseUser } from 'firebase/auth';
 
 // ─── 四天王設定 ───────────────────────────────────────────────
