@@ -622,10 +622,16 @@ const Profile: React.FC = () => {
   const [showSelector, setShowSelector] = useState(false);
   const [pendingAlerts, setPendingAlerts] = useState<string[]>([]);
 
-  const deviceApproved = isDeviceApproved();
+  const [deviceApproved, setDeviceApproved] = useState(isDeviceApproved());
 
   useEffect(() => {
-    const load = () => { setUsers(getUsers()); setMatches(getMatches()); setLogs(getLogs()); };
+    const load = () => {
+      setUsers(getUsers());
+      setMatches(getMatches());
+      setLogs(getLogs());
+      // 同期完了後にデバイス承認状態を再評価
+      setDeviceApproved(isDeviceApproved());
+    };
     load();
     window.addEventListener('rivals-users-changed', load);
     window.addEventListener('rivals-sync-changed', load);
@@ -635,7 +641,7 @@ const Profile: React.FC = () => {
     };
   }, []);
 
-  // Firebase Auth監視（未承認デバイスのみ必要だが常に監視して確実に取得）
+  // Firebase Auth監視（未承認デバイスのみ）
   useEffect(() => {
     if (deviceApproved) { setAuthLoading(false); return; }
     const unsub = onAuthChanged(u => { setFirebaseUser(u); setAuthLoading(false); });
