@@ -12,6 +12,7 @@ import {
   ICONS_DATA, FRAMES_DATA, updateUserIcon, updateUserFrame, getUserAvatarChar,
   getLogs, getSettings, isEventActive, getUserFrameDef, SYSTEM_TITLES,
   submitRankApplication, getUserSystemTitleHistory, clearPendingMissionAlert,
+  isDeviceApproved,
 } from './storage';
 import { User, MatchRecord, ActivityLog, ActivityType, RankEntry, EventType, SystemSettings } from './types';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -26,8 +27,7 @@ import { useNavigate } from 'react-router-dom';
 import { ShogiPiece } from './ShogiPiece';
 import { NumPad } from './NumPad';
 import { MissionCard } from './MissionCard';
-import { auth, signInWithGoogle, signOutGoogle, getProfileAccess, onAuthChanged } from './firebase';
-import type { ProfileAccess } from './firebase';
+import { auth, signInWithGoogle, signOutGoogle, onAuthChanged, getStudentIdFromEmail } from './firebase';
 import type { User as FirebaseUser } from 'firebase/auth';
 
 // ─── 四天王設定 ───────────────────────────────────────────────
@@ -622,6 +622,8 @@ const Profile: React.FC = () => {
   const [showSelector, setShowSelector] = useState(false);
   const [pendingAlerts, setPendingAlerts] = useState<string[]>([]);
 
+  const deviceApproved = isDeviceApproved();
+
   useEffect(() => {
     const load = () => { setUsers(getUsers()); setMatches(getMatches()); setLogs(getLogs()); };
     load();
@@ -633,11 +635,12 @@ const Profile: React.FC = () => {
     };
   }, []);
 
-  // Firebase Auth 状態監視
+  // 未承認デバイスのみFirebase Auth監視
   useEffect(() => {
+    if (deviceApproved) { setAuthLoading(false); return; }
     const unsub = onAuthChanged(u => { setFirebaseUser(u); setAuthLoading(false); });
     return () => unsub();
-  }, []);
+  }, [deviceApproved]);
 
   const refresh = () => setUsers(getUsers());
 
@@ -647,7 +650,7 @@ const Profile: React.FC = () => {
     if (!u) setAuthError('ログインできませんでした。sugamo.ed.jpのアカウントでログインしてください。');
   };
 
-  // ── ログイン画面 ──────────────────────────────────────────
+  // ── 読み込み中 ────────────────────────────────────────────
   if (authLoading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -656,7 +659,8 @@ const Profile: React.FC = () => {
     );
   }
 
-  if (!firebaseUser) {
+  // ── 未承認デバイス：Googleログイン必須 ───────────────────
+  if (!deviceApproved && !firebaseUser) {
     return (
       <div className="flex items-center justify-center min-h-[70vh] p-4">
         <div className="w-full max-w-sm bg-slate-900 border border-white/10 rounded-3xl shadow-2xl overflow-hidden p-8 text-center space-y-6">
@@ -679,15 +683,39 @@ const Profile: React.FC = () => {
     );
   }
 
-  // ── ユーザー選択 ──────────────────────────────────────────
+  // ── 未承認デバイス：studentIdで自動選択 ──────────────────
+  if (!deviceApproved && firebaseUser && !selectedId) {
+    const myStudentId = getStudentIdFromEmail(firebaseUser.email ?? '');
+    const myUser = users.find(u => u.studentId === myStudentId);
+    if (!myUser) {
+      return (
+        <div className="flex items-center justify-center min-h-[70vh] p-4">
+          <div className="w-full max-w-sm bg-slate-900 border border-red-700/40 rounded-3xl p-8 text-center space-y-4">
+            <Lock size={48} className="mx-auto text-red-400" />
+            <h2 className="text-xl font-black text-white">部員が見つかりません</h2>
+            <p className="text-sm text-slate-400">{firebaseUser.email} に対応する部員が登録されていません。管理者に学籍番号の登録を依頼してください。</p>
+            <button onClick={() => signOutGoogle()} className="w-full py-3 bg-slate-800 rounded-xl font-black text-slate-300 active:scale-95 flex items-center justify-center gap-2">
+              <LogOut size={14}/> ログアウト
+            </button>
+          </div>
+        </div>
+      );
+    }
+    // 自分のページに自動遷移
+    if (selectedId !== myUser.id) {
+      setTimeout(() => setSelectedId(myUser.id), 0);
+    }
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-slate-400 font-bold animate-pulse">読み込み中...</div>
+      </div>
+    );
+  }
+
+  // ── 承認済みデバイス：部員選択画面 ───────────────────────
   if (!selectedId) {
     return (
       <div className="space-y-6 animate-in fade-in duration-300">
-        <div className="flex justify-end px-2 pt-2">
-          <button onClick={() => signOutGoogle()} className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-white font-bold transition-colors">
-            <LogOut size={14}/> ログアウト
-          </button>
-        </div>
         <UserSelector
           users={users}
           onSelect={(id) => { setSelectedId(id); }}
@@ -702,27 +730,16 @@ const Profile: React.FC = () => {
   const user = users.find(u => u.id === selectedId);
   if (!user) return null;
 
-  // アクセス権判定
-  const access: ProfileAccess = getProfileAccess(firebaseUser, user.studentId);
+  // ── アクセス権判定 ────────────────────────────────────────
+  // 承認済みデバイス → 全員編集可
+  // 未承認デバイス + Googleログイン済み → 自分のみ編集可
+  const canEdit = deviceApproved || (
+    !!firebaseUser &&
+    !!user.studentId &&
+    getStudentIdFromEmail(firebaseUser.email ?? '') === user.studentId
+  );
 
-  // DENIED → エラー表示
-  if (access === 'DENIED') {
-    return (
-      <div className="flex items-center justify-center min-h-[70vh] p-4">
-        <div className="w-full max-w-sm bg-slate-900 border border-red-700/40 rounded-3xl p-8 text-center space-y-4">
-          <Lock size={48} className="mx-auto text-red-400" />
-          <h2 className="text-xl font-black text-white">アクセス権がありません</h2>
-          <p className="text-sm text-slate-400">このプロフィールを閲覧する権限がありません。</p>
-          <button onClick={() => setSelectedId(null)} className="w-full py-3 bg-slate-800 rounded-xl font-black text-slate-300 active:scale-95">戻る</button>
-        </div>
-      </div>
-    );
-  }
-
-  // 閲覧のみか編集可能かのフラグ
-  const canEdit = access === 'ADMIN' || access === 'OWNER';
-
-  // ミッション通知（編集可能時のみ）
+  // ミッション通知
   useEffect(() => {
     if (!canEdit) return;
     const alerts = user.pendingMissionAlert ?? [];
@@ -827,15 +844,16 @@ const Profile: React.FC = () => {
           <ArrowLeft size={18} className="text-slate-300"/>
         </button>
         <div className="flex items-center gap-2">
-          {!canEdit && (
-            <span className="text-[10px] bg-slate-800 border border-slate-700 text-slate-500 px-2 py-1 rounded-full font-black">👁 閲覧のみ</span>
+          {deviceApproved && (
+            <button onClick={() => setShowSelector(true)} className="flex items-center gap-1.5 bg-slate-800 px-3 py-2 rounded-lg border border-slate-700 text-xs font-bold text-slate-400 hover:bg-slate-700">
+              <Search size={13}/> 切替
+            </button>
           )}
-          <button onClick={() => setShowSelector(true)} className="flex items-center gap-1.5 bg-slate-800 px-3 py-2 rounded-lg border border-slate-700 text-xs font-bold text-slate-400 hover:bg-slate-700">
-            <Search size={13}/> 切替
-          </button>
-          <button onClick={() => signOutGoogle()} className="flex items-center gap-1.5 bg-slate-800 px-3 py-2 rounded-lg border border-slate-700 text-xs font-bold text-slate-400 hover:bg-slate-700">
-            <LogOut size={13}/> ログアウト
-          </button>
+          {!deviceApproved && firebaseUser && (
+            <button onClick={() => signOutGoogle()} className="flex items-center gap-1.5 bg-slate-800 px-3 py-2 rounded-lg border border-slate-700 text-xs font-bold text-slate-400 hover:bg-slate-700">
+              <LogOut size={13}/> ログアウト
+            </button>
+          )}
         </div>
       </div>
 

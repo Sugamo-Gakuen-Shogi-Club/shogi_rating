@@ -1810,13 +1810,17 @@ export const updateUserIcon = (id: string, iconId: string): void => {
   if (u) { u.activeIconId = iconId; saveUsers(all); }
 };
 
-export const parseUserCSV = (csv: string): Partial<User>[] =>
-  csv.split('\n')
+export const parseUserCSV = (csv: string): { data: Partial<User>[]; errors: string[] } => {
+  const errors: string[] = [];
+  const data = csv.split('\n')
     .filter(line => line.trim())
-    .map(line => {
+    .map((line, i) => {
       const [name, reading, isNew, studentId] = line.split(',').map(s => s.trim());
+      if (!studentId) errors.push(`${i + 1}行目「${name}」: 学籍番号が未入力です`);
       return { name: name || '名称未設定', reading: reading || '', isNewMember: isNew === '1', ...(studentId ? { studentId } : {}) };
     });
+  return { data, errors };
+};
 
 const newUserBase = (name: string, reading?: string, isNewMember = false): User => ({
   id:               randomId(),
