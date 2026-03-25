@@ -1201,6 +1201,9 @@ export const processMatch = (
   const autoIsDuel = isFactionWar && p1.isGeneral && p2.isGeneral && p1.faction !== p2.faction;
   const effectiveDuel = isDuel || autoIsDuel;
 
+  // ★ 同士討ち判定: 紅白戦中に同じfaction同士の対局（早期計算）
+  const isSameFaction = isFactionWar && p1.faction === p2.faction;
+
   // ★ Undo snapshot（処理前に保存）
   const resultLabel = result === 'PLAYER1_WIN' ? `${p1.name} 勝ち` : result === 'PLAYER2_WIN' ? `${p2.name} 勝ち` : '引き分け';
   pushUndoSnapshot('MATCH', `対局: ${p1.name} vs ${p2.name}（${resultLabel}）`);
@@ -1239,9 +1242,12 @@ export const processMatch = (
   const now = new Date().toISOString();
 
   // Wins / Losses / Draws
-  if (p1IsWinner) { p1.wins++; p2.losses++; }
-  else if (p2IsWinner) { p2.wins++; p1.losses++; }
-  else { p1.draws++; p2.draws++; }
+  // 紅白戦の同士討ち（同じfaction同士）は勝数・負数にカウントしない
+  if (!isSameFaction) {
+    if (p1IsWinner) { p1.wins++; p2.losses++; }
+    else if (p2IsWinner) { p2.wins++; p1.losses++; }
+    else { p1.draws++; p2.draws++; }
+  }
 
   // Streaks + lossStreak
   if (p1IsWinner) {
@@ -1282,7 +1288,6 @@ export const processMatch = (
   p1.pointsMatch    = (p1.pointsMatch   || 0) + p1Detail.total;
 
   // 紅白戦中の同士討ち（同じfaction同士）はイベントポイントにカウントしない
-  const isSameFaction = isFactionWar && p1.faction === p2.faction;
   if (eventActive && !isSameFaction) p1.eventPoints = (p1.eventPoints || 0) + p1Detail.total;
 
   p2.totalPoints   += p2Detail.total;
