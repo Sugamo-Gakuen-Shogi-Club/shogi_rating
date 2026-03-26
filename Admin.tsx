@@ -13,6 +13,7 @@ import {
   removeAchievement, deleteAttendanceLog, getLogs, ACHIEVEMENTS_DATA,
   updateProfilePin, clearSystemTitleHistory,
   getApprovedDevices, approveThisDevice, revokeDevice, getOrCreateDeviceToken, isDeviceApproved,
+  finalizeFactionWar,
 } from './storage';
 import { User, SystemSettings, Season, EventType, SyncMeta, AutoBackupEntry, MaintenanceState, RankApplication, ActivityLog, ActivityType } from './types';
 import { Card } from './Card';
@@ -346,7 +347,15 @@ const Admin: React.FC = () => {
     endsAt.setDate(endsAt.getDate() + wDuration);
     // 最新の settings を読み直して上書きリスクを回避
     const latestSettings = getSettings();
-    saveSettings({ ...latestSettings, eventName: wName, eventEndsAt: endsAt.toISOString(), eventType: wType });
+    const nowIso = new Date().toISOString();
+    saveSettings({
+      ...latestSettings,
+      eventName: wName,
+      eventEndsAt: endsAt.toISOString(),
+      eventType: wType,
+      factionWarStartAt: wType === EventType.FACTION_WAR ? nowIso : null,
+      factionWarResult: null, // 新規開始時はリセット
+    });
 
     // ── 4. イベントポイントをリセット ──
     resetEventPoints();
@@ -360,7 +369,12 @@ const Admin: React.FC = () => {
 
   const handleStopEvent = () => {
     if (window.confirm('イベントを強制終了しますか？')) {
-      saveSettings({ ...settings, eventEndsAt: null });
+      const cur = getSettings();
+      if (cur.eventType === 'FACTION_WAR' as any) {
+        finalizeFactionWar();
+      } else {
+        saveSettings({ ...cur, eventEndsAt: null });
+      }
       refreshData();
     }
   };

@@ -68,8 +68,16 @@ export const SYSTEM_TITLES: TitleDef[] = [
 ];
 
 export const ACHIEVEMENTS_DATA: AchievementDef[] = [
-  { id: 'FACTION_GENERAL', name: '大将軍', description: 'チームの大将に任命される', conditionType: 'SPECIAL', threshold: 1 },
-  { id: 'DUEL_VICTORY', name: '一騎討ち', description: '敵将との直接対決を制する', conditionType: 'SPECIAL', threshold: 1 },
+  { id: 'FACTION_GENERAL',  name: '大将軍',   description: 'チームの大将に任命される',         conditionType: 'SPECIAL', threshold: 1 },
+  { id: 'DUEL_VICTORY',     name: '一騎討ち',  description: '敵将との直接対決を制する',         conditionType: 'SPECIAL', threshold: 1 },
+  // ★ 紅白戦新称号
+  { id: 'FACTION_SENKO',    name: '先鋒',      description: '紅白戦で最初に対局する',           conditionType: 'SPECIAL', threshold: 1 },
+  { id: 'FACTION_MERIT1',   name: '第1功',     description: '紅白戦でチーム最大の貢献者',       conditionType: 'SPECIAL', threshold: 1 },
+  { id: 'FACTION_MERIT2',   name: '第2功',     description: '紅白戦でチーム第2位の貢献者',      conditionType: 'SPECIAL', threshold: 1 },
+  { id: 'FACTION_MERIT3',   name: '第3功',     description: '紅白戦でチーム第3位の貢献者',      conditionType: 'SPECIAL', threshold: 1 },
+  { id: 'FACTION_WIN',      name: '勝利の立役者', description: '勝利チームの一員として戦い抜く', conditionType: 'SPECIAL', threshold: 1 },
+  { id: 'FACTION_FIGHTER',  name: '紅白の猛者', description: '紅白戦で5局以上対局する',         conditionType: 'SPECIAL', threshold: 1 },
+  { id: 'FACTION_ACE',      name: '紅白のエース', description: '紅白戦で10局以上対局する',      conditionType: 'SPECIAL', threshold: 1 },
   { id: 'COMEBACK_3', name: '不屈', description: '3連敗後に勝利する', conditionType: 'SPECIAL', threshold: 1 },
   { id: 'COMEBACK_5', name: '逆境の勇者', description: '5連敗後に勝利する', conditionType: 'SPECIAL', threshold: 1 },
   { id: 'COMEBACK_10', name: '復活劇', description: '10連敗後に勝利する', conditionType: 'SPECIAL', threshold: 1 },
@@ -1000,7 +1008,7 @@ const appendLogs = (newLogs: ActivityLog[]): void => {
 // ============================================================
 const checkAchievementsAndIcons = (
   user: User,
-  matchContext?: { isDuelWin: boolean; opponentRateBefore?: number }
+  matchContext?: { isDuelWin: boolean; opponentRateBefore?: number; factionMatchCount?: number }
 ): { newAchievements: AchievementDef[]; newIcons: IconDef[] } => {
   const newAchievements: AchievementDef[] = [];
   const newIcons: IconDef[] = [];
@@ -1031,6 +1039,15 @@ const checkAchievementsAndIcons = (
       case 'SPECIAL':
         if (a.id === 'FACTION_GENERAL') met = !!user.isGeneral;
         if (a.id === 'DUEL_VICTORY')    met = !!matchContext?.isDuelWin;
+        // 紅白戦新称号（processMatch内/finalizeFactionWar内で直接pushするため、ここではスキップ）
+        if (a.id === 'FACTION_SENKO')   met = false; // processMatch内で直接付与
+        if (a.id === 'FACTION_MERIT1')  met = false; // finalizeFactionWar内で付与
+        if (a.id === 'FACTION_MERIT2')  met = false;
+        if (a.id === 'FACTION_MERIT3')  met = false;
+        if (a.id === 'FACTION_WIN')     met = false; // finalizeFactionWar内で付与
+        // 紅白戦対局数（matchContextから判定）
+        if (a.id === 'FACTION_FIGHTER') met = !!(matchContext?.factionMatchCount && matchContext.factionMatchCount >= 5);
+        if (a.id === 'FACTION_ACE')     met = !!(matchContext?.factionMatchCount && matchContext.factionMatchCount >= 10);
         // 連敗後勝利
         if (a.id === 'COMEBACK_3')  met = lossStreak >= 3  && (user.wins || 0) > 0 && user.currentStreak > 0;
         if (a.id === 'COMEBACK_5')  met = lossStreak >= 5  && user.currentStreak > 0;
@@ -1295,6 +1312,28 @@ export const processMatch = (
   p2.pointsMatch    = (p2.pointsMatch   || 0) + p2Detail.total;
   if (eventActive && !isSameFaction) p2.eventPoints = (p2.eventPoints || 0) + p2Detail.total;
 
+  // ── 紅白戦専用: 先鋒判定 & 紅白戦対局数カウント ──────────
+  if (isFactionWar) {
+    // 先鋒: 紅白戦期間中で異faction間の最初の対局に参加した両者
+    if (!isSameFaction) {
+      const fwMatches = getMatches().filter(m => !m.isSameFaction); // 今保存前なので現時点では0件が最初
+      const isFirstFactionMatch = fwMatches.length === 0;
+      if (isFirstFactionMatch) {
+        if (!p1.achievements.includes('FACTION_SENKO')) p1.achievements.push('FACTION_SENKO');
+        if (!p2.achievements.includes('FACTION_SENKO')) p2.achievements.push('FACTION_SENKO');
+      }
+    }
+    // 紅白戦の対局数（同士討ち含む、イベント期間中の全対局）
+    const allFwMatches = getMatches();
+    const p1FwCount = allFwMatches.filter(m => m.player1Id === p1Id || m.player2Id === p1Id).length + 1;
+    const p2FwCount = allFwMatches.filter(m => m.player1Id === p2Id || m.player2Id === p2Id).length + 1;
+    // FACTION_FIGHTER(5局) / FACTION_ACE(10局)
+    if (p1FwCount >= 5 && !p1.achievements.includes('FACTION_FIGHTER')) p1.achievements.push('FACTION_FIGHTER');
+    if (p1FwCount >= 10 && !p1.achievements.includes('FACTION_ACE'))     p1.achievements.push('FACTION_ACE');
+    if (p2FwCount >= 5 && !p2.achievements.includes('FACTION_FIGHTER')) p2.achievements.push('FACTION_FIGHTER');
+    if (p2FwCount >= 10 && !p2.achievements.includes('FACTION_ACE'))     p2.achievements.push('FACTION_ACE');
+  }
+
   // Achievements & Icons
   const resP1 = checkAchievementsAndIcons(p1, { isDuelWin: effectiveDuel && p1IsWinner, opponentRateBefore: p2RateBefore });
   const resP2 = checkAchievementsAndIcons(p2, { isDuelWin: effectiveDuel && p2IsWinner, opponentRateBefore: p1RateBefore });
@@ -1313,6 +1352,7 @@ export const processMatch = (
     p1PointsEarned: p1Detail.total,
     p2PointsEarned: p2Detail.total,
     isDuel: effectiveDuel,
+    isSameFaction: isSameFaction || undefined,
   };
   const matches = getMatches();
   matches.unshift(matchRecord);
@@ -1365,6 +1405,7 @@ export const getRivalryStats = (userId: string): { bestCustomer: RivalData | nul
 
   matches.forEach(m => {
     if (m.player1Id !== userId && m.player2Id !== userId) return;
+    if (m.isSameFaction) return; // 同士討ちは因縁ボード・勝率に含めない
     const oppId = m.player1Id === userId ? m.player2Id : m.player1Id;
     if (!map[oppId]) map[oppId] = { wins: 0, losses: 0, draws: 0 };
     if (m.result === 'DRAW') {
@@ -1454,31 +1495,24 @@ export const awardSystemTitles = (): void => {
   const byActivity = [...active].sort((a, b) => b.activityDays - a.activityDays);
   const grinder = byActivity[0] ?? null;
 
-  // GIANT_KILLER: 格上撃破数1位（兼任可・除外なし）
-  const rateMap = Object.fromEntries(active.map(u => [u.id, u.rate]));
-  const upsetCount: Record<string, number> = {};
-  getMatches().forEach(m => {
-    const p1Rate = rateMap[m.player1Id] ?? 0;
-    const p2Rate = rateMap[m.player2Id] ?? 0;
-    if (m.result === 'PLAYER1_WIN' && p2Rate > p1Rate) {
-      upsetCount[m.player1Id] = (upsetCount[m.player1Id] || 0) + 1;
-    } else if (m.result === 'PLAYER2_WIN' && p1Rate > p2Rate) {
-      upsetCount[m.player2Id] = (upsetCount[m.player2Id] || 0) + 1;
-    }
-  });
-  const byUpsets = [...active].sort((a, b) => (upsetCount[b.id] || 0) - (upsetCount[a.id] || 0));
+  // GIANT_KILLER: 格上撃破数1位（user.upsetWinsを直接使用 — 対局時点のレートで判定済み）
+  const byUpsets = [...active].sort((a, b) => (b.upsetWins || 0) - (a.upsetWins || 0));
   const killer = byUpsets[0] ?? null;
 
   // 同率タイ検出（除外なし・全員対象）
   const masterScore  = master  ? (master.rate - master.seasonStartRate)          : null;
   const risingScore  = rising  ? (rising.totalPoints - rising.seasonStartPoints) : null;
   const grinderScore = grinder ? grinder.activityDays                            : null;
-  const killerScore  = killer  ? (upsetCount[killer.id] || 0)                    : null;
+  // ★ killerScoreはuser.upsetWinsを直接使用（対局時点のレートで判定済み）
+  const killerScore  = killer  ? (killer.upsetWins || 0)                         : null;
 
-  const masterHolders  = masterScore  !== null ? active.filter(u => (u.rate - u.seasonStartRate) === masterScore)               : [];
-  const risingHolders  = risingScore  !== null ? active.filter(u => (u.totalPoints - u.seasonStartPoints) === risingScore)      : [];
-  const grinderHolders = grinderScore !== null ? active.filter(u => u.activityDays === grinderScore)                            : [];
-  const killerHolders  = killerScore  !== null ? active.filter(u => (upsetCount[u.id] || 0) === killerScore && killerScore > 0) : [];
+  const masterHolders  = masterScore  !== null ? active.filter(u => (u.rate - u.seasonStartRate) === masterScore)            : [];
+  const risingHolders  = risingScore  !== null ? active.filter(u => (u.totalPoints - u.seasonStartPoints) === risingScore)   : [];
+  const grinderHolders = grinderScore !== null ? active.filter(u => u.activityDays === grinderScore)                         : [];
+  // ★ killerScore > 0 の条件で格上撃破0人全員選出バグを防ぐ
+  const killerHolders  = killerScore !== null && killerScore > 0
+    ? active.filter(u => (u.upsetWins || 0) === killerScore)
+    : [];
 
   // Assign（兼任可：配列にpush、重複なし）
   const addTitle = (userId: string, title: SystemTitle) => {
@@ -1490,11 +1524,11 @@ export const awardSystemTitles = (): void => {
   grinderHolders.forEach(u => addTitle(u.id, 'GRINDER'));
   killerHolders.forEach(u  => addTitle(u.id, 'GIANT_KILLER'));
 
-  // 履歴記録
-  recordSystemTitleChange('MASTER',       masterHolders.map(u => u.id));
-  recordSystemTitleChange('RISING_STAR',  risingHolders.map(u => u.id));
-  recordSystemTitleChange('GRINDER',      grinderHolders.map(u => u.id));
-  recordSystemTitleChange('GIANT_KILLER', killerHolders.map(u => u.id));
+  // 履歴記録（スコア付き）
+  recordSystemTitleChange('MASTER',       masterHolders.map(u => u.id),  masterScore  ?? undefined);
+  recordSystemTitleChange('RISING_STAR',  risingHolders.map(u => u.id),  risingScore  ?? undefined);
+  recordSystemTitleChange('GRINDER',      grinderHolders.map(u => u.id), grinderScore ?? undefined);
+  recordSystemTitleChange('GIANT_KILLER', killerHolders.map(u => u.id),  killerScore  ?? undefined);
 
   // 特別アイコン解放（四天王選出者）
   const unlockEliteForTitle = (holders: User[], titleId: string) => {
@@ -1539,7 +1573,7 @@ export const awardSystemTitles = (): void => {
   });
 
   // ★ 永続称号「第n代 [称号名]」を earnedHonors に付与（退任後も残る）
-  const snap = getSystemTitleHistory();
+  // タイの場合は全員同じ代番号を使う（recordSystemTitleChange 呼び出し後に参照）
   const TITLE_NAME: Record<string, string> = {
     MASTER: '覇者', RISING_STAR: '新星', GRINDER: '鉄人', GIANT_KILLER: '巨人キラー',
   };
@@ -1550,7 +1584,17 @@ export const awardSystemTitles = (): void => {
     { titleId: 'GIANT_KILLER', holders: killerHolders },
   ];
   allHolders.forEach(({ titleId, holders }) => {
-    const gen = (snap.nextGeneration[titleId] ?? 1);
+    if (holders.length === 0) return;
+    // recordSystemTitleChange 後の最新snapから「今回新規追加されたエントリ」の代数を取得
+    const snapNow = getSystemTitleHistory();
+    // 今回のホルダーのうち現役エントリを探して代数を確定
+    // 同タイの全員が同じ代数になるよう、最小世代数を使う
+    const gens = holders.map(u => {
+      const e = snapNow.entries.find(x => x.titleId === titleId && x.userId === u.id && !x.revokedAt);
+      return e?.generation ?? null;
+    }).filter((g): g is number => g !== null);
+    if (gens.length === 0) return;
+    const gen = Math.min(...gens);
     holders.forEach(u => {
       const x = all.find(a => a.id === u.id);
       if (!x) return;
@@ -1595,7 +1639,8 @@ export const clearSystemTitleHistory = (): void => {
 /** 四天王を更新し、履歴を記録する */
 export const recordSystemTitleChange = (
   titleId: string,
-  newHolderIds: string[]
+  newHolderIds: string[],
+  score?: number
 ): void => {
   const snap = getSystemTitleHistory();
   const now = new Date().toISOString();
@@ -1611,10 +1656,12 @@ export const recordSystemTitleChange = (
   });
 
   // 新しいホルダーのうち、まだ現役でないものを追加
+  // ★ タイ修正: 全員に同じ代数を付与し、1回だけインクリメント
+  const gen = snap.nextGeneration[titleId] || 1;
+  let hasNewEntry = false;
   newHolderIds.forEach(uid => {
     const already = snap.entries.find(e => e.titleId === titleId && e.userId === uid && !e.revokedAt);
     if (!already) {
-      const gen = snap.nextGeneration[titleId] || 1;
       const u = users.find(x => x.id === uid);
       snap.entries.push({
         id: Math.random().toString(36).slice(2),
@@ -1623,10 +1670,15 @@ export const recordSystemTitleChange = (
         userName: u?.name || '不明',
         generation: gen,
         awardedAt: now,
+        score,
       });
-      snap.nextGeneration[titleId] = gen + 1;
+      hasNewEntry = true;
     }
   });
+  // ★ 新規エントリがあった場合のみ代数を1つ上げる（タイでも1回だけ）
+  if (hasNewEntry) {
+    snap.nextGeneration[titleId] = gen + 1;
+  }
 
   saveSystemTitleHistory(snap);
 };
@@ -1928,6 +1980,103 @@ export const assignGenerals = (redId: string, whiteId: string): void => {
     }
   }
   saveUsers(all);
+};
+
+// ============================================================
+// FINALIZE FACTION WAR（紅白戦終了処理）
+// ============================================================
+export const finalizeFactionWar = (): void => {
+  const settings = getSettings();
+  if (settings.eventType !== EventType.FACTION_WAR) return;
+
+  const allUsers = getRawUsers();
+  const active   = allUsers.filter(u => u.isActive !== false);
+
+  // チームスコア集計
+  let redScore = 0, whiteScore = 0;
+  active.forEach(u => {
+    if (u.faction === 'RED')   redScore   += (u.eventPoints || 0);
+    if (u.faction === 'WHITE') whiteScore += (u.eventPoints || 0);
+  });
+  const winnerFaction: 'RED' | 'WHITE' | 'DRAW' =
+    redScore > whiteScore ? 'RED' : whiteScore > redScore ? 'WHITE' : 'DRAW';
+
+  // FACTION_WIN: 勝利チームの全員に付与
+  active.forEach(u => {
+    if (winnerFaction !== 'DRAW' && u.faction === winnerFaction) {
+      if (!u.achievements.includes('FACTION_WIN')) u.achievements.push('FACTION_WIN');
+    }
+  });
+
+  // 貢献功: チームごとにeventPoints上位3名を選出
+  const calcMerits = (faction: 'RED' | 'WHITE') => {
+    return [...active]
+      .filter(u => u.faction === faction)
+      .sort((a, b) => (b.eventPoints || 0) - (a.eventPoints || 0));
+  };
+  const redRanked   = calcMerits('RED');
+  const whiteRanked = calcMerits('WHITE');
+
+  const MERIT_PTS = [30, 20, 10] as const;
+  const MERIT_IDS = ['FACTION_MERIT1', 'FACTION_MERIT2', 'FACTION_MERIT3'] as const;
+  const merit1Ids: string[] = [];
+  const merit2Ids: string[] = [];
+  const merit3Ids: string[] = [];
+
+  ([redRanked, whiteRanked]).forEach(ranked => {
+    ranked.slice(0, 3).forEach((u, idx) => {
+      const x = allUsers.find(a => a.id === u.id);
+      if (!x) return;
+      const meritId = MERIT_IDS[idx];
+      const pts     = MERIT_PTS[idx];
+      if (!x.achievements.includes(meritId)) x.achievements.push(meritId);
+      // ポイント付与
+      x.totalPoints   = (x.totalPoints   || 0) + pts;
+      x.monthlyPoints = (x.monthlyPoints || 0) + pts;
+      x.pointsSpecial = (x.pointsSpecial || 0) + pts;
+      appendLogs([{
+        id: randomId(), userId: x.id,
+        type: ActivityType.BONUS,
+        points: pts,
+        description: `紅白戦 ${meritId === 'FACTION_MERIT1' ? '第1功' : meritId === 'FACTION_MERIT2' ? '第2功' : '第3功'}ボーナス`,
+        date: new Date().toISOString(),
+      }]);
+      if (idx === 0) merit1Ids.push(x.id);
+      if (idx === 1) merit2Ids.push(x.id);
+      if (idx === 2) merit3Ids.push(x.id);
+    });
+  });
+
+  saveUsers(allUsers);
+
+  // 結果をSettingsに保存（各ユーザーが未読確認できるように）
+  const closedAt = new Date().toISOString();
+  saveSettings({
+    ...settings,
+    eventEndsAt: null,
+    factionWarResult: {
+      eventName:     settings.eventName || '紅白戦',
+      winnerFaction,
+      redScore,
+      whiteScore,
+      closedAt,
+      merit1: merit1Ids,
+      merit2: merit2Ids,
+      merit3: merit3Ids,
+    },
+  });
+};
+
+/** 指定ユーザーの紅白戦結果発表を既読にする */
+export const markFactionWarResultSeen = (userId: string): void => {
+  const settings = getSettings();
+  if (!settings.factionWarResult) return;
+  const allUsers = getRawUsers();
+  const u = allUsers.find(x => x.id === userId);
+  if (u) {
+    u.factionWarResultSeen = settings.factionWarResult.closedAt;
+    saveUsers(allUsers);
+  }
 };
 
 export const resetEventPoints = (): void => {

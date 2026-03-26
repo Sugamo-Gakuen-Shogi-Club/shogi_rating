@@ -127,6 +127,8 @@ export interface User {
   earnedHonors?: string[];
   /** ★ ミッション達成通知（次回個人ページログイン時に表示） */
   pendingMissionAlert?: string[];
+  /** ★ 紅白戦結果発表を既読済みか（closedAtをキーとして保持） */
+  factionWarResultSeen?: string;
 }
 
 
@@ -138,6 +140,7 @@ export interface SystemTitleHistoryEntry {
   generation: number;        // 第何代
   awardedAt: string;         // ISO日時
   revokedAt?: string;        // 外れた日時（nullなら現役）
+  score?: number;            // 選出時のスコア（表示用）
 }
 
 export interface SystemTitleSnapshot {
@@ -156,6 +159,7 @@ export interface MatchRecord {
   p1PointsEarned: number;
   p2PointsEarned: number;
   isDuel?: boolean;
+  isSameFaction?: boolean;   // 紅白戦中の同士討ち（チームスコア・勝数除外）
 }
 
 export interface SystemSettings {
@@ -168,6 +172,20 @@ export interface SystemSettings {
   currentSeason: Season;
   lastMonthlyReset: string;
   lastTitleUpdate: string | null;
+  /** 紅白戦開始日時（先鋒判定・結果集計に使用） */
+  factionWarStartAt?: string | null;
+  /** 紅白戦終了時に確定した結果（未クリアのユーザーに結果発表モーダルを表示） */
+  factionWarResult?: {
+    eventName: string;
+    winnerFaction: 'RED' | 'WHITE' | 'DRAW';
+    redScore: number;
+    whiteScore: number;
+    closedAt: string;
+    /** 第1〜3功のユーザーID */
+    merit1?: string[];
+    merit2?: string[];
+    merit3?: string[];
+  } | null;
 }
 
 export interface ActivityLog {

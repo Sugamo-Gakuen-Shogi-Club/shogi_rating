@@ -345,8 +345,11 @@ const Rankings: React.FC = () => {
       const p2win = match.result === 'PLAYER2_WIN';
       m[match.player1Id].total++;
       m[match.player2Id].total++;
-      if (p1win) m[match.player1Id].wins++;
-      if (p2win) m[match.player2Id].wins++;
+      // 同士討ちは勝数にカウントしない
+      if (!match.isSameFaction) {
+        if (p1win) m[match.player1Id].wins++;
+        if (p2win) m[match.player2Id].wins++;
+      }
     });
     return m;
   }, [users, matches, weekAgo]);

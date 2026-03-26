@@ -12,7 +12,7 @@ import {
   ICONS_DATA, FRAMES_DATA, updateUserIcon, updateUserFrame, getUserAvatarChar,
   getLogs, getSettings, isEventActive, getUserFrameDef, SYSTEM_TITLES,
   submitRankApplication, getUserSystemTitleHistory, clearPendingMissionAlert,
-  isDeviceApproved,
+  isDeviceApproved, markFactionWarResultSeen,
 } from './storage';
 import { User, MatchRecord, ActivityLog, ActivityType, RankEntry, EventType, SystemSettings } from './types';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -608,6 +608,102 @@ const SqCard: React.FC<{
   </button>
 );
 
+// ─── 紅白戦 結果発表モーダル ─────────────────────────────────
+const FactionWarResultModal: React.FC<{ userId: string; onClose: () => void }> = ({ userId, onClose }) => {
+  const settings  = getSettings();
+  const result    = settings.factionWarResult;
+  if (!result) return null;
+
+  const users = getUsers();
+  const getName = (id: string) => users.find(u => u.id === id)?.name ?? id;
+
+  const winnerLabel =
+    result.winnerFaction === 'RED'   ? '🔴 RED ARMY 勝利！' :
+    result.winnerFaction === 'WHITE' ? '🔵 WHITE ARMY 勝利！' : '引き分け';
+  const winnerColor =
+    result.winnerFaction === 'RED'   ? 'from-red-950 via-red-900 to-slate-900' :
+    result.winnerFaction === 'WHITE' ? 'from-blue-950 via-blue-900 to-slate-900' :
+    'from-slate-800 to-slate-900';
+
+  const handleClose = () => {
+    markFactionWarResultSeen(userId);
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-[400] flex items-center justify-center bg-slate-950/95 backdrop-blur-md p-4 animate-in fade-in duration-500">
+      <div className={`w-full max-w-md bg-gradient-to-br ${winnerColor} border border-white/10 rounded-3xl shadow-2xl overflow-hidden`}>
+        {/* ヘッダー */}
+        <div className="px-6 pt-8 pb-5 text-center border-b border-white/10 relative">
+          <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">FACTION WAR — RESULT</div>
+          <h2 className="text-2xl font-black text-white mb-1">{result.eventName}</h2>
+          <div className={`text-3xl font-black mt-3 ${
+            result.winnerFaction === 'RED' ? 'text-red-400' :
+            result.winnerFaction === 'WHITE' ? 'text-blue-400' : 'text-slate-300'
+          }`}>{winnerLabel}</div>
+          <div className="text-xs text-slate-500 mt-1">
+            {new Date(result.closedAt).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })}
+          </div>
+        </div>
+
+        {/* スコア */}
+        <div className="px-6 py-5 space-y-4">
+          <div className="flex items-center gap-3">
+            <div className="flex-1 bg-red-900/40 border border-red-700/40 rounded-2xl p-4 text-center">
+              <div className="text-[10px] font-black text-red-300 uppercase tracking-widest mb-1">🔴 RED ARMY</div>
+              <div className="text-4xl font-black text-red-400 font-mono">{result.redScore}</div>
+              <div className="text-[10px] text-slate-500 mt-1">pt</div>
+            </div>
+            <div className="text-slate-500 font-black text-sm">VS</div>
+            <div className="flex-1 bg-blue-900/40 border border-blue-700/40 rounded-2xl p-4 text-center">
+              <div className="text-[10px] font-black text-blue-300 uppercase tracking-widest mb-1">🔵 WHITE ARMY</div>
+              <div className="text-4xl font-black text-blue-400 font-mono">{result.whiteScore}</div>
+              <div className="text-[10px] text-slate-500 mt-1">pt</div>
+            </div>
+          </div>
+
+          {/* 貢献功 */}
+          {((result.merit1?.length ?? 0) > 0 || (result.merit2?.length ?? 0) > 0 || (result.merit3?.length ?? 0) > 0) && (
+            <div className="bg-yellow-950/40 border border-yellow-700/30 rounded-2xl p-4 space-y-2">
+              <div className="text-[10px] font-black text-yellow-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                <Star size={11}/> 殊勲表彰
+              </div>
+              {(result.merit1?.length ?? 0) > 0 && (
+                <div className="flex items-center gap-3">
+                  <div className="bg-yellow-500/20 text-yellow-300 text-[10px] font-black px-2.5 py-1 rounded-full border border-yellow-500/40 shrink-0">第1功 +30pt</div>
+                  <div className="text-sm font-black text-white">{result.merit1!.map(getName).join('・')}</div>
+                </div>
+              )}
+              {(result.merit2?.length ?? 0) > 0 && (
+                <div className="flex items-center gap-3">
+                  <div className="bg-slate-400/20 text-slate-300 text-[10px] font-black px-2.5 py-1 rounded-full border border-slate-500/40 shrink-0">第2功 +20pt</div>
+                  <div className="text-sm font-black text-white">{result.merit2!.map(getName).join('・')}</div>
+                </div>
+              )}
+              {(result.merit3?.length ?? 0) > 0 && (
+                <div className="flex items-center gap-3">
+                  <div className="bg-amber-700/20 text-amber-400 text-[10px] font-black px-2.5 py-1 rounded-full border border-amber-700/40 shrink-0">第3功 +10pt</div>
+                  <div className="text-sm font-black text-white">{result.merit3!.map(getName).join('・')}</div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* 閉じるボタン */}
+        <div className="px-6 pb-7">
+          <button
+            onClick={handleClose}
+            className="w-full py-4 rounded-2xl bg-white text-slate-900 font-black text-base shadow-xl hover:bg-slate-100 active:scale-95 transition-all"
+          >
+            確認しました
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ─── メイン ───────────────────────────────────────────────────
 const Profile: React.FC = () => {
   const navigate = useNavigate();
@@ -621,6 +717,7 @@ const Profile: React.FC = () => {
   const [modal, setModal] = useState<'icon'|'frame'|'title'|'titleColl'|'rank'|null>(null);
   const [showSelector, setShowSelector] = useState(false);
   const [pendingAlerts, setPendingAlerts] = useState<string[]>([]);
+  const [showFactionResult, setShowFactionResult] = useState(false);
 
   const [deviceApproved, setDeviceApproved] = useState(isDeviceApproved());
 
@@ -679,6 +776,12 @@ const Profile: React.FC = () => {
     if (alerts.length > 0) {
       setPendingAlerts(alerts);
       clearPendingMissionAlert(target.id);
+    }
+    // ★ 紅白戦結果発表: 未読なら表示
+    const curSettings = getSettings();
+    const fwResult = curSettings.factionWarResult;
+    if (fwResult && target.factionWarResultSeen !== fwResult.closedAt) {
+      setShowFactionResult(true);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId]);
@@ -857,6 +960,11 @@ const Profile: React.FC = () => {
       {canEdit && modal === 'title'     && <TitleModal user={user} onClose={() => setModal(null)} onChange={(id) => { updateUserTitle(selectedId, id === 'NONE' ? null : id); refresh(); setModal(null); }}/>}
       {canEdit && modal === 'titleColl' && <TitleCollectionModal user={user} onClose={() => setModal(null)}/>}
       {canEdit && modal === 'rank'      && <RankModal userId={selectedId} user={user} onClose={() => setModal(null)} onRefresh={refresh}/>}
+
+      {/* ★ 紅白戦結果発表モーダル（未読の場合に最優先表示） */}
+      {showFactionResult && (
+        <FactionWarResultModal userId={selectedId} onClose={() => { setShowFactionResult(false); refresh(); }} />
+      )}
 
       {showSelector && (
         <UserSelector users={users}

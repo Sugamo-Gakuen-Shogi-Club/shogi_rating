@@ -116,6 +116,7 @@ const Dashboard: React.FC = () => {
 
       matches.forEach(m => {
           if (eventStart && new Date(m.date) < eventStart) return;
+          if (m.isSameFaction) return; // 同士討ちは勝数にカウントしない
           const winner = m.result === 'PLAYER1_WIN' ? m.player1Id : m.result === 'PLAYER2_WIN' ? m.player2Id : null;
           if (!winner) return;
           const winnerUser = users.find(u => u.id === winner);
@@ -324,6 +325,21 @@ const Dashboard: React.FC = () => {
                         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,0.4)_100%)]"></div>
                     </div>
                  </>
+             ) : activeEvent ? (
+                 /* ★ 通常強化イベント（STANDARD）エフェクト */
+                 <>
+                    <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-indigo-950/60 to-slate-900"></div>
+                    <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5"></div>
+                    {/* 金色の輝きパルス */}
+                    <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-yellow-500/10 via-transparent to-amber-500/10 animate-pulse"></div>
+                    <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                        <div className="absolute top-[-50%] left-[-10%] w-[80%] h-[200%] bg-gradient-to-b from-yellow-400/8 to-transparent rotate-[20deg] blur-3xl animate-[shimmer_6s_infinite]"></div>
+                        <div className="absolute top-[-30%] right-[-10%] w-[70%] h-[180%] bg-gradient-to-b from-amber-400/8 to-transparent rotate-[-15deg] blur-3xl animate-[shimmer_7s_infinite]" style={{ animationDelay: '2s' }}></div>
+                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-yellow-500/5 rounded-full blur-[80px] animate-pulse"></div>
+                    </div>
+                    {/* ボーダーグロー */}
+                    <div className="absolute inset-0 border-2 border-yellow-500/20 rounded-[2.5rem] pointer-events-none animate-pulse"></div>
+                 </>
              ) : (
                  <div className="absolute inset-0 bg-gradient-to-br from-slate-800 to-slate-950">
                      <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5"></div>
@@ -346,6 +362,19 @@ const Dashboard: React.FC = () => {
                          <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-400 via-yellow-200 to-blue-400 font-black tracking-widest uppercase text-base">
                              {settings.eventName || 'FACTION WAR'}
                          </span>
+                     </div>
+                 ) : activeEvent ? (
+                     /* ★ 通常強化イベントバナー */
+                     <div className="inline-flex items-center gap-2 px-6 py-2 rounded-full bg-yellow-950/80 border border-yellow-500/50 backdrop-blur-md shadow-[0_0_20px_rgba(234,179,8,0.3)] animate-pulse">
+                         <Zap size={16} className="text-yellow-400" fill="currentColor" />
+                         <span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-amber-200 to-yellow-400 font-black tracking-widest uppercase text-base">
+                             {settings.eventName || 'POINT MATCH'}
+                         </span>
+                         {settings.eventMultiplier > 1 && (
+                             <span className="text-[10px] bg-yellow-500 text-slate-900 font-black px-2 py-0.5 rounded-full ml-1">
+                                 ×{settings.eventMultiplier}
+                             </span>
+                         )}
                      </div>
                  ) : (
                      <span className="text-slate-400 font-bold tracking-[0.2em] text-sm uppercase">Shogi Club Management System</span>
@@ -395,6 +424,26 @@ const Dashboard: React.FC = () => {
                         
                         {/* Center Marker */}
                         <div className="absolute top-0 left-1/2 w-1 h-full bg-white z-10 shadow-[0_0_10px_white]"></div>
+                    </div>
+                </div>
+            )}
+
+            {/* ★ 通常強化イベント: ポイント倍率バナー */}
+            {activeEvent && !isFactionWar && (
+                <div className="w-full max-w-3xl mb-6">
+                    <div className="flex items-center justify-center gap-3 bg-yellow-950/60 border border-yellow-500/40 rounded-2xl px-6 py-4 shadow-[0_0_24px_rgba(234,179,8,0.2)]">
+                        <Zap size={20} className="text-yellow-400 shrink-0" fill="currentColor" />
+                        <div className="text-center">
+                            <div className="text-yellow-200 font-black text-sm tracking-wide">
+                                {settings.eventName || 'POINT MATCH'} 開催中！
+                            </div>
+                            <div className="text-yellow-400/80 text-[11px] font-bold mt-0.5">
+                                対局・出席ポイントが
+                                <span className="text-yellow-300 font-black text-sm mx-1">×{settings.eventMultiplier || 1}</span>
+                                倍！今がチャンス
+                            </div>
+                        </div>
+                        <Zap size={20} className="text-yellow-400 shrink-0" fill="currentColor" />
                     </div>
                 </div>
             )}
