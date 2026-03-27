@@ -214,6 +214,7 @@ const FrameModal: React.FC<{ user: User; onClose: () => void; onSelect: (id: str
 // ─── 称号変更モーダル ─────────────────────────────────────────
 const TitleModal: React.FC<{ user: User; onClose: () => void; onChange: (id: string) => void }> = ({ user, onClose, onChange }) => {
   const unlocked = ACHIEVEMENTS_DATA.filter(a => user.achievements.includes(a.id));
+  const honors   = user.earnedHonors ?? [];
   return (
     <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center bg-slate-950/90 backdrop-blur-sm">
       <div className="bg-slate-900 w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl shadow-2xl border border-white/10 flex flex-col max-h-[80vh]">
@@ -225,6 +226,20 @@ const TitleModal: React.FC<{ user: User; onClose: () => void; onChange: (id: str
           <button onClick={() => onChange('NONE')}
             className={`w-full text-left p-3 rounded-xl border text-sm font-bold transition-all ${!user.activeTitle ? 'border-blue-500 bg-blue-900/20 text-blue-300' : 'border-slate-700 text-slate-400 hover:bg-slate-800'}`}
           >なし</button>
+          {/* ★ 四天王永続称号（earnedHonors） */}
+          {honors.length > 0 && (
+            <>
+              <p className="text-[10px] font-black uppercase tracking-widest text-yellow-500/70 pt-2 pb-1 px-1">⚔️ 四天王 永続称号</p>
+              {honors.map(h => (
+                <button key={h} onClick={() => onChange(h)}
+                  className={`w-full text-left p-3 rounded-xl border text-sm font-bold transition-all ${user.activeTitle === h ? 'border-yellow-500 bg-yellow-900/20 text-yellow-300' : 'border-slate-700 text-slate-400 hover:bg-slate-800'}`}
+                >
+                  <div className="flex items-center gap-2"><Crown size={12} className="text-yellow-500 shrink-0"/>{h}</div>
+                </button>
+              ))}
+              {unlocked.length > 0 && <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 pt-2 pb-1 px-1">🏅 実績称号</p>}
+            </>
+          )}
           {unlocked.map(a => (
             <button key={a.id} onClick={() => onChange(a.id)}
               className={`w-full text-left p-3 rounded-xl border text-sm font-bold transition-all ${user.activeTitle === a.id ? 'border-blue-500 bg-blue-900/20 text-blue-300' : 'border-slate-700 text-slate-400 hover:bg-slate-800'}`}
@@ -233,7 +248,7 @@ const TitleModal: React.FC<{ user: User; onClose: () => void; onChange: (id: str
               <div className="text-[10px] font-normal text-slate-500 mt-0.5">{a.description}</div>
             </button>
           ))}
-          {unlocked.length === 0 && <p className="text-slate-500 text-sm text-center py-4">まだ獲得した称号がありません</p>}
+          {unlocked.length === 0 && honors.length === 0 && <p className="text-slate-500 text-sm text-center py-4">まだ獲得した称号がありません</p>}
         </div>
       </div>
     </div>
@@ -888,8 +903,10 @@ const Profile: React.FC = () => {
   const isElite      = user.systemTitle.length > 0;
   const titleDefs    = user.systemTitle.map(id => SYSTEM_TITLES.find(t => t.id === id)).filter(Boolean) as typeof SYSTEM_TITLES;
   const titleDef0    = titleDefs[0] ?? null;
+  // activeTitle は achievements の id OR earnedHonors のテキスト（「第n代 覇者」など）
   const activeTitleName = user.activeTitle
-    ? (ACHIEVEMENTS_DATA.find(a => a.id === user.activeTitle)?.name ?? null)
+    ? (ACHIEVEMENTS_DATA.find(a => a.id === user.activeTitle)?.name
+        ?? ((user.earnedHonors ?? []).includes(user.activeTitle) ? user.activeTitle : null))
     : null;
   const totalM       = user.wins + user.losses + user.draws;
   const wr           = totalM > 0 ? Math.round((user.wins / totalM) * 100) : 0;

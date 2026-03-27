@@ -1148,7 +1148,10 @@ export const recordAttendance = (userId: string): AttendanceResult => {
   user.monthlyPoints    += pts;
   user.pointsAttendance  = (user.pointsAttendance || 0) + pts;
   user.activityDays     += 1;
-  if (isEventActive()) user.eventPoints = (user.eventPoints || 0) + pts;
+  // 紅白戦中は出席ポイントをイベントポイントに加算しない（チームスコアは対局ポイントのみ）
+  if (isEventActive() && getSettings().eventType !== EventType.FACTION_WAR) {
+    user.eventPoints = (user.eventPoints || 0) + pts;
+  }
 
   const res = checkAchievementsAndIcons(user);
   saveUsers(allUsers);
@@ -1160,6 +1163,64 @@ export const recordAttendance = (userId: string): AttendanceResult => {
     description: '出席',
     date: new Date().toISOString(),
   }]);
+
+  // ★ 出席ミッション処理（D_ATTEND / W_ATTEND3）
+  const achieved: import('./types').MissionAchieved[] = [];
+  const dailyKey  = getDailyKey();
+  const weeklyKey = getWeeklyKey();
+  const allProgress = getMissionProgressAll();
+  const logs = getLogs();
+  // 今週の出席日数
+  const weekAttendDays = new Set(
+    logs
+      .filter(l => l.userId === userId && l.type === ActivityType.ATTENDANCE && getLocalDateString(l.date) >= weeklyKey)
+      .map(l => getLocalDateString(l.date))
+  ).size + 1; // +1 for today
+
+  const attendMissions = MISSIONS_DATA.filter(m => m.metric === 'ATTENDANCE');
+  for (const def of attendMissions) {
+    const periodKey = def.type === 'DAILY' ? dailyKey : weeklyKey;
+    const count = def.type === 'DAILY' ? 1 : weekAttendDays;
+    const idx = allProgress.findIndex(p => (p as any).userId === userId && p.missionId === def.id && p.periodKey === periodKey);
+    const completed = count >= def.target;
+    if (idx >= 0) {
+      const prev = allProgress[idx];
+      if (!prev.completed && completed) {
+        allProgress[idx] = { ...prev, current: count, completed: true, completedAt: new Date().toISOString() };
+        achieved.push({ userName: user.name, mission: def, rewardPts: def.rewardPts });
+        const usersNow = getRawUsers();
+        const u2 = usersNow.find(x => x.id === userId);
+        if (u2) {
+          u2.totalPoints   = (u2.totalPoints   || 0) + def.rewardPts;
+          u2.monthlyPoints = (u2.monthlyPoints || 0) + def.rewardPts;
+          u2.pointsSpecial = (u2.pointsSpecial || 0) + def.rewardPts;
+          if (!u2.pendingMissionAlert) u2.pendingMissionAlert = [];
+          u2.pendingMissionAlert.push(def.id);
+          saveUsers(usersNow);
+        }
+        appendLogs([{ id: randomId(), userId, type: ActivityType.BONUS, points: def.rewardPts, description: `ミッション達成: ${def.label}`, date: new Date().toISOString() }]);
+      } else {
+        allProgress[idx] = { ...allProgress[idx], current: count };
+      }
+    } else {
+      allProgress.push({ missionId: def.id, periodKey, current: count, completed, ...(completed ? { completedAt: new Date().toISOString() } : {}), userId } as any);
+      if (completed) {
+        achieved.push({ userName: user.name, mission: def, rewardPts: def.rewardPts });
+        const usersNow = getRawUsers();
+        const u2 = usersNow.find(x => x.id === userId);
+        if (u2) {
+          u2.totalPoints   = (u2.totalPoints   || 0) + def.rewardPts;
+          u2.monthlyPoints = (u2.monthlyPoints || 0) + def.rewardPts;
+          u2.pointsSpecial = (u2.pointsSpecial || 0) + def.rewardPts;
+          if (!u2.pendingMissionAlert) u2.pendingMissionAlert = [];
+          u2.pendingMissionAlert.push(def.id);
+          saveUsers(usersNow);
+        }
+        appendLogs([{ id: randomId(), userId, type: ActivityType.BONUS, points: def.rewardPts, description: `ミッション達成: ${def.label}`, date: new Date().toISOString() }]);
+      }
+    }
+  }
+  saveMissionProgressAll(allProgress);
 
   return { success: true, newAchievements: res.newAchievements, newIcons: res.newIcons, message: `出席を記録しました！ (+${pts} pt)` };
 };
@@ -1573,7 +1634,7 @@ export const awardSystemTitles = (): void => {
   });
 
   // ★ 永続称号「第n代 [称号名]」を earnedHonors に付与（退任後も残る）
-  // タイの場合は全員同じ代番号を使う（recordSystemTitleChange 呼び出し後に参照）
+  // recordSystemTitleChange 呼び出し後の最新snapから代数を取得
   const TITLE_NAME: Record<string, string> = {
     MASTER: '覇者', RISING_STAR: '新星', GRINDER: '鉄人', GIANT_KILLER: '巨人キラー',
   };
@@ -1585,12 +1646,15 @@ export const awardSystemTitles = (): void => {
   ];
   allHolders.forEach(({ titleId, holders }) => {
     if (holders.length === 0) return;
-    // recordSystemTitleChange 後の最新snapから「今回新規追加されたエントリ」の代数を取得
+    // recordSystemTitleChange後の最新snap: 今回付与されたエントリを取得
     const snapNow = getSystemTitleHistory();
-    // 今回のホルダーのうち現役エントリを探して代数を確定
-    // 同タイの全員が同じ代数になるよう、最小世代数を使う
+    // 今回のawardedAt（秒精度で最新のもの）を取得
+    const nowSec = new Date().toISOString().slice(0, 19);
     const gens = holders.map(u => {
-      const e = snapNow.entries.find(x => x.titleId === titleId && x.userId === u.id && !x.revokedAt);
+      // 今回付与した（awardedAtが最新の）エントリを探す
+      const e = snapNow.entries
+        .filter(x => x.titleId === titleId && x.userId === u.id)
+        .sort((a, b) => b.awardedAt.localeCompare(a.awardedAt))[0];
       return e?.generation ?? null;
     }).filter((g): g is number => g !== null);
     if (gens.length === 0) return;
@@ -1646,22 +1710,18 @@ export const recordSystemTitleChange = (
   const now = new Date().toISOString();
   const users = getRawUsers();
 
-  // 現役エントリを終了
+  // 現役エントリを終了（前の代を閉じる）
   snap.entries.forEach(e => {
     if (e.titleId === titleId && !e.revokedAt) {
-      if (!newHolderIds.includes(e.userId)) {
-        e.revokedAt = now;
-      }
+      e.revokedAt = now;
     }
   });
 
-  // 新しいホルダーのうち、まだ現役でないものを追加
+  // 新しいホルダーを追加（維持でも新エントリ = 代が上がる）
   // ★ タイ修正: 全員に同じ代数を付与し、1回だけインクリメント
-  const gen = snap.nextGeneration[titleId] || 1;
-  let hasNewEntry = false;
-  newHolderIds.forEach(uid => {
-    const already = snap.entries.find(e => e.titleId === titleId && e.userId === uid && !e.revokedAt);
-    if (!already) {
+  if (newHolderIds.length > 0) {
+    const gen = snap.nextGeneration[titleId] || 1;
+    newHolderIds.forEach(uid => {
       const u = users.find(x => x.id === uid);
       snap.entries.push({
         id: Math.random().toString(36).slice(2),
@@ -1672,11 +1732,7 @@ export const recordSystemTitleChange = (
         awardedAt: now,
         score,
       });
-      hasNewEntry = true;
-    }
-  });
-  // ★ 新規エントリがあった場合のみ代数を1つ上げる（タイでも1回だけ）
-  if (hasNewEntry) {
+    });
     snap.nextGeneration[titleId] = gen + 1;
   }
 
@@ -1991,7 +2047,6 @@ export const finalizeFactionWar = (): void => {
 
   const allUsers = getRawUsers();
   const active   = allUsers.filter(u => u.isActive !== false);
-
   // チームスコア集計
   let redScore = 0, whiteScore = 0;
   active.forEach(u => {
@@ -2045,6 +2100,11 @@ export const finalizeFactionWar = (): void => {
       if (idx === 1) merit2Ids.push(x.id);
       if (idx === 2) merit3Ids.push(x.id);
     });
+  });
+
+  // ★ 先鋒称号リセット: 次の紅白戦で新たな先鋒が選出されるよう削除
+  allUsers.forEach(u => {
+    u.achievements = (u.achievements || []).filter(a => a !== 'FACTION_SENKO');
   });
 
   saveUsers(allUsers);
