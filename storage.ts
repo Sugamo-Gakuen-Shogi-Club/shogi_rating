@@ -37,7 +37,8 @@ const MAINTENANCE_SANDBOX_URL = `${FIREBASE_BASE}/maintenance_sandbox.json`;
 // DEFAULTS
 // ============================================================
 const DEFAULT_SETTINGS: SystemSettings = {
-  adminPin: '112233',
+  adminPin: '000000',
+  changePassword: '',             // ★ 初期値なし。管理画面から設定必須
   clubName: '将棋部',
   eventName: null,
   eventType: EventType.STANDARD,
@@ -480,6 +481,7 @@ export const saveAutoBackup = (): void => {
       matches: getMatches(),
       settings: getSettings(),
       logs: getLogs(),
+      titleHistory: getSystemTitleHistory(),
       timestamp: new Date().toISOString(),
     };
     localStorage.setItem(key, JSON.stringify(data));
@@ -560,6 +562,7 @@ export const startMaintenanceMode = async (note: string, startedBy = '管理者'
       matches: getMatches(),
       settings: getSettings(),
       logs: getLogs(),
+      titleHistory: getSystemTitleHistory(),
       timestamp,
     };
 
@@ -619,6 +622,7 @@ export const endMaintenanceMode = async (discard: boolean): Promise<{ success: b
       localStorage.setItem(MATCHES_KEY,  JSON.stringify(backup.matches || []));
       localStorage.setItem(SETTINGS_KEY, JSON.stringify(backup.settings || {}));
       localStorage.setItem(LOGS_KEY,     JSON.stringify(backup.logs || []));
+      if (backup.titleHistory) saveSystemTitleHistory(backup.titleHistory);
 
       // 本番Firebaseに書き戻す
       const restoreRes = await fetch(CLOUD_API_URL, {
@@ -722,6 +726,7 @@ const pushToCloud = async (): Promise<boolean> => {
                   localStorage.setItem(MATCHES_KEY,  JSON.stringify(cloudData.matches || []));
                   localStorage.setItem(SETTINGS_KEY, JSON.stringify(cloudData.settings || DEFAULT_SETTINGS));
                   localStorage.setItem(LOGS_KEY,     JSON.stringify(cloudData.logs || []));
+                  if (cloudData.titleHistory) saveSystemTitleHistory(cloudData.titleHistory);
                   window.dispatchEvent(new CustomEvent('rivals-users-changed'));
                   updateSyncMeta({
                     status: 'SYNCED',
@@ -752,6 +757,7 @@ const pushToCloud = async (): Promise<boolean> => {
       logs: getLogs(),
       timestamp,
       approvedDevices: getApprovedDevices(),
+      titleHistory: getSystemTitleHistory(),
     };
     // メンテナンスモード中はsandboxに書く
     const url = maint.active ? MAINTENANCE_SANDBOX_URL : CLOUD_API_URL;
@@ -860,6 +866,8 @@ export const loadFromCloud = async (): Promise<LoadResult> => {
     localStorage.setItem(MATCHES_KEY,  JSON.stringify(data.matches || []));
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(data.settings || DEFAULT_SETTINGS));
     localStorage.setItem(LOGS_KEY,     JSON.stringify(data.logs || []));
+    // 四天王履歴も復元（クラウド優先）
+    if (data.titleHistory) saveSystemTitleHistory(data.titleHistory);
     // 承認済みデバイスも復元（ただし上書きは しない：このデバイス自身のトークンを消さないため）
     if (data.approvedDevices && Array.isArray(data.approvedDevices)) {
       const local = getApprovedDevices();
@@ -2154,6 +2162,7 @@ export const exportData = (): string =>
     matches:  getMatches(),
     settings: getSettings(),
     logs:     getLogs(),
+    titleHistory: getSystemTitleHistory(),
     timestamp: new Date().toISOString(),
   });
 
@@ -2165,6 +2174,7 @@ export const importData = (json: string): boolean => {
     localStorage.setItem(MATCHES_KEY,  JSON.stringify(d.matches  || []));
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(d.settings || DEFAULT_SETTINGS));
     localStorage.setItem(LOGS_KEY,     JSON.stringify(d.logs     || []));
+    if (d.titleHistory) saveSystemTitleHistory(d.titleHistory);
     syncWithServer();
     return true;
   } catch { return false; }

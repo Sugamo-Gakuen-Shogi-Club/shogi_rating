@@ -164,6 +164,7 @@ export interface MatchRecord {
 
 export interface SystemSettings {
   adminPin: string;
+  changePassword: string;        // デバイス承認に使う変更パスワード
   clubName: string;
   eventName: string | null;
   eventType: EventType;
@@ -235,6 +236,7 @@ export interface BackupData {
   logs: ActivityLog[];
   timestamp: string;
   approvedDevices?: { token: string; label: string; approvedAt: string }[];
+  titleHistory?: SystemTitleSnapshot;  // 四天王履歴（同期対象）
 }
 
 export interface RivalData {

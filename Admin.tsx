@@ -78,6 +78,9 @@ const Admin: React.FC = () => {
   const [newAdminPin, setNewAdminPin] = useState('');
   const [newAdminPinConfirm, setNewAdminPinConfirm] = useState('');
   const [adminPinMsg, setAdminPinMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+  const [newChangePass, setNewChangePass] = useState('');
+  const [newChangePassConfirm, setNewChangePassConfirm] = useState('');
+  const [changePassMsg, setChangePassMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
 
   // Auto backups
   const [autoBackups, setAutoBackups] = useState<AutoBackupEntry[]>([]);
@@ -291,6 +294,18 @@ const Admin: React.FC = () => {
     setNewAdminPinConfirm('');
     setAdminPinMsg({ type: 'ok', text: '管理者PINを変更しました' });
     setTimeout(() => setAdminPinMsg(null), 3000);
+  };
+
+  const handleChangePassChange = () => {
+    if (!newChangePass.trim()) { setChangePassMsg({ type: 'err', text: 'パスワードを入力してください' }); return; }
+    if (newChangePass !== newChangePassConfirm) { setChangePassMsg({ type: 'err', text: '確認パスワードが一致しません' }); return; }
+    const updated = { ...settings, changePassword: newChangePass };
+    saveSettings(updated);
+    setSettings(updated);
+    setNewChangePass('');
+    setNewChangePassConfirm('');
+    setChangePassMsg({ type: 'ok', text: '変更パスワードを更新しました' });
+    setTimeout(() => setChangePassMsg(null), 3000);
   };
 
   const toggleNewMember = (id: string) => {
@@ -558,7 +573,8 @@ const Admin: React.FC = () => {
     // 未承認デバイス → koji → 管理者PIN → デバイス名 → 承認
     if (!deviceOk && approveStep !== 'done') {
       const handleKojiSubmit = () => {
-        if (approveKoji === 'koji') { setApproveStep('adminPin'); setApproveKojiErr(false); }
+        if (!s.changePassword) { setApproveKojiErr(true); return; }
+        if (approveKoji === s.changePassword) { setApproveStep('adminPin'); setApproveKojiErr(false); }
         else { setApproveKojiErr(true); setTimeout(() => setApproveKojiErr(false), 1500); }
       };
       const handleAdminPinSubmit = (v: string) => {
@@ -1330,6 +1346,49 @@ const Admin: React.FC = () => {
             </div>
           </Card>
 
+          {/* 変更パスワード変更 */}
+          <Card title="変更パスワード変更" icon={<KeyRound className="text-orange-400" size={18} />}>
+            <div className="space-y-4">
+              <p className="text-xs text-slate-400 font-bold leading-relaxed">
+                デバイス承認時に入力する「変更パスワード」を設定します。<br/>
+                <span className="text-orange-400">デフォルトは初期値のままです。必ず変更してください。</span>
+              </p>
+              <div>
+                <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2">新しい変更パスワード</label>
+                <input
+                  type="password"
+                  value={newChangePass}
+                  onChange={e => setNewChangePass(e.target.value)}
+                  placeholder="新しいパスワードを入力"
+                  className="w-full p-3 border border-slate-700 rounded-xl font-bold bg-slate-800 text-white focus:border-orange-500 outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2">確認（もう一度入力）</label>
+                <input
+                  type="password"
+                  value={newChangePassConfirm}
+                  onChange={e => setNewChangePassConfirm(e.target.value)}
+                  placeholder="確認のため再入力"
+                  className="w-full p-3 border border-slate-700 rounded-xl font-bold bg-slate-800 text-white focus:border-orange-500 outline-none"
+                />
+              </div>
+              {changePassMsg && (
+                <div className={`flex items-center gap-2 p-3 rounded-xl border text-sm font-bold ${changePassMsg.type === 'ok' ? 'bg-green-900/20 border-green-700/40 text-green-300' : 'bg-red-900/20 border-red-700/40 text-red-300'}`}>
+                  {changePassMsg.type === 'ok' ? <Check size={14}/> : <X size={14}/>}
+                  {changePassMsg.text}
+                </div>
+              )}
+              <button
+                onClick={handleChangePassChange}
+                disabled={!newChangePass || newChangePass !== newChangePassConfirm}
+                className="w-full bg-orange-700 hover:bg-orange-600 disabled:bg-slate-700 disabled:text-slate-500 text-white py-3 rounded-xl font-black transition-all active:scale-[0.98]"
+              >
+                変更パスワードを更新する
+              </button>
+            </div>
+          </Card>
+
           {/* Manual Adjustment */}
           <Card title="手動ポイント調整" icon={<Plus className="text-blue-400" />}>
             <div className="space-y-4">
@@ -1392,7 +1451,8 @@ const Admin: React.FC = () => {
                   {kojiErr && <p className="text-xs text-red-400 font-bold">パスワードが間違っています</p>}
                   <button
                     onClick={() => {
-                      if (kojiPass !== 'koji') { setKojiErr(true); return; }
+                      const cp = getSettings().changePassword;
+                      if (!cp || kojiPass !== cp) { setKojiErr(true); return; }
                       approveThisDevice(newDeviceLabel || '未設定');
                       refreshData();
                       setKojiPass('');
