@@ -38,7 +38,7 @@ const MAINTENANCE_SANDBOX_URL = `${FIREBASE_BASE}/maintenance_sandbox.json`;
 // ============================================================
 const DEFAULT_SETTINGS: SystemSettings = {
   adminPin: '000000',
-  changePassword: '',             // ★ 初期値なし。管理画面から設定必須
+  changePassword: 'sugamo',
   clubName: '将棋部',
   eventName: null,
   eventType: EventType.STANDARD,
