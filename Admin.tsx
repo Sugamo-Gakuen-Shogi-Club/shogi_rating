@@ -573,7 +573,6 @@ const Admin: React.FC = () => {
     // 未承認デバイス → koji → 管理者PIN → デバイス名 → 承認
     if (!deviceOk && approveStep !== 'done') {
       const handleKojiSubmit = () => {
-        if (!s.changePassword) { setApproveKojiErr(true); return; }
         if (approveKoji === s.changePassword) { setApproveStep('adminPin'); setApproveKojiErr(false); }
         else { setApproveKojiErr(true); setTimeout(() => setApproveKojiErr(false), 1500); }
       };
