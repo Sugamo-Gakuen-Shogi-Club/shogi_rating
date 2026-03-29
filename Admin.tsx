@@ -1231,7 +1231,7 @@ const Admin: React.FC = () => {
               <div className="pt-3 border-t border-red-900/30">
                 <p className="text-xs text-slate-600 mb-2">⚠ テスト・誤操作時のリセット専用。全履歴と永続称号が消えます。</p>
                 <button
-                  onClick={() => {
+                  onClick={async () => {
                     if (window.confirm('四天王の全履歴と永続称号をリセットします。この操作は取り消せません。本当に実行しますか？')) {
                       clearSystemTitleHistory();
                       await manualSync();
