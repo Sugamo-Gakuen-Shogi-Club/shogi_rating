@@ -1688,11 +1688,15 @@ export const awardSystemTitles = (): void => {
 const SYSTEM_TITLE_HISTORY_KEY = 'club_rivals_system_title_history';
 
 export const getSystemTitleHistory = (): SystemTitleSnapshot => {
+  const DEFAULT: SystemTitleSnapshot = { entries: [], nextGeneration: { MASTER: 1, RISING_STAR: 1, GRINDER: 1, GIANT_KILLER: 1 } };
   try {
     const raw = localStorage.getItem(SYSTEM_TITLE_HISTORY_KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return { ...DEFAULT, ...parsed, entries: Array.isArray(parsed.entries) ? parsed.entries : [] };
+    }
   } catch {}
-  return { entries: [], nextGeneration: { MASTER: 1, RISING_STAR: 1, GRINDER: 1, GIANT_KILLER: 1 } };
+  return DEFAULT;
 };
 
 const saveSystemTitleHistory = (snap: SystemTitleSnapshot): void => {
