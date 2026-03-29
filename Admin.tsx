@@ -1234,6 +1234,7 @@ const Admin: React.FC = () => {
                   onClick={() => {
                     if (window.confirm('四天王の全履歴と永続称号をリセットします。この操作は取り消せません。本当に実行しますか？')) {
                       clearSystemTitleHistory();
+                      await manualSync();
                       refreshData();
                     }
                   }}

@@ -841,6 +841,8 @@ export const loadFromCloud = async (): Promise<LoadResult> => {
 
     const data: BackupData | null = await res.json();
     if (!data || !Array.isArray(data.users) || data.users.length === 0) {
+      // クラウドが空 = 意図的なリセット。ローカルのtitleHistoryも空にして古いデータの復元を防ぐ
+      saveSystemTitleHistory({ entries: [], nextGeneration: { MASTER: 1, RISING_STAR: 1, GRINDER: 1, GIANT_KILLER: 1 } });
       updateSyncMeta({ status: 'NEVER' });
       return 'EMPTY';
     }
