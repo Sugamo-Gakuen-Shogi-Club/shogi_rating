@@ -25,8 +25,26 @@ const formatScore = (titleId: string, score: number | undefined): string => {
 const FourKingsHistory: React.FC = () => {
   const snap = getSystemTitleHistory();
 
-  // 各タイトルの現役エントリを取得（revokedAtがないもの）
-  const activeEntries = snap.entries.filter(e => !e.revokedAt);
+  if (snap.entries.length === 0) {
+    return (
+      <div className="space-y-6 pb-20 animate-in fade-in duration-500">
+        <div className="flex items-center gap-3 px-2 pt-2">
+          <div className="p-2 rounded-xl bg-yellow-500/10 border border-yellow-500/20">
+            <Crown size={22} className="text-yellow-400" fill="currentColor" />
+          </div>
+          <div>
+            <h1 className="text-xl font-black text-white tracking-wider">歴代 四天王</h1>
+            <p className="text-xs text-slate-500 font-bold mt-0.5">Four Kings History</p>
+          </div>
+        </div>
+        <div className="flex flex-col items-center justify-center py-24 gap-4 text-center">
+          <Crown size={48} className="text-slate-700" />
+          <p className="text-slate-500 text-sm font-bold">まだ記録がありません。</p>
+          <p className="text-slate-600 text-xs">管理画面から「称号を更新する」を実行してください。</p>
+        </div>
+      </div>
+    );
+  }
 
   // 「世代」単位でグルーピング：同じawardedAt秒 & 全タイトルを1ブロックに
   // → 各更新は1つの「第n代四天王」ブロックになる
@@ -59,27 +77,6 @@ const FourKingsHistory: React.FC = () => {
       );
     });
   };
-
-  if (snap.entries.length === 0) {
-    return (
-      <div className="space-y-6 pb-20 animate-in fade-in duration-500">
-        <div className="flex items-center gap-3 px-2 pt-2">
-          <div className="p-2 rounded-xl bg-yellow-500/10 border border-yellow-500/20">
-            <Crown size={22} className="text-yellow-400" fill="currentColor" />
-          </div>
-          <div>
-            <h1 className="text-xl font-black text-white tracking-wider">歴代 四天王</h1>
-            <p className="text-xs text-slate-500 font-bold mt-0.5">Four Kings History</p>
-          </div>
-        </div>
-        <div className="flex flex-col items-center justify-center py-24 gap-4 text-center">
-          <Crown size={48} className="text-slate-700" />
-          <p className="text-slate-500 text-sm font-bold">まだ記録がありません。</p>
-          <p className="text-slate-600 text-xs">管理画面から「称号を更新する」を実行してください。</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6 pb-20 animate-in fade-in duration-500">
