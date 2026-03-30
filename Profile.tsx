@@ -399,8 +399,11 @@ const SeasonStatusCard: React.FC<{ userId: string }> = ({ userId }) => {
   allMatches.forEach(m => {
     if (m.date < weekAgo) return;
     weekStats[m.player1Id].total++; weekStats[m.player2Id].total++;
-    if (m.result === 'PLAYER1_WIN') weekStats[m.player1Id].wins++;
-    if (m.result === 'PLAYER2_WIN') weekStats[m.player2Id].wins++;
+    // ★ 紅白戦同士討ちは勝数にカウントしない（Rankings.tsx と統一）
+    if (!m.isSameFaction) {
+      if (m.result === 'PLAYER1_WIN') weekStats[m.player1Id].wins++;
+      if (m.result === 'PLAYER2_WIN') weekStats[m.player2Id].wins++;
+    }
   });
   // 今期対局数マップ
   const seasonMatchCount: Record<string, number> = {};

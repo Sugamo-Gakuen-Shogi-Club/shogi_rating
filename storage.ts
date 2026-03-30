@@ -1566,23 +1566,33 @@ export const awardSystemTitles = (): void => {
   const byActivity = [...active].sort((a, b) => b.activityDays - a.activityDays);
   const grinder = byActivity[0] ?? null;
 
-  // GIANT_KILLER: 格上撃破数1位（user.upsetWinsを直接使用 — 対局時点のレートで判定済み）
-  const byUpsets = [...active].sort((a, b) => (b.upsetWins || 0) - (a.upsetWins || 0));
+  // ★ GIANT_KILLER: マッチレコードから格上撃破数を再計算（Admin確認画面と完全一致）
+  // user.upsetWins は対局時点レートで加算されるが Admin 確認画面と乖離するケースがあるため統一
+  const rateMap = Object.fromEntries(active.map(u => [u.id, u.rate]));
+  const upsetCountAward: Record<string, number> = {};
+  getMatches().forEach(m => {
+    const p1Rate = rateMap[m.player1Id] ?? 0;
+    const p2Rate = rateMap[m.player2Id] ?? 0;
+    if (m.result === 'PLAYER1_WIN' && p2Rate > p1Rate)
+      upsetCountAward[m.player1Id] = (upsetCountAward[m.player1Id] || 0) + 1;
+    else if (m.result === 'PLAYER2_WIN' && p1Rate > p2Rate)
+      upsetCountAward[m.player2Id] = (upsetCountAward[m.player2Id] || 0) + 1;
+  });
+  const byUpsets = [...active].sort((a, b) => (upsetCountAward[b.id] || 0) - (upsetCountAward[a.id] || 0));
   const killer = byUpsets[0] ?? null;
 
   // 同率タイ検出（除外なし・全員対象）
   const masterScore  = master  ? (master.rate - master.seasonStartRate)          : null;
   const risingScore  = rising  ? (rising.totalPoints - rising.seasonStartPoints) : null;
   const grinderScore = grinder ? grinder.activityDays                            : null;
-  // ★ killerScoreはuser.upsetWinsを直接使用（対局時点のレートで判定済み）
-  const killerScore  = killer  ? (killer.upsetWins || 0)                         : null;
+  const killerScore  = killer  ? (upsetCountAward[killer.id] || 0)               : null;
 
-  const masterHolders  = masterScore  !== null ? active.filter(u => (u.rate - u.seasonStartRate) === masterScore)            : [];
-  const risingHolders  = risingScore  !== null ? active.filter(u => (u.totalPoints - u.seasonStartPoints) === risingScore)   : [];
-  const grinderHolders = grinderScore !== null ? active.filter(u => u.activityDays === grinderScore)                         : [];
+  const masterHolders  = masterScore  !== null ? active.filter(u => (u.rate - u.seasonStartRate) === masterScore)                   : [];
+  const risingHolders  = risingScore  !== null ? active.filter(u => (u.totalPoints - u.seasonStartPoints) === risingScore)          : [];
+  const grinderHolders = grinderScore !== null ? active.filter(u => u.activityDays === grinderScore)                                : [];
   // ★ killerScore > 0 の条件で格上撃破0人全員選出バグを防ぐ
   const killerHolders  = killerScore !== null && killerScore > 0
-    ? active.filter(u => (u.upsetWins || 0) === killerScore)
+    ? active.filter(u => (upsetCountAward[u.id] || 0) === killerScore)
     : [];
 
   // Assign（兼任可：配列にpush、重複なし）

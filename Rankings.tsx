@@ -28,9 +28,9 @@ type TabKey =
 const TABS: { key: TabKey; label: string; icon: React.ReactNode; badge?: string }[] = [
   { key: 'seasonGrowth',  label: '今期成長',     icon: <TrendingUp size={12}/> },
   { key: 'rate',          label: 'レート',        icon: <Zap size={12}/> },
-  { key: 'todayMatches',  label: '最終活動日',    icon: <Flame size={12}/>,    badge: '活動日' },
-  { key: 'weekWinRate',   label: '今週の勝率',    icon: <Target size={12}/>,   badge: '今週' },
-  { key: 'monthlyPoints', label: '今月のPt',      icon: <Star size={12}/>,     badge: '今月' },
+  { key: 'todayMatches',  label: '最終活動日',    icon: <Flame size={12}/> },
+  { key: 'weekWinRate',   label: '勝率',          icon: <Target size={12}/>,   badge: '今週' },
+  { key: 'monthlyPoints', label: 'Pt',            icon: <Star size={12}/>,     badge: '今月' },
   { key: 'upsetWins',     label: '格上撃破',      icon: <Swords size={12}/> },
   { key: 'seasonMatches', label: '今期対局数',    icon: <Calendar size={12}/> },
   { key: 'maxStreak',     label: '最大連勝',      icon: <Flame size={12}/> },
@@ -555,6 +555,16 @@ const Rankings: React.FC = () => {
                               )}
                               {activeTitle && (
                                 <div className="text-[10px] text-slate-400 font-bold mt-0.5">「{activeTitle.name}」</div>
+                              )}
+                              {/* ★ 四天王永久称号（earnedHonors） */}
+                              {(user.earnedHonors ?? []).length > 0 && (
+                                <div className="flex flex-wrap gap-1 mt-0.5">
+                                  {(user.earnedHonors ?? []).map(h => (
+                                    <span key={h} className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-yellow-900/40 text-yellow-400 border border-yellow-600/40">
+                                      🏅 {h}
+                                    </span>
+                                  ))}
+                                </div>
                               )}
                               <RankBadge ranks={user.ranks || []}/>
                               <div className="flex items-center gap-2 text-[10px] text-slate-500 font-bold mt-0.5">

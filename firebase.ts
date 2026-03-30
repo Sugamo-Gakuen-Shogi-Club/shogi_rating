@@ -62,6 +62,19 @@ export const getAppCheckToken = async (): Promise<string | null> => {
   }
 };
 
+// ── バックグラウンドタブ復帰時の AppCheck リトライ ──────────
+// タブが非アクティブ中は reCAPTCHA の通信が止まるため、
+// フォアグラウンドに戻った際にトークンを強制更新する
+if (appCheck && typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      getToken(appCheck!, true).catch(() => {
+        // サイレント失敗：次回のAPI呼び出し時に自動リトライされる
+      });
+    }
+  });
+}
+
 // ── Google Authentication ─────────────────────────────────────
 export const auth: Auth = getAuth(app);
 const googleProvider = new GoogleAuthProvider();
