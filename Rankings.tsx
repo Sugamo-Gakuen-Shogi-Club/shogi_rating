@@ -93,7 +93,6 @@ const UserAvatar: React.FC<{ user: User }> = ({ user }) => {
   const iconDef  = ICONS_DATA.find(i => i.id === user.activeIconId);
   const isShogi  = iconDef?.category === 'SHOGI';
   const frameDef = getUserFrameDef(user.activeFrameId);
-  const isElite  = user.systemTitle.length > 0;
   if (isShogi && iconDef) {
     return (
       <div className={`w-14 h-14 flex items-center justify-center shrink-0 ${frameDef.glowClass || ''}`}>
@@ -102,7 +101,7 @@ const UserAvatar: React.FC<{ user: User }> = ({ user }) => {
     );
   }
   return (
-    <div className={`w-14 h-14 rounded-full ${user.avatarColor} p-0.5 shadow-xl shrink-0 ${frameDef.ringClass} ${frameDef.glowClass || ''} ${isElite ? 'ring-[3px] ring-yellow-400 shadow-[0_0_14px_rgba(251,191,36,0.8)]' : ''}`}>
+    <div className={`w-14 h-14 rounded-full ${user.avatarColor} p-0.5 shadow-xl shrink-0 ${frameDef.ringClass} ${frameDef.glowClass || ''}`}>
       <div className="w-full h-full rounded-full bg-slate-900/80 flex items-center justify-center text-2xl text-white font-serif-jp">
         {getUserAvatarChar(user)}
       </div>
@@ -151,11 +150,10 @@ const FourKingsCriteriaPanel: React.FC = () => {
 };
 
 // ─── 順位行の背景スタイル ─────────────────────────────────────
-const rowBg = (rank: number, isElite: boolean): string => {
+const rowBg = (rank: number): string => {
   if (rank === 1) return 'bg-gradient-to-r from-yellow-900/40 via-amber-900/20 to-transparent border-l-4 border-yellow-400/70';
   if (rank === 2) return 'bg-gradient-to-r from-slate-600/20 via-slate-700/10 to-transparent border-l-4 border-slate-400/50';
   if (rank === 3) return 'bg-gradient-to-r from-amber-900/25 via-orange-900/10 to-transparent border-l-4 border-amber-600/50';
-  if (isElite)   return 'bg-yellow-900/10 hover:bg-yellow-900/20 border-l-2 border-yellow-500/50';
   return 'hover:bg-white/5';
 };
 
@@ -513,19 +511,21 @@ const Rankings: React.FC = () => {
                   return sortedUsers.map((user, idx) => {
                     const score = getScore(user, activeTab);
                     if (idx > 0 && score < getScore(sortedUsers[idx - 1], activeTab)) dispRank = idx + 1;
-                    const isElite  = user.systemTitle.length > 0;
                     const total    = user.wins + user.losses + user.draws;
                     const wr       = total > 0 ? Math.round((user.wins / total) * 100) : 0;
                     const isFirst  = dispRank === 1;
                     const isSecond = dispRank === 2;
                     const isThird  = dispRank === 3;
-                    const activeTitle = ACHIEVEMENTS_DATA.find(a => a.id === user.activeTitle);
+                    const activeTitleName = user.activeTitle
+                      ? (ACHIEVEMENTS_DATA.find(a => a.id === user.activeTitle)?.name
+                          ?? ((user.earnedHonors ?? []).includes(user.activeTitle) ? user.activeTitle : null))
+                      : null;
                     const badge    = isFirst ? FIRST_BADGES[activeTab] : '';
 
                     return (
                       <tr key={user.id}
                         onClick={() => { window.location.hash = `/profile/${user.id}`; }}
-                        className={`transition-all group duration-200 cursor-pointer ${rowBg(dispRank, isElite)}`}
+                        className={`transition-all group duration-200 cursor-pointer ${rowBg(dispRank)}`}
                       >
                         {/* 順位 */}
                         <td className="p-4 text-center">
@@ -553,18 +553,8 @@ const Rankings: React.FC = () => {
                                   </span>
                                 </div>
                               )}
-                              {activeTitle && (
-                                <div className="text-[10px] text-slate-400 font-bold mt-0.5">「{activeTitle.name}」</div>
-                              )}
-                              {/* ★ 四天王永久称号（earnedHonors） */}
-                              {(user.earnedHonors ?? []).length > 0 && (
-                                <div className="flex flex-wrap gap-1 mt-0.5">
-                                  {(user.earnedHonors ?? []).map(h => (
-                                    <span key={h} className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-yellow-900/40 text-yellow-400 border border-yellow-600/40">
-                                      🏅 {h}
-                                    </span>
-                                  ))}
-                                </div>
+                              {activeTitleName && (
+                                <div className="text-[10px] text-slate-400 font-bold mt-0.5">「{activeTitleName}」</div>
                               )}
                               <RankBadge ranks={user.ranks || []}/>
                               <div className="flex items-center gap-2 text-[10px] text-slate-500 font-bold mt-0.5">
