@@ -459,8 +459,8 @@ export const undoLastAction = (entryId?: string): UndoEntry | null => {
   localStorage.setItem(UNDO_KEY, JSON.stringify(next));
   window.dispatchEvent(new CustomEvent('rivals-undo-changed', { detail: next }));
 
-  // クラウドにも同期（取り消し後の状態を正とする）
-  syncWithServer();
+  // Undo後は全データを一括プッシュ（整合性を保証）
+  pushAllDataToCloud().catch(() => {});
   return entry;
 };
 
@@ -585,7 +585,8 @@ export const startMaintenanceMode = async (note: string, startedBy = '管理者'
     // 3. ローカルにも自動バックアップ
     saveAutoBackup();
 
-    // 4. メンテナンス状態を保存
+    // 4. メンテナンス状態を保存（リスナーを停止してsandboxへの書き込みが本番に届かないように）
+    stopRealtimeListener();
     const state: MaintenanceState = {
       active: true,
       startedAt: timestamp,
@@ -652,6 +653,10 @@ export const endMaintenanceMode = async (discard: boolean): Promise<{ success: b
     // メンテ状態をリセット
     saveMaintenanceState(DEFAULT_MAINTENANCE);
     clearUndoStack();
+
+    // メンテ終了後: ローカルの状態を全端末に配信（リスナー再開の前に書く）
+    await pushAllDataToCloud();
+    startRealtimeListener();
     updateSyncMeta({ status: 'SYNCED', lastSync: new Date().toISOString(), pendingChanges: 0 });
 
     return { success: true };
@@ -689,209 +694,634 @@ export const verifyMaintenanceBackup = async (): Promise<{
 };
 
 // ============================================================
-// CLOUD SYNC
+// CLOUD SYNC  v3
 // ============================================================
-export type LoadResult = 'CLOUD_LOADED' | 'LOCAL_NEWER' | 'FAILED' | 'EMPTY';
+// 設計方針:
+//   1. Firebase SDK (RTDB) を使い、パスを分割して差分 PATCH
+//      /rivals_data/users/{id}       ← ユーザー単位で個別書き込み
+//      /rivals_data/matches/{id}     ← 試合単位で追記専用 PUT（論理削除対応）
+//      /rivals_data/settings         ← 設定（_generation で世代管理）
+//      /rivals_data/logs             ← ログ
+//      /rivals_data/rankApps         ← 段位申請（全端末共有）
+//      /rivals_data/missionProgress  ← ミッション進捗（全端末共有）
+//      /rivals_data/approvedDevices  ← 承認デバイス
+//      /rivals_data/titleHistory     ← 四天王履歴
+//      /rivals_data/meta             ← { generation, updatedAt }
+//
+//   2. onValue リアルタイムリスナー
+//      他端末の書き込みを即時受信 → フィールド単位マージ
+//
+//   3. 競合解決: 「クラウド上書き」ではなく「マージ」
+//      累積値(wins/points...) → MAX を採用
+//      配列(achievements/icons...) → UNION
+//      rate/rateHistory → rateHistory が長い方（対局数が多い = より最新）
+//
+//   4. 削除は論理削除(deleted:true + deletedAt:ISO)
+//      古い端末のキャッシュが復活を引き起こせない
+//
+//   5. meta.generation（世代番号）による初期化検知
+//      管理者が「初期化」すると generation++ される
+//      端末側が保持する lastKnownGeneration より大きければ完全リセット
+//
+//   6. オフライン対応: pendingQueue に溜めてオンライン復帰時に一括送信
+//      IndexedDB 非使用・localStorage に退避（シンプル優先）
+//
+//   7. 書き込み権限スコープ
+//      承認済みデバイス    → 全パス書き込み可
+//      未承認デバイス      → /rivals_data/users/{自分のID} のみ書き込み可
+//                           （自分のプロフィールを閲覧・更新するだけ）
+// ============================================================
 
-let _syncTimer: number | null = null;
+import {
+  getDatabase, ref, onValue, set, update, get,
+  serverTimestamp, type DatabaseReference, type Unsubscribe,
+} from 'firebase/database';
+import { app } from './firebase';
 
-/** Internal: push current local data to Firebase (or sandbox if maintenance) */
-const pushToCloud = async (): Promise<boolean> => {
+const _db = getDatabase(app);
+const _root = 'rivals_data';
+const _r = (path: string): DatabaseReference =>
+  ref(_db, path ? `${_root}/${path}` : _root);
+
+// ---- offline queue ----
+const OFFLINE_QUEUE_KEY = 'club_rivals_offline_queue';
+interface QueueItem { path: string; value: unknown; queuedAt: string; }
+
+const _enqueue = (path: string, value: unknown): void => {
   try {
-    const timestamp = new Date().toISOString();
+    const q: QueueItem[] = JSON.parse(localStorage.getItem(OFFLINE_QUEUE_KEY) || '[]');
+    // 同一パスの古いエントリを上書き（同一ユーザーの重複を防ぐ）
+    const idx = q.findIndex(i => i.path === path);
+    const item: QueueItem = { path, value, queuedAt: new Date().toISOString() };
+    if (idx >= 0) q[idx] = item; else q.push(item);
+    // 上限 200 件（古いものを捨てる）
+    localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(q.slice(-200)));
+  } catch {}
+};
 
-    // ★ 競合チェック: 本番への書き込み前にクラウドの現在時刻を確認
-    // メンテナンスモード中はsandboxなので競合チェック不要
-    const maint = getMaintenanceState();
-    if (!maint.active) {
-      const meta = getSyncStatus();
-      const lastKnown = meta.lastCloudTimestamp;
-      if (lastKnown) {
-        try {
-          const checkRes = await fetch(
-            `${CLOUD_API_URL}?shallow=true&nocache=${Date.now()}`
-          );
-          if (checkRes.ok) {
-            const checkData: { timestamp?: string } | null = await checkRes.json();
-            const currentCloudTime = checkData?.timestamp || '';
-            if (currentCloudTime && currentCloudTime > lastKnown) {
-              // 別デバイスがクラウドを更新していた → ローカルに取り込んでから書く
-              console.warn('[Sync] Conflict detected: cloud was updated by another device. Merging...');
-              const fullRes = await fetch(`${CLOUD_API_URL}?nocache=${Date.now()}`);
-              if (fullRes.ok) {
-                const cloudData: BackupData | null = await fullRes.json();
-                if (cloudData && Array.isArray(cloudData.users) && cloudData.users.length > 0) {
-                  // クラウドデータをローカルに取り込む（クラウド優先）
-                  localStorage.setItem(USERS_KEY,    JSON.stringify(cloudData.users));
-                  localStorage.setItem(MATCHES_KEY,  JSON.stringify(cloudData.matches || []));
-                  localStorage.setItem(SETTINGS_KEY, JSON.stringify(cloudData.settings || DEFAULT_SETTINGS));
-                  localStorage.setItem(LOGS_KEY,     JSON.stringify(cloudData.logs || []));
-                  if (cloudData.titleHistory) saveSystemTitleHistory(cloudData.titleHistory);
-                  window.dispatchEvent(new CustomEvent('rivals-users-changed'));
-                  updateSyncMeta({
-                    status: 'SYNCED',
-                    lastSync: new Date().toISOString(),
-                    localTimestamp: currentCloudTime,
-                    pendingChanges: 0,
-                    lastCloudTimestamp: currentCloudTime,
-                  });
-                  // ローカルへの変更通知（UIが再描画される）
-                  window.dispatchEvent(new CustomEvent('rivals-conflict-resolved', {
-                    detail: { mergedAt: new Date().toISOString() }
-                  }));
-                  return true; // プッシュせず取り込みのみ（クラウドが正）
-                }
-              }
-            }
-          }
-        } catch (_) {
-          // チェック失敗は無視してプッシュ続行（ネットワーク問題など）
-        }
+const _flushQueue = async (): Promise<void> => {
+  try {
+    const q: QueueItem[] = JSON.parse(localStorage.getItem(OFFLINE_QUEUE_KEY) || '[]');
+    if (q.length === 0) return;
+    const updates: Record<string, unknown> = {};
+    q.forEach(i => { updates[`${_root}/${i.path}`] = i.value; });
+    await update(ref(_db), updates);
+    localStorage.removeItem(OFFLINE_QUEUE_KEY);
+    console.info(`[Sync] Flushed ${q.length} queued writes`);
+  } catch (e) {
+    console.warn('[Sync] Queue flush failed:', e);
+  }
+};
+
+// ---- write helper (retry × 2 → queue on fail) ----
+const _write = async (path: string, value: unknown, merge = false): Promise<void> => {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      if (merge) {
+        await update(_r(path), value as Record<string, unknown>);
+      } else {
+        await set(_r(path), value);
+      }
+      return; // 成功
+    } catch (e: any) {
+      const isLastAttempt = attempt === 2;
+      if (isLastAttempt) {
+        // 3回失敗 → オフラインキューに積む（復帰時に再送）
+        _enqueue(path, value);
+      } else {
+        // 1〜2回目失敗 → 指数バックオフで待機
+        await new Promise(r => setTimeout(r, 300 * Math.pow(2, attempt)));
       }
     }
+  }
+};
 
-    const data: BackupData = {
-      users: getRawUsers(),
-      matches: getMatches(),
-      settings: getSettings(),
-      logs: getLogs(),
-      timestamp,
-      approvedDevices: getApprovedDevices(),
-      titleHistory: getSystemTitleHistory(),
-    };
-    // メンテナンスモード中はsandboxに書く
-    const url = maint.active ? MAINTENANCE_SANDBOX_URL : CLOUD_API_URL;
+// ---- meta / generation ----
+const META_GEN_KEY = 'club_rivals_last_generation';
+const _getLastKnownGen = (): number =>
+  parseInt(localStorage.getItem(META_GEN_KEY) || '0', 10);
+const _saveLastKnownGen = (g: number): void =>
+  localStorage.setItem(META_GEN_KEY, String(g));
 
-    // ★ App Check トークンをヘッダーに付与（取得失敗時はトークンなしで継続）
-    const appCheckToken = await getAppCheckToken();
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (appCheckToken) headers['X-Firebase-AppCheck'] = appCheckToken;
+const _writeMeta = (): void => {
+  set(_r('meta/updatedAt'), new Date().toISOString()).catch(() => {});
+};
 
-    const res = await fetch(url, {
-      method: 'PUT',
-      headers,
-      body: JSON.stringify(data),
+// ---- ignore own echo ----
+let _ignoreEcho = false;
+
+// ============================================================
+// REALTIME LISTENER
+// ============================================================
+let _unsub: Unsubscribe | null = null;
+let _listenerActive = false;
+
+export const startRealtimeListener = (): void => {
+  if (_listenerActive) return;
+  _listenerActive = true;
+
+  _unsub = onValue(
+    _r(''),
+    (snapshot) => {
+      if (_ignoreEcho) { _ignoreEcho = false; return; }
+      const cloud = snapshot.val() as CloudSnapshot | null;
+      if (!cloud) { _handleEmptyCloud(); return; }
+      _applyCloud(cloud);
+    },
+    (err) => {
+      console.error('[Sync] listener error:', err);
+      updateSyncMeta({ status: 'ERROR', lastError: err.message });
+    }
+  );
+
+  // オンライン復帰時にキューをフラッシュ
+  if (typeof window !== 'undefined') {
+    window.addEventListener('online', () => {
+      _flushQueue().then(() => manualSync());
     });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    updateSyncMeta({
-      status: 'SYNCED',
-      lastSync: timestamp,
-      pendingChanges: 0,
-      lastError: undefined,
-      lastCloudTimestamp: timestamp,  // ★ 書き込み後、自分がクラウドの最新であることを記録
+
+    // タブ復帰時にも同期（バックグラウンドでの変更を取り込む）
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        // キュー残留分を送出してから最新状態を pull
+        _flushQueue().catch(() => {});
+        // onValue は常時接続なので基本不要だが、
+        // リスナーが死んでいた場合に再起動する
+        if (!_listenerActive) {
+          stopRealtimeListener();
+          startRealtimeListener();
+        }
+      }
     });
+  }
+};
+
+export const stopRealtimeListener = (): void => {
+  _unsub?.();
+  _unsub = null;
+  _listenerActive = false;
+};
+
+interface CloudSnapshot {
+  users?: Record<string, User>;
+  matches?: Record<string, MatchRecord & { deleted?: boolean; deletedAt?: string }>;
+  settings?: SystemSettings & { _generation?: number };
+  logs?: ActivityLog[];
+  rankApps?: RankApplication[];
+  missionProgress?: any[];
+  approvedDevices?: { token: string; label: string; approvedAt: string }[];
+  titleHistory?: SystemTitleSnapshot;
+  meta?: { updatedAt?: string };
+}
+
+const _handleEmptyCloud = (): void => {
+  // 意図的な初期化（管理者がFirebaseを空にした）
+  saveSystemTitleHistory({ entries: [], nextGeneration: { MASTER: 1, RISING_STAR: 1, GRINDER: 1, GIANT_KILLER: 1 } });
+  updateSyncMeta({ status: 'NEVER' });
+};
+
+// ============================================================
+// APPLY CLOUD DATA  ← 競合解決の核心
+// ============================================================
+const _applyCloud = (cloud: CloudSnapshot): void => {
+  if (getMaintenanceState().active) return; // メンテ中は受信無視
+
+  // ── 世代番号チェック（初期化検知） ────────────────────────
+  const cloudGen = (cloud.settings as any)?._generation ?? 0;
+  const localGen = _getLastKnownGen();
+  if (cloudGen > localGen) {
+    // 世代が上がった = 管理者が初期化した → ローカルを完全リセット
+    console.warn(`[Sync] Generation changed ${localGen} → ${cloudGen}. Resetting local.`);
+    _fullResetLocal(cloud);
+    _saveLastKnownGen(cloudGen);
+    return;
+  }
+
+  // ── ユーザーマージ ──────────────────────────────────────
+  if (cloud.users) {
+    const localArr = getRawUsers();
+    const localMap = new Map(localArr.map(u => [u.id, u]));
+    let changed = false;
+
+    Object.entries(cloud.users).forEach(([id, cu]) => {
+      const local = localMap.get(id);
+      if (!local) {
+        localMap.set(id, normalizeUser(cu));
+        changed = true;
+      } else {
+        const merged = _mergeUser(local, cu);
+        if (JSON.stringify(merged) !== JSON.stringify(local)) {
+          localMap.set(id, merged);
+          changed = true;
+        }
+      }
+    });
+
+    if (changed) {
+      localStorage.setItem(USERS_KEY, JSON.stringify(Array.from(localMap.values())));
+      window.dispatchEvent(new CustomEvent('rivals-users-changed'));
+    }
+  }
+
+  // ── マッチ追記（論理削除を尊重） ──────────────────────────
+  if (cloud.matches) {
+    const raw: any[] = JSON.parse(localStorage.getItem(MATCHES_KEY) || '[]');
+    const localMap = new Map(raw.map(m => [m.id, m]));
+    let changed = false;
+
+    Object.entries(cloud.matches).forEach(([id, cm]) => {
+      const local = localMap.get(id);
+      if (!local) {
+        localMap.set(id, cm);
+        changed = true;
+      } else if (cm.deleted && !local.deleted) {
+        // 他端末で論理削除 → ローカルにも伝播
+        localMap.set(id, { ...local, deleted: true, deletedAt: cm.deletedAt });
+        changed = true;
+      }
+    });
+
+    if (changed) {
+      const sorted = Array.from(localMap.values()).sort(
+        (a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime()
+      );
+      localStorage.setItem(MATCHES_KEY, JSON.stringify(sorted));
+    }
+  }
+
+  // ── 設定（世代番号付きで世代が新しい方を採用）─────────────
+  if (cloud.settings) {
+    const localSettings = getSettings() as any;
+    const cloudSettingsGen = (cloud.settings as any)._generation ?? 0;
+    const localSettingsGen = localSettings._generation ?? 0;
+    if (cloudSettingsGen >= localSettingsGen) {
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(cloud.settings));
+    }
+  }
+
+  // ── ログ（未保有分を補充）──────────────────────────────────
+  if (cloud.logs && Array.isArray(cloud.logs)) {
+    const local = getLogs();
+    const localIds = new Set(local.map(l => l.id));
+    const newLogs = cloud.logs.filter(l => !localIds.has(l.id));
+    if (newLogs.length > 0) {
+      const merged = [...newLogs, ...local].slice(0, LOGS_MAX);
+      localStorage.setItem(LOGS_KEY, JSON.stringify(merged));
+    }
+  }
+
+  // ── 四天王履歴 ─────────────────────────────────────────
+  if (cloud.titleHistory) saveSystemTitleHistory(cloud.titleHistory);
+
+  // ── 承認デバイス（UNION）──────────────────────────────────
+  if (cloud.approvedDevices && Array.isArray(cloud.approvedDevices)) {
+    const local = getApprovedDevices();
+    const merged = [...cloud.approvedDevices];
+    local.forEach(d => { if (!merged.some(m => m.token === d.token)) merged.push(d); });
+    localStorage.setItem(APPROVED_DEVICES_KEY, JSON.stringify(merged));
+  }
+
+  // ── 段位申請（クラウド優先・管理者の承認状態を反映）─────────
+  if (cloud.rankApps && Array.isArray(cloud.rankApps)) {
+    localStorage.setItem(RANK_APPS_KEY, JSON.stringify(cloud.rankApps));
+    window.dispatchEvent(new CustomEvent('rivals-rank-apps-changed', { detail: cloud.rankApps }));
+  }
+
+  // ── ミッション進捗（達成済みを優先）────────────────────────
+  if (cloud.missionProgress && Array.isArray(cloud.missionProgress)) {
+    const local = _getMissionProgressAll();
+    const merged = _mergeMissions(local, cloud.missionProgress);
+    localStorage.setItem(MISSION_PROGRESS_KEY, JSON.stringify(merged));
+  }
+
+  updateSyncMeta({ status: 'SYNCED', lastSync: new Date().toISOString(), pendingChanges: 0 });
+};
+
+/** 世代が上がった場合のフルリセット */
+const _fullResetLocal = (cloud: CloudSnapshot): void => {
+  if (cloud.users) {
+    const arr = Object.values(cloud.users).map(u => normalizeUser(u));
+    localStorage.setItem(USERS_KEY, JSON.stringify(arr));
+  }
+  if (cloud.matches) {
+    const arr = Object.values(cloud.matches);
+    localStorage.setItem(MATCHES_KEY, JSON.stringify(arr));
+  }
+  if (cloud.settings)  localStorage.setItem(SETTINGS_KEY, JSON.stringify(cloud.settings));
+  if (cloud.logs)      localStorage.setItem(LOGS_KEY, JSON.stringify(cloud.logs));
+  if (cloud.titleHistory) saveSystemTitleHistory(cloud.titleHistory);
+  if (cloud.approvedDevices) localStorage.setItem(APPROVED_DEVICES_KEY, JSON.stringify(cloud.approvedDevices));
+  if (cloud.rankApps)  localStorage.setItem(RANK_APPS_KEY, JSON.stringify(cloud.rankApps));
+  if (cloud.missionProgress) localStorage.setItem(MISSION_PROGRESS_KEY, JSON.stringify(cloud.missionProgress));
+
+  localStorage.removeItem(UNDO_KEY);
+  window.dispatchEvent(new CustomEvent('rivals-users-changed'));
+  updateSyncMeta({ status: 'SYNCED', lastSync: new Date().toISOString(), pendingChanges: 0 });
+};
+
+// ============================================================
+// USER MERGE  ← フィールド単位の競合解決
+// ============================================================
+const _mergeUser = (local: User, cloud: User): User => {
+  // rateHistory の長い方が「より多くの対局を経験した最新状態」
+  const cloudIsNewer = (cloud.rateHistory?.length ?? 0) >= (local.rateHistory?.length ?? 0);
+
+  return normalizeUser({
+    ...local,
+    // 累積系: MAX（どちらかが失われても復元できる）
+    wins:             Math.max(local.wins ?? 0, cloud.wins ?? 0),
+    losses:           Math.max(local.losses ?? 0, cloud.losses ?? 0),
+    draws:            Math.max(local.draws ?? 0, cloud.draws ?? 0),
+    totalPoints:      Math.max(local.totalPoints ?? 0, cloud.totalPoints ?? 0),
+    monthlyPoints:    Math.max(local.monthlyPoints ?? 0, cloud.monthlyPoints ?? 0),
+    pointsMatch:      Math.max(local.pointsMatch ?? 0, cloud.pointsMatch ?? 0),
+    pointsAttendance: Math.max(local.pointsAttendance ?? 0, cloud.pointsAttendance ?? 0),
+    pointsSpecial:    Math.max(local.pointsSpecial ?? 0, cloud.pointsSpecial ?? 0),
+    eventPoints:      Math.max(local.eventPoints ?? 0, cloud.eventPoints ?? 0),
+    activityDays:     Math.max(local.activityDays ?? 0, cloud.activityDays ?? 0),
+    upsetWins:        Math.max(local.upsetWins ?? 0, cloud.upsetWins ?? 0),
+    maxStreak:        Math.max(local.maxStreak ?? 0, cloud.maxStreak ?? 0),
+
+    // 配列系: UNION（称号・アイコン・フレームは取り消しなし）
+    achievements:   [...new Set([...(local.achievements ?? []), ...(cloud.achievements ?? [])])],
+    unlockedIcons:  [...new Set([...(local.unlockedIcons ?? []), ...(cloud.unlockedIcons ?? [])])],
+    unlockedFrames: [...new Set([...(local.unlockedFrames ?? []), ...(cloud.unlockedFrames ?? [])])],
+    earnedHonors:   [...new Set([...(local.earnedHonors ?? []), ...(cloud.earnedHonors ?? [])])],
+    systemTitle:    [...new Set([...(local.systemTitle ?? []), ...(cloud.systemTitle ?? [])])] as SystemTitle[],
+    pendingMissionAlert: [...new Set([...(local.pendingMissionAlert ?? []), ...(cloud.pendingMissionAlert ?? [])])],
+
+    // rate 系: rateHistory が長い方を採用
+    rate:           cloudIsNewer ? (cloud.rate ?? local.rate)      : local.rate,
+    rateHistory:    cloudIsNewer ? (cloud.rateHistory ?? local.rateHistory) : local.rateHistory,
+    currentStreak:  cloudIsNewer ? (cloud.currentStreak ?? local.currentStreak) : local.currentStreak,
+    lossStreak:     cloudIsNewer ? (cloud.lossStreak ?? local.lossStreak) : local.lossStreak,
+
+    // 出席: 最新日付を採用
+    lastAttendance: _laterDate(local.lastAttendance, cloud.lastAttendance),
+
+    // 退部フラグ: false（退部）は伝播（取り消せない）
+    isActive: (local.isActive === false || cloud.isActive === false) ? false : true,
+
+    // UI 設定系: クラウドを優先（管理者変更を尊重）
+    activeIconId:  cloud.activeIconId  ?? local.activeIconId,
+    activeFrameId: cloud.activeFrameId ?? local.activeFrameId,
+    activeTitle:   cloud.activeTitle   ?? local.activeTitle,
+    profilePin:    cloud.profilePin    ?? local.profilePin,
+    ranks:         cloud.ranks         ?? local.ranks,
+    seasonStartRate:   cloud.seasonStartRate   ?? local.seasonStartRate,
+    seasonStartPoints: cloud.seasonStartPoints ?? local.seasonStartPoints,
+  });
+};
+
+const _laterDate = (a?: string | null, b?: string | null): string | null => {
+  if (!a) return b ?? null;
+  if (!b) return a;
+  return a > b ? a : b;
+};
+
+const _mergeMissions = (local: any[], cloud: any[]): any[] => {
+  const map = new Map<string, any>();
+  local.forEach(p => map.set(`${p.userId}:${p.missionId}:${p.periodKey}`, p));
+  cloud.forEach(p => {
+    const key = `${p.userId}:${p.missionId}:${p.periodKey}`;
+    const ex = map.get(key);
+    // 達成済みが優先・未達成なら current が大きい方
+    if (!ex || (!ex.completed && p.completed) || (ex.current < p.current)) {
+      map.set(key, p);
+    }
+  });
+  return Array.from(map.values());
+};
+
+// ============================================================
+// PUSH TO CLOUD  ← 書き込み
+// ============================================================
+
+/** 単一ユーザーを個別 PATCH */
+export const pushUser = async (user: User): Promise<void> => {
+  if (getMaintenanceState().active) return;
+  _ignoreEcho = true;
+  await _write(`users/${user.id}`, user);
+  _writeMeta();
+};
+
+/** 複数ユーザーをバルク PATCH */
+export const pushUsers = async (users: User[]): Promise<void> => {
+  if (getMaintenanceState().active) return;
+  _ignoreEcho = true;
+  const obj = Object.fromEntries(users.map(u => [u.id, u]));
+  await _write('users', obj, true);
+  _writeMeta();
+};
+
+/** マッチを個別 PUT（追記専用・上書き禁止） */
+export const pushMatch = async (match: MatchRecord): Promise<void> => {
+  if (getMaintenanceState().active) return;
+  await _write(`matches/${match.id}`, match);
+  _writeMeta();
+};
+
+/** マッチを論理削除 */
+export const pushMatchDelete = async (id: string, data: object): Promise<void> => {
+  if (getMaintenanceState().active) return;
+  await _write(`matches/${id}`, data);
+  _writeMeta();
+};
+
+/** 設定を書き込む */
+export const pushSettings = async (settings: SystemSettings): Promise<void> => {
+  if (getMaintenanceState().active) return;
+  _ignoreEcho = true;
+  await _write('settings', settings);
+  _writeMeta();
+};
+
+/** ログを書き込む */
+export const pushLogs = async (logs: ActivityLog[]): Promise<void> => {
+  if (getMaintenanceState().active) return;
+  await _write('logs', logs);
+};
+
+/** 段位申請を書き込む */
+export const pushRankApps = async (apps: RankApplication[]): Promise<void> => {
+  if (getMaintenanceState().active) return;
+  await _write('rankApps', apps);
+};
+
+/** ミッション進捗を書き込む */
+export const pushMissionProgress = async (progress: any[]): Promise<void> => {
+  if (getMaintenanceState().active) return;
+  await _write('missionProgress', progress);
+};
+
+/** 承認デバイスを書き込む */
+export const pushApprovedDevices = async (devices: object[]): Promise<void> => {
+  if (getMaintenanceState().active) return;
+  await _write('approvedDevices', devices);
+};
+
+/** 四天王履歴を書き込む */
+export const pushTitleHistory = async (history: SystemTitleSnapshot): Promise<void> => {
+  if (getMaintenanceState().active) return;
+  await _write('titleHistory', history);
+};
+
+/**
+ * 全データを一括書き込み（移行・Undo後・メンテ終了時）
+ * generation は変えない（管理者のみ上げる）
+ */
+export const pushAllDataToCloud = async (): Promise<boolean> => {
+  try {
+    updateSyncMeta({ status: 'SYNCING' });
+    _ignoreEcho = true;
+
+    const users = getRawUsers();
+    const allMatches: any[] = JSON.parse(localStorage.getItem(MATCHES_KEY) || '[]');
+    const usersObj   = Object.fromEntries(users.map(u => [u.id, u]));
+    const matchesObj = Object.fromEntries(allMatches.map(m => [m.id, m]));
+    const currentGen = _getLastKnownGen();
+
+    await update(ref(_db), {
+      [`${_root}/users`]:           usersObj,
+      [`${_root}/matches`]:         matchesObj,
+      [`${_root}/settings`]:        { ...getSettings(), _generation: currentGen },
+      [`${_root}/logs`]:            getLogs(),
+      [`${_root}/titleHistory`]:    getSystemTitleHistory(),
+      [`${_root}/approvedDevices`]: getApprovedDevices(),
+      [`${_root}/rankApps`]:        getRankApplications(),
+      [`${_root}/missionProgress`]: _getMissionProgressAll(),
+      [`${_root}/meta/updatedAt`]:  new Date().toISOString(),
+    });
+
+    updateSyncMeta({ status: 'SYNCED', lastSync: new Date().toISOString(), pendingChanges: 0 });
     return true;
   } catch (e: any) {
-    updateSyncMeta({ status: 'ERROR', lastError: e?.message || 'Unknown error' });
+    _ignoreEcho = false;
+    updateSyncMeta({ status: 'ERROR', lastError: e?.message });
     return false;
   }
 };
 
 /**
- * Called after every local write. Debounces 3s to avoid hammering Firebase
- * on rapid successive writes. Tracks pendingChanges count for UI indicator.
+ * 管理者用: 世代番号を上げて全データを初期化する
+ * これにより全端末が次回 onValue で _fullResetLocal を実行する
  */
+export const pushInitializeWithGeneration = async (emptyData: {
+  users: User[]; matches: MatchRecord[]; settings: SystemSettings;
+}): Promise<boolean> => {
+  try {
+    updateSyncMeta({ status: 'SYNCING' });
+    _ignoreEcho = true;
+
+    const newGen = _getLastKnownGen() + 1;
+    _saveLastKnownGen(newGen);
+
+    const usersObj   = Object.fromEntries(emptyData.users.map(u => [u.id, u]));
+    const matchesObj = Object.fromEntries(emptyData.matches.map(m => [m.id, m]));
+
+    await update(ref(_db), {
+      [`${_root}/users`]:           usersObj,
+      [`${_root}/matches`]:         matchesObj,
+      [`${_root}/settings`]:        { ...emptyData.settings, _generation: newGen },
+      [`${_root}/logs`]:            [],
+      [`${_root}/rankApps`]:        [],
+      [`${_root}/missionProgress`]: [],
+      [`${_root}/titleHistory`]:    { entries: [], nextGeneration: { MASTER: 1, RISING_STAR: 1, GRINDER: 1, GIANT_KILLER: 1 } },
+      [`${_root}/meta/updatedAt`]:  new Date().toISOString(),
+    });
+
+    updateSyncMeta({ status: 'SYNCED', lastSync: new Date().toISOString(), pendingChanges: 0 });
+    return true;
+  } catch (e: any) {
+    _ignoreEcho = false;
+    updateSyncMeta({ status: 'ERROR', lastError: e?.message });
+    return false;
+  }
+};
+
+// ============================================================
+// 未承認デバイス向け: 自分のユーザーデータのみ同期
+// ============================================================
+/**
+ * 未承認デバイスが個人ページを開いた時に呼ぶ。
+ * 自分の userId に対応するクラウドのユーザーデータだけを取得してローカルに反映。
+ * 書き込みは行わない（読み取り専用）。
+ */
+export const syncMyProfileOnly = async (userId: string): Promise<boolean> => {
+  try {
+    const snapshot = await get(_r(`users/${userId}`));
+    const cloudUser = snapshot.val() as User | null;
+    if (!cloudUser) return false;
+
+    const local = getRawUsers();
+    const idx = local.findIndex(u => u.id === userId);
+    if (idx >= 0) {
+      local[idx] = _mergeUser(local[idx], cloudUser);
+    } else {
+      local.push(normalizeUser(cloudUser));
+    }
+    localStorage.setItem(USERS_KEY, JSON.stringify(local));
+    window.dispatchEvent(new CustomEvent('rivals-users-changed'));
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+// ============================================================
+// 後方互換 API
+// ============================================================
+export type LoadResult = 'CLOUD_LOADED' | 'LOCAL_NEWER' | 'FAILED' | 'EMPTY';
+
+let _syncTimer: number | null = null;
+
 export const syncWithServer = (): void => {
-  const now = new Date().toISOString();
   const cur = getSyncStatus();
-  updateSyncMeta({
-    status: 'PENDING',
-    localTimestamp: now,
-    pendingChanges: (cur.pendingChanges || 0) + 1,
-  });
-
-  // Auto-backup on every local change (max once per session per day)
+  updateSyncMeta({ status: 'PENDING', pendingChanges: (cur.pendingChanges || 0) + 1 });
   saveAutoBackup();
-
   if (_syncTimer !== null) window.clearTimeout(_syncTimer);
   _syncTimer = window.setTimeout(async () => {
     _syncTimer = null;
     updateSyncMeta({ status: 'SYNCING' });
-    const ok = await pushToCloud();
-    if (!ok) {
-      // Retry once after 10s
-      window.setTimeout(() => pushToCloud(), 10000);
-    }
+    await pushAllDataToCloud();
   }, 3000);
 };
 
-/** Manual sync triggered by user */
 export const manualSync = async (): Promise<boolean> => {
   if (_syncTimer !== null) { window.clearTimeout(_syncTimer); _syncTimer = null; }
   updateSyncMeta({ status: 'SYNCING' });
-  return await pushToCloud();
+  return pushAllDataToCloud();
 };
 
-/**
- * Called on app startup.
- * - If cloud has newer data → overwrite local
- * - If local has newer data AND no other device has written since → push local to cloud
- * - If conflict (both sides changed) → cloud wins to protect multi-device integrity
- * - If no cloud data → return EMPTY (caller seeds)
- */
 export const loadFromCloud = async (): Promise<LoadResult> => {
   try {
     updateSyncMeta({ status: 'SYNCING' });
-    const appCheckToken = await getAppCheckToken();
-    const headers: Record<string, string> = {};
-    if (appCheckToken) headers['X-Firebase-AppCheck'] = appCheckToken;
+    const snapshot = await get(_r(''));
+    const cloud = snapshot.val() as CloudSnapshot | null;
 
-    const res = await fetch(`${CLOUD_API_URL}?nocache=${Date.now()}`, { headers });
-    if (!res.ok) { updateSyncMeta({ status: 'ERROR', lastError: `HTTP ${res.status}` }); return 'FAILED'; }
-
-    const data: BackupData | null = await res.json();
-    if (!data || !Array.isArray(data.users) || data.users.length === 0) {
-      // クラウドが空 = 意図的なリセット。ローカルのtitleHistoryも空にして古いデータの復元を防ぐ
-      saveSystemTitleHistory({ entries: [], nextGeneration: { MASTER: 1, RISING_STAR: 1, GRINDER: 1, GIANT_KILLER: 1 } });
-      updateSyncMeta({ status: 'NEVER' });
+    if (!cloud || !cloud.users || Object.keys(cloud.users).length === 0) {
+      _handleEmptyCloud();
+      startRealtimeListener();
       return 'EMPTY';
     }
 
-    const meta = getSyncStatus();
-    const cloudTime  = data.timestamp || '';
-    const localTime  = meta.localTimestamp  || '';   // このデバイスが最後に書いた時刻
-    const lastKnown  = meta.lastCloudTimestamp || ''; // 前回読み込んだクラウド時刻
-
-    // ローカルが新しい かつ クラウドが前回読み込み時から変わっていない
-    // → このデバイスだけが変更者 → ローカルをプッシュしてよい
-    const localIsNewer    = localTime && cloudTime && localTime > cloudTime;
-    const cloudUnchanged  = !lastKnown || cloudTime <= lastKnown;
-
-    if (localIsNewer && cloudUnchanged && meta.pendingChanges > 0) {
-      // このデバイスのみが変更 → ローカルをクラウドに反映
-      await pushToCloud();
-      return 'LOCAL_NEWER';
-    }
-
-    // クラウドが新しい、または競合（両方変更）→ クラウドを正とする
-    localStorage.setItem(USERS_KEY,    JSON.stringify(data.users));
-    localStorage.setItem(MATCHES_KEY,  JSON.stringify(data.matches || []));
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(data.settings || DEFAULT_SETTINGS));
-    localStorage.setItem(LOGS_KEY,     JSON.stringify(data.logs || []));
-    // 四天王履歴も復元（クラウド優先）
-    if (data.titleHistory) saveSystemTitleHistory(data.titleHistory);
-    // 承認済みデバイスも復元（ただし上書きは しない：このデバイス自身のトークンを消さないため）
-    if (data.approvedDevices && Array.isArray(data.approvedDevices)) {
-      const local = getApprovedDevices();
-      const merged = [...data.approvedDevices];
-      local.forEach(d => { if (!merged.some(m => m.token === d.token)) merged.push(d); });
-      localStorage.setItem(APPROVED_DEVICES_KEY, JSON.stringify(merged));
-    }
-
-    const syncedAt = new Date().toISOString();
-    updateSyncMeta({
-      status: 'SYNCED',
-      lastSync: syncedAt,
-      localTimestamp: cloudTime,
-      pendingChanges: 0,
-      lastCloudTimestamp: cloudTime,  // ★ 今読んだクラウド時刻を記録
-    });
+    _applyCloud(cloud);
+    // キュー残留分をフラッシュ
+    await _flushQueue();
+    startRealtimeListener();
     return 'CLOUD_LOADED';
   } catch (e: any) {
     updateSyncMeta({ status: 'ERROR', lastError: e?.message });
     return 'FAILED';
   }
 };
+
+// ── mission progress helpers (used internally) ──
+const _getMissionProgressAll = (): MissionProgress[] => {
+  try { return JSON.parse(localStorage.getItem(MISSION_PROGRESS_KEY) || '[]'); }
+  catch { return []; }
+};
+
 
 // ============================================================
 // SETTINGS
@@ -903,8 +1333,11 @@ export const getSettings = (): SystemSettings => {
 };
 
 export const saveSettings = (settings: SystemSettings): void => {
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
-  syncWithServer();
+  // _generation を引き継ぐ（世代番号は pushInitializeWithGeneration のみが変える）
+  const prev = getSettings() as any;
+  const withGen = { ...settings, _generation: prev._generation ?? 0 };
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(withGen));
+  pushSettings(withGen as any).catch(() => {});
 };
 
 export const isEventActive = (): boolean => {
@@ -975,11 +1408,29 @@ export const getUsers = (includeInactive = false): User[] => {
 };
 
 export const saveUsers = (users: User[]): void => {
-  // 常に normalizeUser を通して保存（型変換漏れ・旧形式データの混入を防ぐ）
   const normalized = users.map(normalizeUser);
   localStorage.setItem(USERS_KEY, JSON.stringify(normalized));
   window.dispatchEvent(new CustomEvent('rivals-users-changed'));
-  syncWithServer();
+
+  // 未承認デバイスは自分のデータのみクラウドに書き込める
+  // （班長PCなど承認済みデバイスは全員分を書き込む）
+  if (!isDeviceApproved()) {
+    const myToken = getDeviceToken();
+    // token と studentId の紐付けは個人ページ側で管理するため、
+    // ここでは「変更されたユーザーのうち自分が編集可能なもの」に絞る。
+    // 未承認デバイスは processMatch / recordAttendance が弾くため、
+    // ここに到達するのは個人ページの UI 設定変更（アイコン・フレーム等）のみ。
+    // それらは自分の userId と紐付いた変更なので安全に push できる。
+    const myUserId = localStorage.getItem('club_rivals_my_user_id');
+    if (myUserId) {
+      const myUser = normalized.find(u => u.id === myUserId);
+      if (myUser) pushUser(myUser).catch(() => {});
+    }
+    return; // 他ユーザーはクラウドに書かない
+  }
+
+  // 承認済みデバイス: 全員分を個別 PATCH
+  pushUsers(normalized).catch(() => {});
 };
 
 // ============================================================
@@ -1011,6 +1462,7 @@ const appendLogs = (newLogs: ActivityLog[]): void => {
   const existing = getLogs();
   const merged = [...newLogs, ...existing].slice(0, LOGS_MAX);
   localStorage.setItem(LOGS_KEY, JSON.stringify(merged));
+  pushLogs(merged).catch(() => {});
 };
 
 // ============================================================
@@ -1428,6 +1880,8 @@ export const processMatch = (
   const matches = getMatches();
   matches.unshift(matchRecord);
   saveMatches(matches);
+  // マッチは追記専用 PUT（競合で消えない）
+  pushMatch(matchRecord).catch(() => {});
 
   // ── Activity logs ──────────────────────────────────────
   appendLogs([
@@ -1461,9 +1915,14 @@ export const processMatch = (
 // DELETE MATCH (← FIX: was a no-op stub)
 // ============================================================
 export const deleteMatch = (id: string): void => {
-  const matches = getMatches().filter(m => m.id !== id);
-  saveMatches(matches);
-  syncWithServer();
+  // 論理削除: deleted フラグを立てるだけ（実データは残す）
+  const raw: any[] = JSON.parse(localStorage.getItem(MATCHES_KEY) || '[]');
+  const idx = raw.findIndex(m => m.id === id);
+  if (idx >= 0) {
+    raw[idx] = { ...raw[idx], deleted: true, deletedAt: new Date().toISOString() };
+    localStorage.setItem(MATCHES_KEY, JSON.stringify(raw));
+    pushMatchDelete(id, raw[idx]).catch(() => {});
+  }
 };
 
 // ============================================================
@@ -1691,6 +2150,7 @@ export const awardSystemTitles = (): void => {
   const settings = getSettings();
   saveSettings({ ...settings, lastTitleUpdate: new Date().toISOString() });
   saveUsers(all);
+  pushTitleHistory(getSystemTitleHistory()).catch(() => {});
 };
 
 
@@ -1840,7 +2300,6 @@ export const recordRankingAward = (
     description: `🏆 ${rankLabel}ランキング ${posLabel} — +${pts}pt`,
     date: new Date().toISOString(),
   }]);
-  syncWithServer();
 };
 
 export const manualRateAdjustment = (uid: string, delta: number, reason: string): void => {
@@ -1881,8 +2340,7 @@ export const getApprovedDevices = (): { token: string; label: string; approvedAt
 
 const saveApprovedDevices = (list: { token: string; label: string; approvedAt: string }[]): void => {
   localStorage.setItem(APPROVED_DEVICES_KEY, JSON.stringify(list));
-  // Firebase にも同期（設定の一部として）
-  syncWithServer();
+  pushApprovedDevices(list).catch(() => {});
 };
 
 /** このデバイスが承認済みかチェック */
@@ -2191,7 +2649,7 @@ export const importData = (json: string): boolean => {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(d.settings || DEFAULT_SETTINGS));
     localStorage.setItem(LOGS_KEY,     JSON.stringify(d.logs     || []));
     if (d.titleHistory) saveSystemTitleHistory(d.titleHistory);
-    syncWithServer();
+    pushAllDataToCloud().catch(() => {});
     return true;
   } catch { return false; }
 };
@@ -2220,6 +2678,7 @@ export const getPendingRankApplications = (): RankApplication[] =>
 const saveRankApplications = (apps: RankApplication[]): void => {
   localStorage.setItem(RANK_APPS_KEY, JSON.stringify(apps));
   window.dispatchEvent(new CustomEvent('rivals-rank-apps-changed', { detail: apps }));
+  pushRankApps(apps).catch(() => {}); // ★ 全端末に同期
 };
 
 /**
@@ -2300,7 +2759,6 @@ export const approveRankApplication = (
   app.reviewedAt = new Date().toISOString();
   app.reviewNote = reviewNote;
   saveRankApplications(apps);
-  syncWithServer();
   return true;
 };
 
@@ -2331,7 +2789,6 @@ export const removeRank = (userId: string, rankId: string): void => {
   if (!user) return;
   user.ranks = (user.ranks || []).filter(r => r.id !== rankId);
   saveUsers(all);
-  syncWithServer(); // ローカル削除をFirebaseに即反映
 };
 
 // ============================================================
@@ -2349,7 +2806,6 @@ export const removeAchievement = (userId: string, achievementId: string): void =
   user.achievements = (user.achievements || []).filter(id => id !== achievementId);
   if (user.activeTitle === achievementId) user.activeTitle = null;
   saveUsers(all);
-  syncWithServer();
 };
 
 // ============================================================
@@ -2393,7 +2849,6 @@ export const deleteAttendanceLog = (logId: string): { success: boolean; message:
   user.lastAttendance = remainingAttendances[0]?.date ?? undefined;
 
   saveUsers(all);
-  syncWithServer();
   return { success: true, message: `${user.name} の出席を削除しました` };
 };
 
@@ -2472,15 +2927,16 @@ export const getWeeklyKey = (): string => {
   return `${monday.getFullYear()}-${String(monday.getMonth()+1).padStart(2,'0')}-${String(monday.getDate()).padStart(2,'0')}`;
 };
 
-const getMissionProgressAll = (): MissionProgress[] => {
+export const getMissionProgressAll = (): MissionProgress[] => {
   try {
     const raw = localStorage.getItem(MISSION_PROGRESS_KEY);
     return raw ? JSON.parse(raw) : [];
   } catch { return []; }
 };
 
-const saveMissionProgressAll = (list: MissionProgress[]): void => {
+export const saveMissionProgressAll = (list: MissionProgress[]): void => {
   localStorage.setItem(MISSION_PROGRESS_KEY, JSON.stringify(list));
+  pushMissionProgress(list).catch(() => {}); // ★ 全端末に同期
 };
 
 /** ユーザーの全ミッション進捗を取得 */

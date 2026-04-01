@@ -12,7 +12,7 @@ import {
   ICONS_DATA, FRAMES_DATA, updateUserIcon, updateUserFrame, getUserAvatarChar,
   getLogs, getSettings, isEventActive, getUserFrameDef, SYSTEM_TITLES,
   submitRankApplication, getUserSystemTitleHistory, clearPendingMissionAlert,
-  isDeviceApproved, markFactionWarResultSeen,
+  isDeviceApproved, markFactionWarResultSeen, syncMyProfileOnly,
 } from './storage';
 import { User, MatchRecord, ActivityLog, ActivityType, RankEntry, EventType, SystemSettings } from './types';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -771,7 +771,13 @@ const Profile: React.FC = () => {
     if (users.length === 0) return; // usersがロードされるまで待つ
     const myStudentId = getStudentIdFromEmail(firebaseUser.email ?? '');
     const myUser = users.find(u => u.studentId === myStudentId);
-    if (myUser) setSelectedId(myUser.id);
+    if (myUser) {
+      setSelectedId(myUser.id);
+      // 未承認デバイス: 自分のデータだけクラウドから最新を取得
+      // （他端末で変更された自分のプロフィールを反映するため）
+      localStorage.setItem('club_rivals_my_user_id', myUser.id);
+      syncMyProfileOnly(myUser.id).then(() => refresh());
+    }
   }, [deviceApproved, firebaseUser, users, selectedId]);
 
   const refresh = () => setUsers(getUsers());
