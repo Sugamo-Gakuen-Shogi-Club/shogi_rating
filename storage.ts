@@ -763,6 +763,22 @@ const _flushQueue = async (): Promise<void> => {
   try {
     const q: QueueItem[] = JSON.parse(localStorage.getItem(OFFLINE_QUEUE_KEY) || '[]');
     if (q.length === 0) return;
+
+    // オフライン中に積まれたキューは「オフライン前のローカル状態」をベースにしている。
+    // 復帰時にそのまま送ると、オフライン中に他端末が書いたデータを上書きしてしまう。
+    // そのため、まずクラウドの最新状態をローカルにマージしてからキューを送信する。
+    // ※ キューの各エントリは個別パスへの差分書き込みなので、
+    //   マージ後のローカルを元に再構築して送る。
+    try {
+      const snapshot = await get(ref(_db, _root));
+      const cloud = snapshot.val() as CloudSnapshot | null;
+      if (cloud && cloud.users && Object.keys(cloud.users).length > 0) {
+        _applyCloud(cloud);
+      }
+    } catch {
+      // pull に失敗してもキューは送る（ネットワーク回復直後は不安定なことがある）
+    }
+
     const updates: Record<string, unknown> = {};
     q.forEach(i => { updates[`${_root}/${i.path}`] = i.value; });
     await update(ref(_db), updates);
@@ -825,7 +841,7 @@ export const startRealtimeListener = (): void => {
     (snapshot) => {
       if (_ignoreEcho) { _ignoreEcho = false; return; }
       const cloud = snapshot.val() as CloudSnapshot | null;
-      if (!cloud) { _handleEmptyCloud(); return; }
+      if (!cloud) { _handleEmptyCloud(true); return; }
       _applyCloud(cloud);
     },
     (err) => {
@@ -834,10 +850,11 @@ export const startRealtimeListener = (): void => {
     }
   );
 
-  // オンライン復帰時にキューをフラッシュ
+  // オンライン復帰時: pull-merge-push の順で同期
   if (typeof window !== 'undefined') {
     window.addEventListener('online', () => {
-      _flushQueue().then(() => manualSync());
+      // manualSync が pull → flushQueue → push を一括で行う
+      manualSync().catch(() => {});
     });
 
     // タブ復帰時にも同期（バックグラウンドでの変更を取り込む）
@@ -874,10 +891,42 @@ interface CloudSnapshot {
   meta?: { updatedAt?: string };
 }
 
-const _handleEmptyCloud = (): void => {
-  // 意図的な初期化（管理者がFirebaseを空にした）
-  saveSystemTitleHistory({ entries: [], nextGeneration: { MASTER: 1, RISING_STAR: 1, GRINDER: 1, GIANT_KILLER: 1 } });
-  updateSyncMeta({ status: 'NEVER' });
+/**
+ * Firebase が空だったときの処理。
+ *
+ * fromRealtime=false（起動時の loadFromCloud から呼ばれる場合）:
+ *   → 即座に処理する。App.tsx 側が 'EMPTY' を受け取って seedData() を呼ぶ。
+ *
+ * fromRealtime=true（onValue リスナーから呼ばれる場合）:
+ *   → デバウンスをかける。onValue は書き込み直後に一瞬 null を返すことがあるため、
+ *      短時間に2回連続で空を受信した場合のみ「本当の初期化」とみなす。
+ *      これにより、管理者が初期化した直後に他端末が誤ってローカルデータを
+ *      クラウドに書き戻してしまうのを防ぐ。
+ */
+let _emptyCloudCount = 0;
+let _emptyCloudTimer: ReturnType<typeof setTimeout> | null = null;
+
+const _handleEmptyCloud = (fromRealtime = false): void => {
+  if (!fromRealtime) {
+    // 起動時の1回限り呼び出し → 即処理（seedData に任せる）
+    saveSystemTitleHistory({ entries: [], nextGeneration: { MASTER: 1, RISING_STAR: 1, GRINDER: 1, GIANT_KILLER: 1 } });
+    updateSyncMeta({ status: 'NEVER' });
+    return;
+  }
+
+  // リアルタイムリスナーからの呼び出し → 2回連続確認デバウンス
+  _emptyCloudCount += 1;
+  if (_emptyCloudTimer) clearTimeout(_emptyCloudTimer);
+  _emptyCloudTimer = setTimeout(() => { _emptyCloudCount = 0; }, 5000);
+
+  if (_emptyCloudCount >= 2) {
+    _emptyCloudCount = 0;
+    console.warn('[Sync] Cloud confirmed empty twice via realtime. Treating as intentional reset.');
+    saveSystemTitleHistory({ entries: [], nextGeneration: { MASTER: 1, RISING_STAR: 1, GRINDER: 1, GIANT_KILLER: 1 } });
+    updateSyncMeta({ status: 'NEVER' });
+  } else {
+    console.warn('[Sync] Cloud appears empty via realtime. Waiting for confirmation...');
+  }
 };
 
 // ============================================================
@@ -1171,6 +1220,14 @@ export const pushTitleHistory = async (history: SystemTitleSnapshot): Promise<vo
  * generation は変えない（管理者のみ上げる）
  */
 export const pushAllDataToCloud = async (): Promise<boolean> => {
+  // ── 未承認デバイスはフル書き込み禁止 ──────────────────────
+  // 未承認デバイスが全データを上書きするのを防ぐ。
+  // 個人データの書き込みは saveUsers() 内の pushUser() で行う。
+  if (!isDeviceApproved()) {
+    console.warn('[Sync] pushAllDataToCloud blocked: device not approved');
+    return false;
+  }
+
   try {
     updateSyncMeta({ status: 'SYNCING' });
     _ignoreEcho = true;
@@ -1282,15 +1339,51 @@ export const syncWithServer = (): void => {
   if (_syncTimer !== null) window.clearTimeout(_syncTimer);
   _syncTimer = window.setTimeout(async () => {
     _syncTimer = null;
-    updateSyncMeta({ status: 'SYNCING' });
-    await pushAllDataToCloud();
+    // pull-then-push: デバウンス後もマージを経由してから push する
+    await manualSync();
   }, 3000);
 };
 
+/**
+ * 手動同期: pull-then-push
+ *
+ * 旧実装は pushAllDataToCloud() のみ（ローカル全上書き）だったため、
+ * 他端末が書いたデータを消してしまう問題があった。
+ *
+ * 新実装:
+ *   1. クラウドから最新を取得して _applyCloud() でローカルにマージ
+ *   2. オフラインキューを送信
+ *   3. マージ済みのローカルをクラウドに push（承認済みデバイスのみ）
+ *
+ * 未承認デバイスは手順1のマージのみ行い、push はスキップする。
+ */
 export const manualSync = async (): Promise<boolean> => {
   if (_syncTimer !== null) { window.clearTimeout(_syncTimer); _syncTimer = null; }
   updateSyncMeta({ status: 'SYNCING' });
-  return pushAllDataToCloud();
+
+  try {
+    // Step1: クラウドから最新を pull してローカルにマージ
+    const snapshot = await get(_r(''));
+    const cloud = snapshot.val() as CloudSnapshot | null;
+    if (cloud && cloud.users && Object.keys(cloud.users).length > 0) {
+      _applyCloud(cloud);
+    }
+
+    // Step2: オフラインキューのフラッシュ
+    await _flushQueue();
+
+    // Step3: マージ後のローカルをクラウドに push（承認済みデバイスのみ）
+    // 未承認デバイスは push しない（個人データは saveUsers 経由で push 済み）
+    if (!isDeviceApproved()) {
+      updateSyncMeta({ status: 'SYNCED', lastSync: new Date().toISOString(), pendingChanges: 0 });
+      return true;
+    }
+
+    return pushAllDataToCloud();
+  } catch (e: any) {
+    updateSyncMeta({ status: 'ERROR', lastError: e?.message });
+    return false;
+  }
 };
 
 export const loadFromCloud = async (): Promise<LoadResult> => {
