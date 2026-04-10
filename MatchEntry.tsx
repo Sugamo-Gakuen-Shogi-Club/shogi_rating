@@ -243,10 +243,20 @@ const MatchEntry: React.FC = () => {
       const allMatchesNow = getMatches();
       const p1Won = result === 'PLAYER1_WIN', p2Won = result === 'PLAYER2_WIN';
       if (p1User && p2User) {
-        Promise.all([
-          updateMissionsAfterMatch({ id: p1User.id, name: p1User.name, rate: p1User.rate, wins: p1User.wins, losses: p1User.losses }, { id: p2User.id, rate: p2User.rate }, p1Won, allMatchesNow),
-          updateMissionsAfterMatch({ id: p2User.id, name: p2User.name, rate: p2User.rate, wins: p2User.wins, losses: p2User.losses }, { id: p1User.id, rate: p1User.rate }, p2Won, allMatchesNow),
-        ]).then(([m1, m2]) => { const all = [...m1, ...m2]; if (all.length > 0) setMissionAchieved(all); });
+        // 直列実行: p1→p2 の順で localStorage を読み書きすることで
+        // 同時アクセスによる stale read（ポイント消失・二重付与）を防ぐ
+        (async () => {
+          const m1 = await updateMissionsAfterMatch(
+            { id: p1User.id, name: p1User.name, rate: p1User.rate, wins: p1User.wins, losses: p1User.losses },
+            { id: p2User.id, rate: p2User.rate }, p1Won, allMatchesNow
+          );
+          const m2 = await updateMissionsAfterMatch(
+            { id: p2User.id, name: p2User.name, rate: p2User.rate, wins: p2User.wins, losses: p2User.losses },
+            { id: p1User.id, rate: p1User.rate }, p2Won, allMatchesNow
+          );
+          const all = [...m1, ...m2];
+          if (all.length > 0) setMissionAchieved(all);
+        })();
       }
       setStep('SUCCESS');
     } catch (e: any) { playSound?.('ERROR'); alert(e.message || 'エラーが発生しました'); }

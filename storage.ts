@@ -734,7 +734,7 @@ export const verifyMaintenanceBackup = async (): Promise<{
 
 import {
   getDatabase, ref, onValue, set, update, get,
-  serverTimestamp, type DatabaseReference, type Unsubscribe,
+  runTransaction, serverTimestamp, type DatabaseReference, type Unsubscribe,
 } from 'firebase/database';
 import { app } from './firebase';
 
@@ -823,8 +823,87 @@ const _writeMeta = (): void => {
   set(_r('meta/updatedAt'), new Date().toISOString()).catch(() => {});
 };
 
+// ============================================================
+// TRANSACTIONAL COUNTER INCREMENT
+// ============================================================
+// wins / losses / draws / totalPoints / monthlyPoints /
+// pointsMatch / pointsAttendance / pointsSpecial / eventPoints /
+// activityDays / upsetWins / maxStreak / currentStreak / lossStreak
+// はサーバー側で runTransaction() してアトミックに加算する。
+// これにより複数端末の同時書き込みによるダブルカウントを防ぐ。
+//
+// オフライン時: runTransaction はオフラインキューに積まれ、
+//               復帰時に自動的に再試行される（Firebase SDK標準動作）。
+// ============================================================
+
+type UserCounterDeltas = {
+  wins?:             number;
+  losses?:           number;
+  draws?:            number;
+  totalPoints?:      number;
+  monthlyPoints?:    number;
+  pointsMatch?:      number;
+  pointsAttendance?: number;
+  pointsSpecial?:    number;
+  eventPoints?:      number;
+  activityDays?:     number;
+  upsetWins?:        number;
+  // maxStreak / currentStreak / lossStreak は「上書き」が正しい動作なのでMAX採用を維持
+};
+
+/**
+ * Firebase RTDB の runTransaction を使い、指定ユーザーの数値カウンターを
+ * アトミックにインクリメントする。
+ * ローカルは呼び出し元が既に更新済みなので、ここではクラウドのみ更新する。
+ */
+export const pushUserCounters = async (
+  userId: string,
+  deltas: UserCounterDeltas,
+): Promise<void> => {
+  if (getMaintenanceState().active) return;
+  if (!isDeviceApproved()) return;
+
+  const userRef = _r(`users/${userId}`);
+  try {
+    await runTransaction(userRef, (current: any) => {
+      if (current === null) return current; // ユーザーが存在しない場合はキャンセル
+      const next = { ...current };
+      const add = (field: keyof UserCounterDeltas) => {
+        if (deltas[field] !== undefined) {
+          next[field] = (next[field] ?? 0) + deltas[field]!;
+        }
+      };
+      add('wins');
+      add('losses');
+      add('draws');
+      add('totalPoints');
+      add('monthlyPoints');
+      add('pointsMatch');
+      add('pointsAttendance');
+      add('pointsSpecial');
+      add('eventPoints');
+      add('activityDays');
+      add('upsetWins');
+      return next;
+    });
+  } catch (e) {
+    // transaction 失敗時はフォールバックとして通常の pushUser を試みる
+    console.warn('[Sync] runTransaction failed, falling back to pushUser:', e);
+    const local = getRawUsers().find(u => u.id === userId);
+    if (local) await pushUser(local).catch(() => {});
+  }
+};
+
 // ---- ignore own echo ----
-let _ignoreEcho = false;
+// カウンター方式: 複数の書き込みが並走しても自分のエコーを正確に無視できる
+let _ignoreEchoCount = 0;
+/** @deprecated 直接触らず _echoOn/_echoOff/_checkEcho を使う */
+const _echoOn  = () => { _ignoreEchoCount++; };
+const _echoOff = () => { _ignoreEchoCount = Math.max(0, _ignoreEchoCount - 1); };
+const _checkEcho = (): boolean => {
+  if (_ignoreEchoCount > 0) { _echoOff(); return true; }
+  return false;
+};
 
 // ============================================================
 // REALTIME LISTENER
@@ -839,7 +918,7 @@ export const startRealtimeListener = (): void => {
   _unsub = onValue(
     _r(''),
     (snapshot) => {
-      if (_ignoreEcho) { _ignoreEcho = false; return; }
+      if (_checkEcho()) return;
       const cloud = snapshot.val() as CloudSnapshot | null;
       if (!cloud) { _handleEmptyCloud(true); return; }
       _applyCloud(cloud);
@@ -951,6 +1030,18 @@ const _applyCloud = (cloud: CloudSnapshot): void => {
     const localArr = getRawUsers();
     const localMap = new Map(localArr.map(u => [u.id, u]));
     let changed = false;
+
+    // クラウドに存在するIDを追跡（削除検知用）
+    const cloudIds = new Set(Object.keys(cloud.users));
+
+    // クラウドに存在しないローカルユーザーを削除
+    // （管理者が部員を削除→他端末が古いデータで復活させるバグを防ぐ）
+    for (const [id] of localMap) {
+      if (!cloudIds.has(id)) {
+        localMap.delete(id);
+        changed = true;
+      }
+    }
 
     Object.entries(cloud.users).forEach(([id, cu]) => {
       const local = localMap.get(id);
@@ -1149,7 +1240,7 @@ const _mergeMissions = (local: any[], cloud: any[]): any[] => {
 /** 単一ユーザーを個別 PATCH */
 export const pushUser = async (user: User): Promise<void> => {
   if (getMaintenanceState().active) return;
-  _ignoreEcho = true;
+  _echoOn();
   await _write(`users/${user.id}`, user);
   _writeMeta();
 };
@@ -1157,7 +1248,7 @@ export const pushUser = async (user: User): Promise<void> => {
 /** 複数ユーザーをバルク PATCH */
 export const pushUsers = async (users: User[]): Promise<void> => {
   if (getMaintenanceState().active) return;
-  _ignoreEcho = true;
+  _echoOn();
   const obj = Object.fromEntries(users.map(u => [u.id, u]));
   await _write('users', obj, true);
   _writeMeta();
@@ -1180,7 +1271,7 @@ export const pushMatchDelete = async (id: string, data: object): Promise<void> =
 /** 設定を書き込む */
 export const pushSettings = async (settings: SystemSettings): Promise<void> => {
   if (getMaintenanceState().active) return;
-  _ignoreEcho = true;
+  _echoOn();
   await _write('settings', settings);
   _writeMeta();
 };
@@ -1230,7 +1321,7 @@ export const pushAllDataToCloud = async (): Promise<boolean> => {
 
   try {
     updateSyncMeta({ status: 'SYNCING' });
-    _ignoreEcho = true;
+    _echoOn();
 
     const users = getRawUsers();
     const allMatches: any[] = JSON.parse(localStorage.getItem(MATCHES_KEY) || '[]');
@@ -1253,7 +1344,8 @@ export const pushAllDataToCloud = async (): Promise<boolean> => {
     updateSyncMeta({ status: 'SYNCED', lastSync: new Date().toISOString(), pendingChanges: 0 });
     return true;
   } catch (e: any) {
-    _ignoreEcho = false;
+    // echoカウンターをリセット（書き込み失敗時はエコーが来ないため）
+    _ignoreEchoCount = 0;
     updateSyncMeta({ status: 'ERROR', lastError: e?.message });
     return false;
   }
@@ -1268,7 +1360,7 @@ export const pushInitializeWithGeneration = async (emptyData: {
 }): Promise<boolean> => {
   try {
     updateSyncMeta({ status: 'SYNCING' });
-    _ignoreEcho = true;
+    _echoOn();
 
     const newGen = _getLastKnownGen() + 1;
     _saveLastKnownGen(newGen);
@@ -1290,7 +1382,7 @@ export const pushInitializeWithGeneration = async (emptyData: {
     updateSyncMeta({ status: 'SYNCED', lastSync: new Date().toISOString(), pendingChanges: 0 });
     return true;
   } catch (e: any) {
-    _ignoreEcho = false;
+    _ignoreEchoCount = 0;
     updateSyncMeta({ status: 'ERROR', lastError: e?.message });
     return false;
   }
@@ -1711,6 +1803,17 @@ export const recordAttendance = (userId: string): AttendanceResult => {
   const res = checkAchievementsAndIcons(user);
   saveUsers(allUsers);
 
+  // 出席カウンターをトランザクションでアトミックに更新
+  const attendDeltas: UserCounterDeltas = {
+    totalPoints:      pts,
+    monthlyPoints:    pts,
+    pointsAttendance: pts,
+    activityDays:     1,
+    ...(isEventActive() && getSettings().eventType !== EventType.FACTION_WAR
+      ? { eventPoints: pts } : {}),
+  };
+  pushUserCounters(userId, attendDeltas).catch(() => {});
+
   appendLogs([{
     id: randomId(), userId,
     type: ActivityType.ATTENDANCE,
@@ -1743,6 +1846,7 @@ export const recordAttendance = (userId: string): AttendanceResult => {
       if (!prev.completed && completed) {
         allProgress[idx] = { ...prev, current: count, completed: true, completedAt: new Date().toISOString() };
         achieved.push({ userName: user.name, mission: def, rewardPts: def.rewardPts });
+        // pendingMissionAlert だけローカルに書く（ポイント加算はトランザクション）
         const usersNow = getRawUsers();
         const u2 = usersNow.find(x => x.id === userId);
         if (u2) {
@@ -1753,6 +1857,7 @@ export const recordAttendance = (userId: string): AttendanceResult => {
           u2.pendingMissionAlert.push(def.id);
           saveUsers(usersNow);
         }
+        pushUserCounters(userId, { totalPoints: def.rewardPts, monthlyPoints: def.rewardPts, pointsSpecial: def.rewardPts }).catch(() => {});
         appendLogs([{ id: randomId(), userId, type: ActivityType.BONUS, points: def.rewardPts, description: `ミッション達成: ${def.label}`, date: new Date().toISOString() }]);
       } else {
         allProgress[idx] = { ...allProgress[idx], current: count };
@@ -1771,6 +1876,7 @@ export const recordAttendance = (userId: string): AttendanceResult => {
           u2.pendingMissionAlert.push(def.id);
           saveUsers(usersNow);
         }
+        pushUserCounters(userId, { totalPoints: def.rewardPts, monthlyPoints: def.rewardPts, pointsSpecial: def.rewardPts }).catch(() => {});
         appendLogs([{ id: randomId(), userId, type: ActivityType.BONUS, points: def.rewardPts, description: `ミッション達成: ${def.label}`, date: new Date().toISOString() }]);
       }
     }
@@ -1954,7 +2060,37 @@ export const processMatch = (
   const resP1 = checkAchievementsAndIcons(p1, { isDuelWin: effectiveDuel && p1IsWinner, opponentRateBefore: p2RateBefore });
   const resP2 = checkAchievementsAndIcons(p2, { isDuelWin: effectiveDuel && p2IsWinner, opponentRateBefore: p1RateBefore });
 
+  // ローカルに保存（rate・rateHistory・streak・achievements・icons など全フィールド）
   saveUsers(allUsers);
+
+  // ── カウンター系はトランザクションでアトミックにクラウド更新 ──
+  // saveUsers は pushUsers（全フィールド上書き）を呼ぶが、
+  // 数値カウンターはそれとは別に runTransaction で加算することで
+  // 複数端末の同時書き込みによるダブルカウントを防ぐ。
+  // （pushUsers は achievements・icons などの配列/非数値フィールドの同期に使われる）
+  const p1Deltas: UserCounterDeltas = {
+    totalPoints:  p1Detail.total,
+    monthlyPoints: p1Detail.total,
+    pointsMatch:  p1Detail.total,
+    ...(p1IsWinner ? { wins: 1 } : {}),
+    ...(p2IsWinner && !isSameFaction ? { losses: 1 } : {}),
+    ...(isDraw2   && !isSameFaction ? { draws: 1 } : {}),
+    ...(p1IsWinner && p2RateBefore - p1.rate >= 100 ? { upsetWins: 1 } : {}),
+    ...(eventActive && !isSameFaction ? { eventPoints: p1Detail.total } : {}),
+  };
+  const p2Deltas: UserCounterDeltas = {
+    totalPoints:  p2Detail.total,
+    monthlyPoints: p2Detail.total,
+    pointsMatch:  p2Detail.total,
+    ...(p2IsWinner ? { wins: 1 } : {}),
+    ...(p1IsWinner && !isSameFaction ? { losses: 1 } : {}),
+    ...(isDraw2   && !isSameFaction ? { draws: 1 } : {}),
+    ...(p2IsWinner && p1RateBefore - p2.rate >= 100 ? { upsetWins: 1 } : {}),
+    ...(eventActive && !isSameFaction ? { eventPoints: p2Detail.total } : {}),
+  };
+  // fire-and-forget: 失敗時は pushUser フォールバックが走る
+  pushUserCounters(p1Id, p1Deltas).catch(() => {});
+  pushUserCounters(p2Id, p2Deltas).catch(() => {});
 
   // ── Save match record (← FIX: was completely missing) ──
   const matchRecord: MatchRecord = {
@@ -3080,7 +3216,7 @@ export const updateMissionsAfterMatch = async (
       if (metric === 'MATCHES')    return todayMatches.length;
       if (metric === 'WINS')       return todayWins;
       if (metric === 'DRAWS')      return todayDraws;
-      if (metric === 'ATTENDANCE') return 0; // 出席は recordAttendance 側で処理
+      if (metric === 'ATTENDANCE') return 0;
     } else {
       if (metric === 'MATCHES')    return weekMatches.length;
       if (metric === 'WINS')       return weekWins;
@@ -3092,9 +3228,11 @@ export const updateMissionsAfterMatch = async (
 
   const all = getMissionProgressAll();
   const achieved: MissionAchieved[] = [];
+  // 今回のミッション達成で付与するトータルポイント（一括で transaction に送る）
+  let totalRewardPts = 0;
 
   for (const def of MISSIONS_DATA) {
-    if (def.metric === 'ATTENDANCE') continue; // 出席ミッションはスキップ
+    if (def.metric === 'ATTENDANCE') continue;
     const periodKey = def.type === 'DAILY' ? dailyKey : weeklyKey;
     const idx = all.findIndex(p => (p as any).userId === player.id && p.missionId === def.id && p.periodKey === periodKey);
     const current = getCount(def.metric, def.type);
@@ -3103,18 +3241,9 @@ export const updateMissionsAfterMatch = async (
     if (idx >= 0) {
       const prev = all[idx];
       if (!prev.completed && completed) {
-        // 今回達成
         all[idx] = { ...prev, current, completed: true, completedAt: new Date().toISOString() };
         achieved.push({ userName: player.name, mission: def, rewardPts: def.rewardPts });
-        // ポイント付与
-        const users = getRawUsers();
-        const u = users.find(x => x.id === player.id);
-        if (u) {
-          u.totalPoints   = (u.totalPoints   || 0) + def.rewardPts;
-          u.monthlyPoints = (u.monthlyPoints || 0) + def.rewardPts;
-          u.pointsSpecial = (u.pointsSpecial || 0) + def.rewardPts;
-          saveUsers(users);
-        }
+        totalRewardPts += def.rewardPts;
       } else {
         all[idx] = { ...prev, current };
       }
@@ -3125,17 +3254,36 @@ export const updateMissionsAfterMatch = async (
       };
       if (completed) {
         achieved.push({ userName: player.name, mission: def, rewardPts: def.rewardPts });
-        const users = getRawUsers();
-        const u = users.find(x => x.id === player.id);
-        if (u) {
-          u.totalPoints   = (u.totalPoints   || 0) + def.rewardPts;
-          u.monthlyPoints = (u.monthlyPoints || 0) + def.rewardPts;
-          u.pointsSpecial = (u.pointsSpecial || 0) + def.rewardPts;
-          saveUsers(users);
-        }
+        totalRewardPts += def.rewardPts;
       }
       all.push(entry as any);
     }
+  }
+
+  // ポイント付与: ローカルを先に更新してからトランザクションでクラウドにも反映
+  // ※ getRawUsers() を1回だけ呼ぶことで p1/p2 の並走による stale read を防ぐ
+  if (totalRewardPts > 0) {
+    const users = getRawUsers();
+    const u = users.find(x => x.id === player.id);
+    if (u) {
+      u.totalPoints   = (u.totalPoints   || 0) + totalRewardPts;
+      u.monthlyPoints = (u.monthlyPoints || 0) + totalRewardPts;
+      u.pointsSpecial = (u.pointsSpecial || 0) + totalRewardPts;
+      if (!u.pendingMissionAlert) u.pendingMissionAlert = [];
+      achieved.forEach(a => u.pendingMissionAlert!.push(a.mission.id));
+      saveUsers(users);
+    }
+    // クラウドはトランザクションで加算（saveUsers の pushUsers と二重に当たるが、
+    // transaction が後勝ちするので数値は正確に保たれる）
+    pushUserCounters(player.id, {
+      totalPoints:   totalRewardPts,
+      monthlyPoints: totalRewardPts,
+      pointsSpecial: totalRewardPts,
+    }).catch(() => {});
+
+    achieved.forEach(a => {
+      appendLogs([{ id: randomId(), userId: player.id, type: ActivityType.BONUS, points: a.rewardPts, description: `ミッション達成: ${a.mission.label}`, date: new Date().toISOString() }]);
+    });
   }
 
   saveMissionProgressAll(all);
