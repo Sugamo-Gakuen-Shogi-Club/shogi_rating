@@ -1902,7 +1902,9 @@ const eloExpected = (rA: number, rB: number): number =>
  * レートは0未満にはならない
  */
 const eloChange = (myRate: number, oppRate: number, score: number): number => {
-  const K = 32;
+  const K_WIN  = 40;  // 勝ち: 上昇を大きく
+  const K_LOSE = 24;  // 負け: 下落を小さく
+  const K = score === 1 ? K_WIN : score === 0 ? K_LOSE : 32;
   const expected = eloExpected(myRate, oppRate);
   const raw = Math.round(K * (score - expected));
   if (score === 1)   return Math.max(1,  raw);   // 勝ち: 最低+1
