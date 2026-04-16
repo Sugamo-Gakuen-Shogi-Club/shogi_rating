@@ -1828,12 +1828,12 @@ export const recordAttendance = (userId: string): AttendanceResult => {
   const weeklyKey = getWeeklyKey();
   const allProgress = getMissionProgressAll();
   const logs = getLogs();
-  // 今週の出席日数
+  // 今週の出席日数（appendLogs済みなので今日分もlogsに含まれている）
   const weekAttendDays = new Set(
     logs
       .filter(l => l.userId === userId && l.type === ActivityType.ATTENDANCE && getLocalDateString(l.date) >= weeklyKey)
       .map(l => getLocalDateString(l.date))
-  ).size + 1; // +1 for today
+  ).size;
 
   const attendMissions = MISSIONS_DATA.filter(m => m.metric === 'ATTENDANCE');
   for (const def of attendMissions) {
