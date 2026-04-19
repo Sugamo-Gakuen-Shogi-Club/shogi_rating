@@ -1805,8 +1805,6 @@ export const recordAttendance = (userId: string): AttendanceResult => {
   // 出席は「承認済みデバイス1台のみ・同日1回限り」で競合しないため
   // pushUserCounters（transaction加算）は呼ばない。
   // saveUsers → pushUsers がフルオブジェクト上書きで同期するので十分。
-  // ※ pushUserCounters を呼ぶと pushUsers との二重書き込みで
-  //   activityDays・ポイントが +2 されるバグが発生する。
 
   appendLogs([{
     id: randomId(), userId,
@@ -1822,7 +1820,8 @@ export const recordAttendance = (userId: string): AttendanceResult => {
   const weeklyKey = getWeeklyKey();
   const allProgress = getMissionProgressAll();
   const logs = getLogs();
-  // 今週の出席日数（appendLogs済みなので今日分もlogsに含まれている）
+  // 今週の出席日数
+  // appendLogs済みなので今日分もlogsに含まれている → +1 不要
   const weekAttendDays = new Set(
     logs
       .filter(l => l.userId === userId && l.type === ActivityType.ATTENDANCE && getLocalDateString(l.date) >= weeklyKey)
@@ -1840,7 +1839,7 @@ export const recordAttendance = (userId: string): AttendanceResult => {
       if (!prev.completed && completed) {
         allProgress[idx] = { ...prev, current: count, completed: true, completedAt: new Date().toISOString() };
         achieved.push({ userName: user.name, mission: def, rewardPts: def.rewardPts });
-        // pendingMissionAlert だけローカルに書く（ポイント加算はトランザクション）
+        // saveUsers で Firebase に書き込む（pushUserCounters は呼ばない→二重加算を防ぐ）
         const usersNow = getRawUsers();
         const u2 = usersNow.find(x => x.id === userId);
         if (u2) {
@@ -1851,7 +1850,6 @@ export const recordAttendance = (userId: string): AttendanceResult => {
           u2.pendingMissionAlert.push(def.id);
           saveUsers(usersNow);
         }
-        pushUserCounters(userId, { totalPoints: def.rewardPts, monthlyPoints: def.rewardPts, pointsSpecial: def.rewardPts }).catch(() => {});
         appendLogs([{ id: randomId(), userId, type: ActivityType.BONUS, points: def.rewardPts, description: `ミッション達成: ${def.label}`, date: new Date().toISOString() }]);
       } else {
         allProgress[idx] = { ...allProgress[idx], current: count };
@@ -1870,7 +1868,6 @@ export const recordAttendance = (userId: string): AttendanceResult => {
           u2.pendingMissionAlert.push(def.id);
           saveUsers(usersNow);
         }
-        pushUserCounters(userId, { totalPoints: def.rewardPts, monthlyPoints: def.rewardPts, pointsSpecial: def.rewardPts }).catch(() => {});
         appendLogs([{ id: randomId(), userId, type: ActivityType.BONUS, points: def.rewardPts, description: `ミッション達成: ${def.label}`, date: new Date().toISOString() }]);
       }
     }
