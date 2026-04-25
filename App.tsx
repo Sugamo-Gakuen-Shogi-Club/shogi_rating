@@ -208,6 +208,7 @@ const App: React.FC = () => {
   const [isIdle, setIsIdle] = useState(false);
   const [initStatus, setInitStatus] = useState<InitStatus>('LOADING');
   const [initMessage, setInitMessage] = useState('クラウドデータを取得中...');
+  const [initError, setInitError] = useState<string | null>(null);
   const [showTutorial, setShowTutorial] = useState(false);
   const timerRef = useRef<number | null>(null);
   const IDLE_TIMEOUT = 45000;
@@ -220,32 +221,38 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const initialize = async () => {
-      // ★ App Check を最初に初期化（Firebase へのリクエスト前）
-      initAppCheck();
+      try {
+        // ★ App Check を最初に初期化（Firebase へのリクエスト前）
+        initAppCheck();
 
-      setInitMessage('クラウドデータを取得中...');
-      const result: LoadResult = await loadFromCloud();
+        setInitMessage('クラウドデータを取得中...');
+        const result: LoadResult = await loadFromCloud();
 
-      if (result === 'CLOUD_LOADED') {
-        setInitMessage('クラウドから最新データを取得しました');
-      } else if (result === 'LOCAL_NEWER') {
-        setInitMessage('ローカルデータをクラウドに同期しました');
-      } else if (result === 'EMPTY') {
-        setInitMessage('初回セットアップ中...');
-        await seedData();
-      } else {
-        // FAILED → use local data (no overwrite happened)
-        const hasLocal = getUsers().length > 0;
-        if (!hasLocal) {
+        if (result === 'CLOUD_LOADED') {
+          setInitMessage('クラウドから最新データを取得しました');
+        } else if (result === 'LOCAL_NEWER') {
+          setInitMessage('ローカルデータをクラウドに同期しました');
+        } else if (result === 'EMPTY') {
           setInitMessage('初回セットアップ中...');
           await seedData();
         } else {
-          setInitMessage('オフライン：ローカルデータで起動します');
+          // FAILED → use local data (no overwrite happened)
+          const hasLocal = getUsers().length > 0;
+          if (!hasLocal) {
+            setInitMessage('初回セットアップ中...');
+            await seedData();
+          } else {
+            setInitMessage('オフライン：ローカルデータで起動します');
+          }
         }
+        setInitStatus('SUCCESS');
+        // 初回のみチュートリアルを表示
+        if (!isTutorialDone()) setShowTutorial(true);
+      } catch (e: any) {
+        console.error('[App] 初期化エラー:', e);
+        setInitError(e?.message || String(e));
+        setInitStatus('ERROR');
       }
-      setInitStatus('SUCCESS');
-      // 初回のみチュートリアルを表示
-      if (!isTutorialDone()) setShowTutorial(true);
     };
 
     initialize();
@@ -269,6 +276,49 @@ const App: React.FC = () => {
         <div className="text-center">
           <h2 className="text-white font-black text-xl tracking-widest uppercase">CLUB RIVALS</h2>
           <p className="text-slate-500 text-sm mt-2 font-bold animate-pulse">{initMessage}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (initStatus === 'ERROR') {
+    const clearLocalStorage = () => {
+      if (window.confirm('ローカルデータをすべて消去して再起動します。\nクラウドのデータは消えません。よろしいですか？')) {
+        localStorage.clear();
+        window.location.reload();
+      }
+    };
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center space-y-6 p-8">
+        <AlertCircle size={64} className="text-red-500" />
+        <div className="text-center space-y-3 max-w-lg">
+          <h2 className="text-white font-black text-xl">起動エラーが発生しました</h2>
+          <p className="text-slate-400 text-sm">アプリの初期化中にエラーが起きました。以下の手順を試してください。</p>
+          {initError && (
+            <div className="bg-red-950/50 border border-red-700/50 rounded-xl p-3 text-left">
+              <p className="text-red-300 text-xs font-mono break-all">{initError}</p>
+            </div>
+          )}
+          <div className="text-left bg-slate-800/60 rounded-xl p-4 text-sm text-slate-300 space-y-2">
+            <p className="font-bold text-white">対処法：</p>
+            <p>① ページをリロード（F5 / Ctrl+R）</p>
+            <p>② ブラウザのコンソール（F12）でエラー内容を確認</p>
+            <p>③ キャッシュが溜まった場合 → 下のボタンでリセット</p>
+          </div>
+          <div className="flex gap-3 justify-center pt-2">
+            <button
+              onClick={() => window.location.reload()}
+              className="px-5 py-2.5 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-500 transition-colors"
+            >
+              再読み込み
+            </button>
+            <button
+              onClick={clearLocalStorage}
+              className="px-5 py-2.5 bg-red-800 text-white rounded-xl font-bold hover:bg-red-700 transition-colors"
+            >
+              ローカルデータをリセット
+            </button>
+          </div>
         </div>
       </div>
     );
