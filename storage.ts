@@ -1031,17 +1031,10 @@ const _applyCloud = (cloud: CloudSnapshot): void => {
     const localMap = new Map(localArr.map(u => [u.id, u]));
     let changed = false;
 
-    // クラウドに存在するIDを追跡（削除検知用）
-    const cloudIds = new Set(Object.keys(cloud.users));
-
-    // クラウドに存在しないローカルユーザーを削除
-    // （管理者が部員を削除→他端末が古いデータで復活させるバグを防ぐ）
-    for (const [id] of localMap) {
-      if (!cloudIds.has(id)) {
-        localMap.delete(id);
-        changed = true;
-      }
-    }
+    // ユーザーの削除は isActive:false（ソフトデリート）で行う。
+    // クラウドに存在しないIDをローカルから削除してはいけない。
+    // 理由: 新入部員追加直後にFirebase反映が遅延した場合、
+    // クラウドにいない=削除されたと誤判定して新入部員を消す競合バグが発生する。
 
     Object.entries(cloud.users).forEach(([id, cu]) => {
       const local = localMap.get(id);
