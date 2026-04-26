@@ -327,6 +327,8 @@ const Rankings: React.FC = () => {
     users.forEach(u => { m[u.id] = 0; });
     matches.forEach(match => {
       if (match.date.split('T')[0] !== activityDateStr) return;
+      if (!m[match.player1Id]) m[match.player1Id] = 0;
+      if (!m[match.player2Id]) m[match.player2Id] = 0;
       m[match.player1Id] = (m[match.player1Id] || 0) + 1;
       m[match.player2Id] = (m[match.player2Id] || 0) + 1;
     });
@@ -341,6 +343,8 @@ const Rankings: React.FC = () => {
       if (match.date < weekAgo) return;
       const p1win = match.result === 'PLAYER1_WIN';
       const p2win = match.result === 'PLAYER2_WIN';
+      if (!m[match.player1Id]) m[match.player1Id] = { wins: 0, total: 0 };
+      if (!m[match.player2Id]) m[match.player2Id] = { wins: 0, total: 0 };
       m[match.player1Id].total++;
       m[match.player2Id].total++;
       // 同士討ちは勝数にカウントしない
@@ -357,6 +361,8 @@ const Rankings: React.FC = () => {
     const m: Record<string, number> = {};
     users.forEach(u => { m[u.id] = 0; });
     matches.forEach(match => {
+      if (!m[match.player1Id]) m[match.player1Id] = 0;
+      if (!m[match.player2Id]) m[match.player2Id] = 0;
       m[match.player1Id] = (m[match.player1Id] || 0) + 1;
       m[match.player2Id] = (m[match.player2Id] || 0) + 1;
     });
@@ -440,168 +446,4 @@ const Rankings: React.FC = () => {
       <div className="overflow-x-auto scrollbar-hide -mx-1 px-1">
         <div className="flex gap-1.5 min-w-max pb-1">
           {TABS.map(t => (
-            <button key={t.key} onClick={() => setActiveTab(t.key)}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black transition-all whitespace-nowrap relative ${
-                activeTab === t.key
-                  ? t.key === 'fourKings'
-                    ? 'bg-gradient-to-r from-yellow-500 to-amber-400 text-slate-900 shadow-xl'
-                    : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-xl'
-                  : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
-              }`}
-            >
-              {t.icon}{t.label}
-              {t.badge && (
-                <span className={`text-[8px] px-1 py-0.5 rounded font-black ${activeTab === t.key ? 'bg-white/20' : 'bg-blue-600/40 text-blue-300'}`}>
-                  {t.badge}
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* 四天王基準タブ */}
-      {activeTab === 'fourKings' && (
-        <Card className="border border-yellow-500/20 rounded-[2rem] bg-slate-900/50 backdrop-blur-xl overflow-hidden">
-          <div className="p-6">
-            <h3 className="text-lg font-black text-yellow-400 flex items-center gap-2 mb-4"><Crown size={18}/> 四天王 選出基準</h3>
-            <FourKingsCriteriaPanel/>
-          </div>
-        </Card>
-      )}
-
-      {/* まとめタブ */}
-      {activeTab === 'summary' && (
-        <Card className="border border-indigo-500/20 rounded-[2rem] bg-slate-900/50 backdrop-blur-xl overflow-hidden">
-          <div className="p-6">
-            <h3 className="text-lg font-black text-indigo-300 flex items-center gap-2 mb-4">📊 ランキングまとめ</h3>
-            <SummaryPanel
-              users={sortedUsers}
-              getScore={getScore}
-              getScoreLabel={getScoreLabel}
-              tiebreak={tiebreak}
-            />
-          </div>
-        </Card>
-      )}
-
-      {/* ランキングテーブル */}
-      {isTable && (
-        <Card className="overflow-hidden border border-white/10 shadow-2xl rounded-[2rem] bg-slate-900/50 backdrop-blur-xl">
-          {/* 今週勝率の注意書き */}
-          {activeTab === 'weekWinRate' && (
-            <div className="px-5 pt-4 pb-0 text-[10px] text-slate-500 font-bold">
-              ※ 直近7日間の対局が3局以上の部員のみ対象
-            </div>
-          )}
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead className="bg-slate-950/80 border-b border-white/5">
-                <tr>
-                  <th className="p-4 text-slate-500 font-black text-[10px] uppercase w-14 text-center">順位</th>
-                  <th className="p-4 text-slate-500 font-black text-[10px] uppercase">部員</th>
-                  <th className="p-4 text-slate-500 font-black text-[10px] uppercase text-right">{TABS.find(t => t.key === activeTab)?.label}</th>
-                  <th className="p-4 text-slate-500 font-black text-[10px] uppercase text-right hidden sm:table-cell">Rate</th>
-                  <th className="p-4 text-slate-500 font-black text-[10px] uppercase text-right hidden sm:table-cell">勝率</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5">
-                {(() => {
-                  let dispRank = 1;
-                  return sortedUsers.map((user, idx) => {
-                    const score = getScore(user, activeTab);
-                    if (idx > 0 && score < getScore(sortedUsers[idx - 1], activeTab)) dispRank = idx + 1;
-                    const total    = user.wins + user.losses + user.draws;
-                    const wr       = total > 0 ? Math.round((user.wins / total) * 100) : 0;
-                    const isFirst  = dispRank === 1;
-                    const isSecond = dispRank === 2;
-                    const isThird  = dispRank === 3;
-                    const activeTitleName = user.activeTitle
-                      ? (ACHIEVEMENTS_DATA.find(a => a.id === user.activeTitle)?.name
-                          ?? ((user.earnedHonors ?? []).includes(user.activeTitle) ? user.activeTitle : null))
-                      : null;
-                    const badge    = isFirst ? FIRST_BADGES[activeTab] : '';
-
-                    return (
-                      <tr key={user.id}
-                        onClick={() => { window.location.hash = `/profile/${user.id}`; }}
-                        className={`transition-all group duration-200 cursor-pointer ${rowBg(dispRank)}`}
-                      >
-                        {/* 順位 */}
-                        <td className="p-4 text-center">
-                          {rankIcon(dispRank)}
-                        </td>
-
-                        {/* 部員情報 */}
-                        <td className="p-4">
-                          <div className="flex items-center gap-3">
-                            <div className="transition-transform group-hover:scale-110 shrink-0">
-                              <UserAvatar user={user}/>
-                            </div>
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className={`font-black text-base transition-colors truncate max-w-[120px] ${isFirst ? 'text-yellow-200' : isSecond ? 'text-slate-200' : isThird ? 'text-amber-400' : 'text-slate-200 group-hover:text-blue-400'}`}>
-                                  {user.name}
-                                </span>
-                                {user.systemTitle.map(t => <FKBadge key={t} titleId={t}/>)}
-                              </div>
-                              {/* 1位専用バッジ */}
-                              {badge && (
-                                <div className="inline-flex items-center mt-0.5">
-                                  <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-300 border border-yellow-500/30">
-                                    {badge}
-                                  </span>
-                                </div>
-                              )}
-                              {activeTitleName && (
-                                <div className="text-[10px] text-slate-400 font-bold mt-0.5">「{activeTitleName}」</div>
-                              )}
-                              <RankBadge ranks={user.ranks || []}/>
-                              <div className="flex items-center gap-2 text-[10px] text-slate-500 font-bold mt-0.5">
-                                {user.isNewMember && <span className="text-green-500 font-black">🔰 新入班員</span>}
-                                {user.currentStreak >= 3 && <span className="text-rose-500">🔥{user.currentStreak}連勝</span>}
-                              </div>
-                            </div>
-                          </div>
-                        </td>
-
-                        {/* スコア */}
-                        <td className="p-4 text-right">
-                          <div className={`font-mono font-black text-xl ${scoreColor(activeTab, dispRank)}`}>
-                            {getScoreLabel(user, activeTab)}
-                          </div>
-                          {/* 補足サブテキスト */}
-                          {activeTab === 'weekWinRate' && weekStats[user.id]?.total >= 3 && (
-                            <div className="text-[10px] text-slate-500">{weekStats[user.id].total}局</div>
-                          )}
-                          {activeTab === 'seasonGrowth' && (
-                            <div className="text-[10px] text-slate-500">
-                              Rate{Math.round(user.rate - user.seasonStartRate) >= 0 ? '+' : ''}{Math.round(user.rate - user.seasonStartRate)}
-                            </div>
-                          )}
-                        </td>
-
-                        {/* Rate（sm以上） */}
-                        <td className="p-4 text-right font-mono font-bold text-slate-400 hidden sm:table-cell">
-                          {Math.round(user.rate)}
-                        </td>
-
-                        {/* 勝率（sm以上） */}
-                        <td className="p-4 text-right hidden sm:table-cell">
-                          <div className={`text-xl font-black ${wr >= 50 ? 'text-green-400' : 'text-slate-500'}`}>{wr}%</div>
-                          <div className="text-[10px] text-slate-600">{user.wins}W-{user.losses}L</div>
-                        </td>
-                      </tr>
-                    );
-                  });
-                })()}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-      )}
-    </div>
-  );
-};
-
-export default Rankings;
+            <button key={t.key} onClick={() => setActiveT
