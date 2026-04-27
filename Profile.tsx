@@ -398,6 +398,8 @@ const SeasonStatusCard: React.FC<{ userId: string }> = ({ userId }) => {
   allUsers.forEach(u => { weekStats[u.id] = { wins: 0, total: 0 }; });
   allMatches.forEach(m => {
     if (m.date < weekAgo) return;
+    if (!weekStats[m.player1Id]) weekStats[m.player1Id] = { wins: 0, total: 0 };
+    if (!weekStats[m.player2Id]) weekStats[m.player2Id] = { wins: 0, total: 0 };
     weekStats[m.player1Id].total++; weekStats[m.player2Id].total++;
     // ★ 紅白戦同士討ちは勝数にカウントしない（Rankings.tsx と統一）
     if (!m.isSameFaction) {
