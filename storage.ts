@@ -8,6 +8,7 @@ import {
   RankEntry, RankApplication,
   SystemTitleHistoryEntry, SystemTitleSnapshot,
   MissionDef, MissionProgress, MissionAchieved,
+  InstructorSession,
 } from './types';
 import { getAppCheckToken } from './appCheck';
 
@@ -25,6 +26,7 @@ const MAINTENANCE_KEY = 'club_rivals_maintenance';
 const RANK_APPS_KEY   = 'club_rivals_rank_apps';
 const DEVICE_TOKEN_KEY = 'club_rivals_device_token'; // このデバイスのトークン
 const APPROVED_DEVICES_KEY = 'club_rivals_approved_devices'; // 承認済みトークン一覧（設定に埋め込み）
+const COACHING_KEY    = 'club_rivals_coaching_sessions'; // 指導対局記録
 const UNDO_MAX      = 10;
 const LOGS_MAX      = 200;
 
@@ -46,7 +48,8 @@ const DEFAULT_SETTINGS: SystemSettings = {
   eventMultiplier: 2,
   currentSeason: Season.TERM_1_EARLY,
   lastMonthlyReset: new Date().toISOString(),
-  lastTitleUpdate: null
+  lastTitleUpdate: null,
+  instructorPin: '000000',
 };
 
 // 初期レートは0（負けで減る仕様のため）
@@ -3283,4 +3286,133 @@ export const clearPendingMissionAlert = (userId: string): void => {
   if (!u) return;
   u.pendingMissionAlert = [];
   saveUsers(all);
+};
+
+// ============================================================
+// COACHING SYSTEM（指導対局）
+// ============================================================
+
+/** 指導対局記録一覧を取得 */
+export const getCoachingSessions = (): InstructorSession[] => {
+  try {
+    const raw = localStorage.getItem(COACHING_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+};
+
+/** 指導対局記録を保存 */
+const saveCoachingSessions = (sessions: InstructorSession[]): void => {
+  localStorage.setItem(COACHING_KEY, JSON.stringify(sessions));
+};
+
+/**
+ * 指導対局を記録する
+ * - 承認済みデバイスのみ実行可
+ * - 指導者PINが一致する必要がある
+ * - 同日・同指導者での登録は1回まで
+ * - 指導者: 通常ポイント獲得（勝利扱い: 10pt + ボーナス）
+ * - 受講者: レート変動なし・ポイント3倍
+ */
+export const recordCoachingSession = (
+  instructorId: string,
+  studentId: string,
+  content: string,
+  pin: string,
+): { success: boolean; message: string; instructorPts: number; studentPts: number } => {
+  if (!isDeviceApproved()) return { success: false, message: 'DEVICE_NOT_APPROVED', instructorPts: 0, studentPts: 0 };
+
+  const settings = getSettings();
+  const correctPin = settings.instructorPin ?? '000000';
+  if (pin !== correctPin) return { success: false, message: 'PIN_WRONG', instructorPts: 0, studentPts: 0 };
+
+  const allUsers = getRawUsers();
+  const instructor = allUsers.find(u => u.id === instructorId);
+  const student    = allUsers.find(u => u.id === studentId);
+  if (!instructor || !student) return { success: false, message: 'USER_NOT_FOUND', instructorPts: 0, studentPts: 0 };
+  if (!instructor.isInstructor) return { success: false, message: 'NOT_INSTRUCTOR', instructorPts: 0, studentPts: 0 };
+
+  // 同日・同指導者の重複チェック
+  const today = new Date().toISOString().slice(0, 10);
+  const sessions = getCoachingSessions();
+  const alreadyToday = sessions.some(s =>
+    s.instructorId === instructorId &&
+    s.studentId === studentId &&
+    s.date.slice(0, 10) === today
+  );
+  if (alreadyToday) return { success: false, message: 'ALREADY_TODAY', instructorPts: 0, studentPts: 0 };
+
+  // ── 指導者ポイント（通常対局勝利相当）────────────────────
+  const eventActive = isEventActive();
+  const eventMult = eventActive ? (settings.eventMultiplier || 1) : 1;
+  const spam = spamPenaltyFor(instructorId);
+  const instrBase = 10;
+  const instrStreak = Math.min((instructor.currentStreak || 0) * 2, 6);
+  const instrNewMember = instructor.isNewMember ? 3 : 0;
+  const instrSubtotal = Math.round((instrBase + instrStreak + instrNewMember) * spam);
+  const instrPts = Math.round(instrSubtotal * eventMult);
+
+  // ── 受講者ポイント（通常5pt × 3倍）────────────────────
+  const stdBase = 5;
+  const stdSpam = spamPenaltyFor(studentId);
+  const stdNewMember = student.isNewMember ? 3 : 0;
+  const stdSubtotal = Math.round((stdBase + stdNewMember) * stdSpam);
+  const stdPts = Math.round(stdSubtotal * eventMult * 3);
+
+  // ── Snapshot for undo ──────────────────────────────────
+  pushUndoSnapshot('MATCH', `指導対局: ${instructor.name} → ${student.name}`);
+
+  // ── 指導者ステータス更新 ────────────────────────────────
+  instructor.totalPoints   = (instructor.totalPoints   || 0) + instrPts;
+  instructor.monthlyPoints = (instructor.monthlyPoints || 0) + instrPts;
+  instructor.pointsMatch   = (instructor.pointsMatch   || 0) + instrPts;
+  instructor.wins          = (instructor.wins          || 0) + 1;
+  instructor.currentStreak = (instructor.currentStreak || 0) + 1;
+  instructor.maxStreak     = Math.max(instructor.maxStreak || 0, instructor.currentStreak);
+
+  // ── 受講者ステータス更新（レート変動なし）──────────────
+  student.totalPoints   = (student.totalPoints   || 0) + stdPts;
+  student.monthlyPoints = (student.monthlyPoints || 0) + stdPts;
+  student.pointsMatch   = (student.pointsMatch   || 0) + stdPts;
+
+  saveUsers(allUsers);
+
+  // ── 活動ログ ───────────────────────────────────────────
+  const now = new Date().toISOString();
+  appendLogs([
+    { id: randomId(), userId: instructorId, type: ActivityType.MATCH_WIN,  points: instrPts, description: `指導対局（指導者）: vs ${student.name}`, date: now },
+    { id: randomId(), userId: studentId,   type: ActivityType.MATCH_LOSS, points: stdPts,   description: `指導対局（受講）: vs ${instructor.name} +${stdPts}pt（3倍）`, date: now },
+  ]);
+
+  // ── セッション記録 ─────────────────────────────────────
+  const session: InstructorSession = {
+    id: randomId(),
+    date: now,
+    instructorId,
+    instructorName: instructor.name,
+    studentId,
+    studentName: student.name,
+    content,
+    instructorPointsEarned: instrPts,
+    studentPointsEarned: stdPts,
+  };
+  sessions.push(session);
+  saveCoachingSessions(sessions);
+
+  return { success: true, message: 'OK', instructorPts: instrPts, studentPts: stdPts };
+};
+
+/** 指導者設定：isInstructor フラグを切り替え */
+export const toggleInstructor = (userId: string): void => {
+  const all = getRawUsers();
+  const u = all.find(x => x.id === userId);
+  if (!u) return;
+  u.isInstructor = !u.isInstructor;
+  saveUsers(all);
+};
+
+/** 指導者PIN変更 */
+export const changeInstructorPin = (newPin: string): void => {
+  const settings = getSettings();
+  settings.instructorPin = newPin;
+  saveSettings(settings);
 };

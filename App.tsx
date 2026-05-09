@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { HashRouter, Routes, Route, useLocation, Link } from 'react-router-dom';
-import { Home, Trophy, User as UserIcon, Settings, PlusCircle, BookOpen, Cloud, CloudOff, RefreshCw, Loader, AlertCircle, Wrench, Crown } from 'lucide-react';
+import { Home, Trophy, User as UserIcon, Settings, PlusCircle, BookOpen, Cloud, CloudOff, RefreshCw, Loader, AlertCircle, Wrench, Crown, GraduationCap } from 'lucide-react';
 import { seedData, loadFromCloud, getUsers, getSyncStatus, manualSync, LoadResult, getMaintenanceState } from './storage';
 import { initAppCheck } from './appCheck';
 import { SyncMeta } from './types';
@@ -12,6 +12,7 @@ import Profile      from './Profile';
 import ProfileView  from './ProfileView';
 import Admin        from './Admin';
 import { Guide }    from './Guide';
+import Coaching     from './Coaching';
 import { Screensaver } from './Screensaver';
 import { Tutorial, isTutorialDone } from './Tutorial';
 import UndoPanel    from './UndoPanel';
@@ -122,13 +123,14 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // 公開ページルートは廃止 — すべてアプリシェルを使用
 
   const navItems = [
-    { path: '/',           icon: Home,       label: 'ホーム' },
-    { path: '/rankings',   icon: Trophy,     label: 'ランキング' },
-    { path: '/fourKings',  icon: Crown,      label: '四天王' },
-    { path: '/match',      icon: PlusCircle, label: '対戦記録' },
-    { path: '/profile',    icon: UserIcon,   label: '個人データ' },
-    { path: '/guide',      icon: BookOpen,   label: 'ガイド' },
-    { path: '/admin',      icon: Settings,   label: '管理画面' },
+    { path: '/',           icon: Home,           label: 'ホーム' },
+    { path: '/rankings',   icon: Trophy,         label: 'ランキング' },
+    { path: '/fourKings',  icon: Crown,          label: '四天王' },
+    { path: '/coaching',   icon: GraduationCap,  label: '指導対局' },
+    { path: '/match',      icon: PlusCircle,     label: '対戦記録' },
+    { path: '/profile',    icon: UserIcon,       label: '個人データ' },
+    { path: '/guide',      icon: BookOpen,       label: 'ガイド' },
+    { path: '/admin',      icon: Settings,       label: '管理画面' },
   ];
 
   return (
@@ -335,6 +337,7 @@ const App: React.FC = () => {
           <Route path="/rankings"            element={<Rankings />} />
           <Route path="/fourKings"           element={<FourKingsHistory />} />
           <Route path="/match"               element={<MatchEntry />} />
+          <Route path="/coaching"            element={<Coaching />} />
           <Route path="/profile"             element={<Profile />} />
           <Route path="/profile/:userId"     element={<ProfileView />} />
           <Route path="/guide"               element={<Guide />} />

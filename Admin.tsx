@@ -14,6 +14,7 @@ import {
   updateProfilePin, clearSystemTitleHistory,
   getApprovedDevices, approveThisDevice, revokeDevice, getOrCreateDeviceToken, isDeviceApproved,
   finalizeFactionWar,
+  toggleInstructor, changeInstructorPin,
 } from './storage';
 import { User, SystemSettings, Season, EventType, SyncMeta, AutoBackupEntry, MaintenanceState, RankApplication, ActivityLog, ActivityType } from './types';
 import { Card } from './Card';
@@ -23,7 +24,7 @@ import {
   CheckCircle, Shuffle, Users, Crown, ChevronRight, X,
   RefreshCw, Languages, FileUp, Upload, Swords, Cloud,
   CloudOff, AlertCircle, Loader, UserCheck, UserX, RotateCcw,
-  Wrench, Medal, Check, KeyRound, Star, Lock, LogOut
+  Wrench, Medal, Check, KeyRound, Star, Lock, LogOut, GraduationCap as GraduationCapIcon
 } from 'lucide-react';
 import { UserSelector } from './UserSelector';
 import MaintenancePanel from './MaintenancePanel';
@@ -81,6 +82,11 @@ const Admin: React.FC = () => {
   const [newChangePass, setNewChangePass] = useState('');
   const [newChangePassConfirm, setNewChangePassConfirm] = useState('');
   const [changePassMsg, setChangePassMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+
+  // Instructor PIN change
+  const [newInstructorPin, setNewInstructorPin] = useState('');
+  const [newInstructorPinConfirm, setNewInstructorPinConfirm] = useState('');
+  const [instructorPinMsg, setInstructorPinMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
 
   // Auto backups
   const [autoBackups, setAutoBackups] = useState<AutoBackupEntry[]>([]);
@@ -294,6 +300,18 @@ const Admin: React.FC = () => {
     setNewAdminPinConfirm('');
     setAdminPinMsg({ type: 'ok', text: '管理者PINを変更しました' });
     setTimeout(() => setAdminPinMsg(null), 3000);
+  };
+
+  const handleInstructorPinChange = () => {
+    if (newInstructorPin.length !== 6) { setInstructorPinMsg({ type: 'err', text: '6桁で入力してください' }); return; }
+    if (newInstructorPin !== newInstructorPinConfirm) { setInstructorPinMsg({ type: 'err', text: '確認PINが一致しません' }); return; }
+    changeInstructorPin(newInstructorPin);
+    const updated = { ...settings, instructorPin: newInstructorPin };
+    setSettings(updated);
+    setNewInstructorPin('');
+    setNewInstructorPinConfirm('');
+    setInstructorPinMsg({ type: 'ok', text: '指導者PINを変更しました' });
+    setTimeout(() => setInstructorPinMsg(null), 3000);
   };
 
   const handleChangePassChange = () => {
@@ -925,6 +943,9 @@ const Admin: React.FC = () => {
                         <button onClick={() => toggleNewMember(u.id)} className={`px-3 py-1.5 rounded-lg text-[10px] font-black border transition-all ${u.isNewMember ? 'bg-green-900/30 text-green-400 border-green-600' : 'bg-slate-900 text-slate-500 border-slate-700'}`}>
                           {u.isNewMember ? '🔰 新入' : '一般'}
                         </button>
+                        <button onClick={() => { toggleInstructor(u.id); setUsers(getUsers()); }} className={`px-3 py-1.5 rounded-lg text-[10px] font-black border transition-all ${u.isInstructor ? 'bg-yellow-900/30 text-yellow-300 border-yellow-600' : 'bg-slate-900 text-slate-500 border-slate-700'}`}>
+                          {u.isInstructor ? '🎓 指導者' : '指導者OFF'}
+                        </button>
                         {/* ★ Soft delete button */}
                         <button onClick={() => handleDeactivateUser(u.id, u.name)} className="text-slate-500 hover:text-yellow-500 p-2 transition-colors" title="休眠（データ保持）">
                           <UserX size={18} />
@@ -1343,6 +1364,51 @@ const Admin: React.FC = () => {
                 className="w-full bg-red-700 hover:bg-red-600 disabled:bg-slate-700 disabled:text-slate-500 text-white py-3 rounded-xl font-black transition-all active:scale-[0.98]"
               >
                 管理者PINを変更する
+              </button>
+            </div>
+          </Card>
+
+          {/* 指導者PIN変更 */}
+          <Card title="指導者PIN変更" icon={<GraduationCapIcon className="text-yellow-400" size={18} />}>
+            <div className="space-y-4">
+              <p className="text-xs text-slate-400 font-bold leading-relaxed">
+                指導対局記録時に全指導者共通で使用するPINです。<br/>
+                <span className="text-yellow-400">初期値は 000000 です。必ず変更してください。</span>
+              </p>
+              {instructorPinMsg && (
+                <div className={`flex items-center gap-2 p-3 rounded-xl border text-sm font-bold ${instructorPinMsg.type === 'ok' ? 'bg-green-900/20 border-green-700/40 text-green-300' : 'bg-red-900/20 border-red-700/40 text-red-300'}`}>
+                  {instructorPinMsg.type === 'ok' ? <Check size={14}/> : <X size={14}/>}
+                  {instructorPinMsg.text}
+                </div>
+              )}
+              <div>
+                <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2">新しい指導者PIN（6桁）</label>
+                <input
+                  type="password"
+                  value={newInstructorPin}
+                  onChange={e => setNewInstructorPin(e.target.value.replace(/\D/g,'').slice(0,6))}
+                  placeholder="000000"
+                  maxLength={6}
+                  className="w-full p-3 border border-slate-700 rounded-xl font-mono text-2xl tracking-[0.5em] text-center bg-slate-800 text-white focus:border-yellow-500 outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2">確認（もう一度入力）</label>
+                <input
+                  type="password"
+                  value={newInstructorPinConfirm}
+                  onChange={e => setNewInstructorPinConfirm(e.target.value.replace(/\D/g,'').slice(0,6))}
+                  placeholder="000000"
+                  maxLength={6}
+                  className="w-full p-3 border border-slate-700 rounded-xl font-mono text-2xl tracking-[0.5em] text-center bg-slate-800 text-white focus:border-yellow-500 outline-none"
+                />
+              </div>
+              <button
+                onClick={handleInstructorPinChange}
+                disabled={newInstructorPin.length < 6 || newInstructorPinConfirm.length < 6}
+                className="w-full bg-yellow-700 hover:bg-yellow-600 disabled:bg-slate-700 disabled:text-slate-500 text-white py-3 rounded-xl font-black transition-all active:scale-[0.98]"
+              >
+                指導者PINを変更する
               </button>
             </div>
           </Card>

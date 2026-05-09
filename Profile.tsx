@@ -13,14 +13,15 @@ import {
   getLogs, getSettings, isEventActive, getUserFrameDef, SYSTEM_TITLES,
   submitRankApplication, getUserSystemTitleHistory, clearPendingMissionAlert,
   isDeviceApproved, markFactionWarResultSeen, syncMyProfileOnly,
+  getCoachingSessions,
 } from './storage';
-import { User, MatchRecord, ActivityLog, ActivityType, RankEntry, EventType, SystemSettings } from './types';
+import { User, MatchRecord, ActivityLog, ActivityType, RankEntry, EventType, SystemSettings, InstructorSession } from './types';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import {
   ArrowLeft, Tag, Star, Crown, Swords, Search, Skull, Smile, Lock,
   Grid, Shield, Medal, Plus, Check, X as XIcon, Award, TrendingUp,
   Calendar, ChevronRight, Edit3, List, Flame, Snowflake, ChevronUp, ChevronDown,
-  LogIn, LogOut,
+  LogIn, LogOut, GraduationCap,
 } from 'lucide-react';
 import { UserSelector } from './UserSelector';
 import { useNavigate } from 'react-router-dom';
@@ -932,6 +933,11 @@ const Profile: React.FC = () => {
     .filter(m => m.player1Id === selectedId || m.player2Id === selectedId)
     .slice(0, 10);
   const recentLogs = getLogs().filter(l => l.userId === selectedId).slice(0, 8);
+  const allCoachingSessions = getCoachingSessions();
+  const myCoachingSessions = allCoachingSessions
+    .filter(s => s.instructorId === selectedId || s.studentId === selectedId)
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, 10);
   const maxPt      = Math.max(user.pointsMatch || 0, user.pointsAttendance || 0, user.pointsSpecial || 0, 1);
   const unlockedAch = ACHIEVEMENTS_DATA.filter(a => user.achievements.includes(a.id));
 
@@ -1449,6 +1455,40 @@ const Profile: React.FC = () => {
                 <span className="text-sm font-black text-amber-400 shrink-0">+{l.points}</span>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+      {/* ─── 指導対局履歴 ─── */}
+      {myCoachingSessions.length > 0 && (
+        <div className="bg-slate-900 border border-white/5 rounded-2xl p-4">
+          <div className="text-[10px] font-black text-yellow-500 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+            <GraduationCap size={11}/> 指導対局履歴
+          </div>
+          <div className="space-y-0">
+            {myCoachingSessions.map(s => {
+              const isInstructor = s.instructorId === selectedId;
+              return (
+                <div key={s.id} className="flex items-start justify-between py-2.5 border-b border-white/5 last:border-0 gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[10px] text-slate-500 mb-0.5">
+                      {new Date(s.date).toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full border ${isInstructor ? 'bg-yellow-900/40 text-yellow-300 border-yellow-700/40' : 'bg-emerald-900/40 text-emerald-300 border-emerald-700/40'}`}>
+                        {isInstructor ? '指導者' : '受講'}
+                      </span>
+                      <span className="text-xs font-bold text-slate-300 truncate">
+                        {isInstructor ? `→ ${s.studentName}` : `← ${s.instructorName}`}
+                      </span>
+                    </div>
+                    <div className="text-[10px] text-slate-500 mt-0.5 truncate">{s.content}</div>
+                  </div>
+                  <span className={`text-sm font-black shrink-0 ${isInstructor ? 'text-yellow-400' : 'text-emerald-400'}`}>
+                    +{isInstructor ? s.instructorPointsEarned : s.studentPointsEarned}pt
+                  </span>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

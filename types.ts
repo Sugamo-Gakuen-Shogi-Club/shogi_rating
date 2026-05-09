@@ -125,6 +125,8 @@ export interface User {
   unlockedFrames?: string[];
   // ★ 永続称号（「第n代 覇者」など、退任後も保持）
   earnedHonors?: string[];
+  /** ★ 指導者フラグ */
+  isInstructor?: boolean;
   /** ★ ミッション達成通知（次回個人ページログイン時に表示） */
   pendingMissionAlert?: string[];
   /** ★ 紅白戦結果発表を既読済みか（closedAtをキーとして保持） */
@@ -187,6 +189,8 @@ export interface SystemSettings {
     merit2?: string[];
     merit3?: string[];
   } | null;
+  /** ★ 指導対局PIN（全指導者共通・初期値 "000000"） */
+  instructorPin?: string;
 }
 
 export interface ActivityLog {
@@ -352,4 +356,19 @@ export interface MissionAchieved {
   userName: string;
   mission: MissionDef;
   rewardPts: number;
+}
+
+// ============================================================
+// COACHING SYSTEM（指導対局）
+// ============================================================
+export interface InstructorSession {
+  id: string;
+  date: string;            // ISO日時
+  instructorId: string;
+  instructorName: string;
+  studentId: string;
+  studentName: string;
+  content: string;         // 指導内容（簡潔に）
+  instructorPointsEarned: number;
+  studentPointsEarned: number;  // 3倍
 }
