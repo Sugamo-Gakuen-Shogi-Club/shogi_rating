@@ -327,7 +327,7 @@ const Coaching: React.FC = () => {
           }}
           onClose={() => setShowStudentSelector(false)}
           excludeIds={[selectedInstructor.id]}
-          mode="ATTENDANCE"
+          mode="SIMPLE"
           title="受講者を選択"
           zIndex={200}
         />
