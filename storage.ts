@@ -970,6 +970,7 @@ interface CloudSnapshot {
   missionProgress?: any[];
   approvedDevices?: { token: string; label: string; approvedAt: string }[];
   titleHistory?: SystemTitleSnapshot;
+  coaching?: InstructorSession[];
   meta?: { updatedAt?: string };
 }
 
@@ -1123,6 +1124,15 @@ const _applyCloud = (cloud: CloudSnapshot): void => {
     window.dispatchEvent(new CustomEvent('rivals-rank-apps-changed', { detail: cloud.rankApps }));
   }
 
+  if (cloud.coaching && Array.isArray(cloud.coaching)) {
+    // IDベースでマージ（ローカルにないものを追加）
+    const local = getCoachingSessions();
+    const localIds = new Set(local.map(s => s.id));
+    const merged = [...local, ...cloud.coaching.filter(s => !localIds.has(s.id))];
+    merged.sort((a, b) => a.date.localeCompare(b.date));
+    localStorage.setItem(COACHING_KEY, JSON.stringify(merged));
+  }
+
   // ── ミッション進捗（達成済みを優先）────────────────────────
   if (cloud.missionProgress && Array.isArray(cloud.missionProgress)) {
     const local = _getMissionProgressAll();
@@ -1149,6 +1159,7 @@ const _fullResetLocal = (cloud: CloudSnapshot): void => {
   if (cloud.approvedDevices) localStorage.setItem(APPROVED_DEVICES_KEY, JSON.stringify(cloud.approvedDevices));
   if (cloud.rankApps)  localStorage.setItem(RANK_APPS_KEY, JSON.stringify(cloud.rankApps));
   if (cloud.missionProgress) localStorage.setItem(MISSION_PROGRESS_KEY, JSON.stringify(cloud.missionProgress));
+  if (cloud.coaching)  localStorage.setItem(COACHING_KEY, JSON.stringify(cloud.coaching));
 
   localStorage.removeItem(UNDO_KEY);
   window.dispatchEvent(new CustomEvent('rivals-users-changed'));
@@ -3397,6 +3408,9 @@ export const recordCoachingSession = (
   };
   sessions.push(session);
   saveCoachingSessions(sessions);
+
+  // Firebaseに同期
+  _write('coaching', sessions).catch(() => {});
 
   return { success: true, message: 'OK', instructorPts: instrPts, studentPts: stdPts };
 };
