@@ -912,7 +912,7 @@ const Admin: React.FC = () => {
               <div className="space-y-3 p-4 bg-slate-900/50 rounded-2xl border border-white/5">
                 <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-3">
                   <input type="text" value={newName} onChange={e => setNewName(e.target.value)} placeholder="名前（例：秀村 紘嗣）" className="w-full p-3 border border-slate-700 rounded-xl bg-slate-800 text-white font-bold focus:ring-2 focus:ring-blue-500 outline-none" />
-                  <input type="text" value={newReading} onChange={e => setNewReading(e.target.value)} placeholder="読み（例：ひでむら ひろし）" className="w-full p-3 border border-slate-700 rounded-xl bg-slate-800 text-white font-bold focus:ring-2 focus:ring-blue-500 outline-none" />
+                  <input type="text" value={newReading} onChange={e => setNewReading(e.target.value)} placeholder="読み（例：ひでむら こうじ）" className="w-full p-3 border border-slate-700 rounded-xl bg-slate-800 text-white font-bold focus:ring-2 focus:ring-blue-500 outline-none" />
                   <input type="text" value={newStudentId} onChange={e => setNewStudentId(e.target.value.replace(/\D/g,''))} placeholder="学籍番号（例：125010）" className={`w-full p-3 border rounded-xl bg-slate-800 text-white font-bold focus:ring-2 outline-none ${newStudentId ? 'border-slate-700 focus:ring-indigo-500' : 'border-yellow-500/60 focus:ring-yellow-500'}`} />
                   <button onClick={handleAddUser} disabled={!newName.trim() || !newStudentId.trim()} className="bg-blue-600 disabled:bg-slate-700 disabled:text-slate-500 text-white px-6 py-3 rounded-xl font-bold shadow-lg hover:bg-blue-500 flex items-center justify-center gap-2 md:col-span-1 transition-all">
                     <Plus size={20} /> 追加
