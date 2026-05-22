@@ -314,6 +314,7 @@ const Rankings: React.FC = () => {
   const users   = getUsers();
   const matches = getMatches();
   const [activeTab, setActiveTab] = useState<TabKey>('seasonGrowth');
+  const [showTabSelector, setShowTabSelector] = useState(false);
 
   // 最終活動日（出席が1件でも記録された日を活動日とみなす）
   const lastActivityDate = getSettings().lastActivityDate;
@@ -371,7 +372,7 @@ const Rankings: React.FC = () => {
 
   const getScore = (u: User, key: TabKey): number => {
     switch (key) {
-      case 'seasonGrowth':  return (u.rate + u.totalPoints) - (u.seasonStartRate + u.seasonStartPoints);
+      case 'seasonGrowth':  return (u.rate - u.seasonStartRate) + Math.round((u.totalPoints - u.seasonStartPoints) * 0.5);
       case 'rate':          return u.rate;
       case 'activityDays':  return u.activityDays || 0;
       case 'totalPoints':   return u.totalPoints;
@@ -446,7 +447,7 @@ const Rankings: React.FC = () => {
       <div className="overflow-x-auto scrollbar-hide -mx-1 px-1">
         <div className="flex gap-1.5 min-w-max pb-1">
           {TABS.map(t => (
-            <button key={t.key} onClick={() => setActiveTab(t.key)}
+            <button key={t.key} onClick={() => { setActiveTab(t.key); setShowTabSelector(false); }}
               className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black transition-all whitespace-nowrap relative ${
                 activeTab === t.key
                   ? t.key === 'fourKings'
@@ -465,6 +466,26 @@ const Rankings: React.FC = () => {
           ))}
         </div>
       </div>
+
+      {/* 今期成長ヒーローカード（seasonGrowthタブ選択時に大きく表示） */}
+      {activeTab === 'seasonGrowth' && (() => {
+        const top = sortedUsers[0];
+        if (!top) return null;
+        const rateGrowth = Math.round(top.rate - top.seasonStartRate);
+        const ptsGrowth  = top.totalPoints - top.seasonStartPoints;
+        const score      = getScore(top, 'seasonGrowth');
+        return (
+          <div className="rounded-[2rem] bg-gradient-to-br from-blue-900/60 via-indigo-900/50 to-slate-900/60 border border-blue-500/30 p-6 flex flex-col items-center gap-2 shadow-2xl">
+            <div className="text-[10px] font-black text-blue-400 uppercase tracking-widest">👑 今期トップ</div>
+            <div className="text-4xl font-black text-white mt-1">{top.name}</div>
+            <div className="text-6xl font-black font-mono text-yellow-300 mt-2">{score >= 0 ? `+${score}` : score}</div>
+            <div className="flex gap-6 mt-2 text-sm font-bold text-slate-400">
+              <span>Rate {rateGrowth >= 0 ? '+' : ''}{rateGrowth}</span>
+              <span>Pt×½ {ptsGrowth >= 0 ? '+' : ''}{Math.round(ptsGrowth * 0.5)}</span>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* 四天王基準タブ */}
       {activeTab === 'fourKings' && (

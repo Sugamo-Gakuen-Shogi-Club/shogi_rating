@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   getUsers, saveUsers, getSettings, saveSettings,
-  manualPointAdjustment, manualRateAdjustment, resetMonthly,
+  manualPointAdjustment, manualRateAdjustment, resetMonthly, grantBatch,
   isEventActive, exportData, importData, getMatches, deleteMatch,
   assignGenerals, resetEventPoints, getFactionBalanceSimulation,
-  awardSystemTitles, snapshotSeasonBaseline, updateUserReading,
+  awardSystemTitles, snapshotSeasonBaseline, snapshotCampBaseline, updateUserReading,
   parseUserCSV, bulkAddUsers,
   deactivateUser, reactivateUser, getInactiveUsers,
   manualSync, getSyncStatus, getAutoBackups, restoreFromAutoBackup,
@@ -58,6 +58,14 @@ const Admin: React.FC = () => {
   const [approveAdminPin, setApproveAdminPin] = useState('');
   const [approveAdminErr, setApproveAdminErr] = useState(false);
   const [approveLabel, setApproveLabel] = useState('部室iPad');
+  const [campLabel, setCampLabel] = useState('');
+
+  // 一括付与
+  const [batchMode, setBatchMode]       = useState<'POINT' | 'RATE'>('POINT');
+  const [batchSelected, setBatchSelected] = useState<Record<string, boolean>>({});
+  const [batchValue, setBatchValue]     = useState(0);
+  const [batchReason, setBatchReason]   = useState('');
+  const [batchCsvError, setBatchCsvError] = useState<string | null>(null);
 
   // Sync state
   const [syncMeta, setSyncMeta] = useState<SyncMeta>(getSyncStatus());
@@ -912,7 +920,7 @@ const Admin: React.FC = () => {
               <div className="space-y-3 p-4 bg-slate-900/50 rounded-2xl border border-white/5">
                 <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-3">
                   <input type="text" value={newName} onChange={e => setNewName(e.target.value)} placeholder="名前（例：秀村 紘嗣）" className="w-full p-3 border border-slate-700 rounded-xl bg-slate-800 text-white font-bold focus:ring-2 focus:ring-blue-500 outline-none" />
-                  <input type="text" value={newReading} onChange={e => setNewReading(e.target.value)} placeholder="読み（例：ひでむら こうじ）" className="w-full p-3 border border-slate-700 rounded-xl bg-slate-800 text-white font-bold focus:ring-2 focus:ring-blue-500 outline-none" />
+                  <input type="text" value={newReading} onChange={e => setNewReading(e.target.value)} placeholder="読み（例：ひでむら ひろし）" className="w-full p-3 border border-slate-700 rounded-xl bg-slate-800 text-white font-bold focus:ring-2 focus:ring-blue-500 outline-none" />
                   <input type="text" value={newStudentId} onChange={e => setNewStudentId(e.target.value.replace(/\D/g,''))} placeholder="学籍番号（例：125010）" className={`w-full p-3 border rounded-xl bg-slate-800 text-white font-bold focus:ring-2 outline-none ${newStudentId ? 'border-slate-700 focus:ring-indigo-500' : 'border-yellow-500/60 focus:ring-yellow-500'}`} />
                   <button onClick={handleAddUser} disabled={!newName.trim() || !newStudentId.trim()} className="bg-blue-600 disabled:bg-slate-700 disabled:text-slate-500 text-white px-6 py-3 rounded-xl font-bold shadow-lg hover:bg-blue-500 flex items-center justify-center gap-2 md:col-span-1 transition-all">
                     <Plus size={20} /> 追加
@@ -1217,6 +1225,39 @@ const Admin: React.FC = () => {
                   {Object.values(Season).map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
+              {/* 合宿ベースライン */}
+              <div className="border-t border-white/5 pt-4 space-y-3">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block">合宿表彰ベースライン</label>
+                {settings.campBaselineLabel && (
+                  <p className="text-[11px] text-indigo-400 font-bold">
+                    📌 現在の起点: {settings.campBaselineLabel}
+                  </p>
+                )}
+                <p className="text-[10px] text-slate-600">学期開始時に記録。合宿で「学期またぎの成長度」を表彰するための基準点です。</p>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="例: 2025 夏季合宿"
+                    value={campLabel}
+                    onChange={e => setCampLabel(e.target.value)}
+                    className="flex-1 p-3 border border-slate-700 rounded-xl font-bold bg-slate-900 text-white focus:border-indigo-500 outline-none text-sm"
+                  />
+                  <button
+                    onClick={() => {
+                      const label = campLabel.trim() || `${settings.currentSeason} 起点`;
+                      if (window.confirm(`合宿ベースラインを「${label}」として記録しますか？\n全部員の現在のレート・ポイントが起点として保存されます。`)) {
+                        snapshotCampBaseline(label);
+                        setSettings(getSettings());
+                        setCampLabel('');
+                        alert('合宿ベースラインを記録しました。');
+                      }
+                    }}
+                    className="px-4 py-2 bg-indigo-700 hover:bg-indigo-600 text-white rounded-xl font-black text-sm transition-all whitespace-nowrap"
+                  >
+                    起点を記録
+                  </button>
+                </div>
+              </div>
               {/* シーズン終了日 */}
               <div className="border-t border-white/5 pt-4">
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block mb-2">
@@ -1480,6 +1521,113 @@ const Admin: React.FC = () => {
                 className="w-full p-3 border border-slate-700 rounded-xl font-bold text-slate-400 flex items-center justify-center gap-3 hover:bg-white/5">
                 <History size={18}/> 今月のポイントをリセット
               </button>
+            </div>
+          </Card>
+
+          <Card title="一括付与" icon={<FileUp className="text-purple-400" />}>
+            <div className="space-y-4">
+              {/* ポイント/レート切り替え */}
+              <div className="flex gap-1 bg-slate-900 p-1 rounded-xl border border-slate-700">
+                <button onClick={() => setBatchMode('POINT')} className={`flex-1 py-3 rounded-lg text-xs font-bold transition-all ${batchMode === 'POINT' ? 'bg-amber-600 text-white shadow-lg' : 'text-slate-500'}`}>ポイント</button>
+                <button onClick={() => setBatchMode('RATE')}  className={`flex-1 py-3 rounded-lg text-xs font-bold transition-all ${batchMode === 'RATE'  ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-500'}`}>レート</button>
+              </div>
+
+              {/* 部員チェックリスト */}
+              <div className="space-y-1 max-h-52 overflow-y-auto pr-1">
+                <button
+                  onClick={() => {
+                    const allIds = users.reduce<Record<string, boolean>>((acc, u) => { acc[u.id] = true; return acc; }, {});
+                    const allSelected = users.every(u => batchSelected[u.id]);
+                    setBatchSelected(allSelected ? {} : allIds);
+                  }}
+                  className="text-[11px] font-bold text-blue-400 hover:text-blue-300 px-1"
+                >
+                  {users.every(u => batchSelected[u.id]) ? '全解除' : '全選択'}
+                </button>
+                {users.map(u => (
+                  <label key={u.id} className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-800 cursor-pointer">
+                    <input type="checkbox" checked={!!batchSelected[u.id]} onChange={e => setBatchSelected(s => ({ ...s, [u.id]: e.target.checked }))}
+                      className="w-4 h-4 accent-purple-500"/>
+                    <span className="text-sm font-bold text-white">{u.name}</span>
+                    <span className="ml-auto text-xs text-slate-500 font-mono">{batchMode === 'POINT' ? `${u.totalPoints}pt` : `R${u.rate}`}</span>
+                  </label>
+                ))}
+              </div>
+
+              {/* 値・理由 */}
+              <div className="flex gap-2">
+                <input type="number" value={batchValue} onChange={e => setBatchValue(Number(e.target.value))}
+                  className="w-24 p-3 border border-slate-700 rounded-xl font-bold text-center bg-slate-900 text-white" placeholder="値"/>
+                <input type="text" value={batchReason} onChange={e => setBatchReason(e.target.value)}
+                  className="flex-1 p-3 border border-slate-700 rounded-xl font-bold bg-slate-900 text-white" placeholder="理由"/>
+              </div>
+
+              {/* 実行ボタン */}
+              <button
+                onClick={() => {
+                  const targets = users.filter(u => batchSelected[u.id]);
+                  if (targets.length === 0) { alert('部員を選択してください'); return; }
+                  if (batchValue === 0) { alert('値を入力してください'); return; }
+                  if (!window.confirm(`${targets.length}名に ${batchMode === 'POINT' ? `${batchValue}pt` : `レート${batchValue}`} を付与しますか？`)) return;
+                  grantBatch(
+                    targets.map(u => batchMode === 'POINT' ? { userId: u.id, pts: batchValue } : { userId: u.id, rate: batchValue }),
+                    batchReason || '一括付与'
+                  );
+                  refreshData();
+                  setBatchSelected({});
+                  setBatchValue(0);
+                  alert(`✅ ${targets.length}名に付与しました`);
+                }}
+                className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-3 rounded-xl font-black shadow-lg active:scale-[0.98]"
+              >
+                {Object.values(batchSelected).filter(Boolean).length}名に付与する
+              </button>
+
+              {/* CSV一括付与 */}
+              <div className="border-t border-white/5 pt-4 space-y-2">
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">CSV一括付与</p>
+                <p className="text-[10px] text-slate-600">A列: 部員名、B列: ポイント（ヘッダー行不要）</p>
+                {batchCsvError && <p className="text-xs text-red-400 font-bold">{batchCsvError}</p>}
+                <label className="flex items-center justify-center gap-2 w-full py-3 border border-dashed border-purple-700 rounded-xl text-purple-400 font-bold text-sm cursor-pointer hover:bg-purple-900/20 transition-all">
+                  <FileUp size={16}/> CSVを読み込む
+                  <input type="file" accept=".csv,text/csv" className="hidden" onChange={e => {
+                    setBatchCsvError(null);
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = ev => {
+                      try {
+                        const text = ev.target?.result as string;
+                        const lines = text.split(/\r?\n/).filter(l => l.trim());
+                        const grants: { userId: string; pts: number }[] = [];
+                        const notFound: string[] = [];
+                        lines.forEach(line => {
+                          const cols = line.split(',');
+                          const name = cols[0]?.trim();
+                          const pts  = parseInt(cols[1]?.trim() ?? '', 10);
+                          if (!name || isNaN(pts)) return;
+                          const u = users.find(u => u.name === name);
+                          if (!u) { notFound.push(name); return; }
+                          grants.push({ userId: u.id, pts });
+                        });
+                        if (notFound.length > 0) {
+                          setBatchCsvError(`名前が見つかりません: ${notFound.join(', ')}`);
+                          return;
+                        }
+                        if (grants.length === 0) { setBatchCsvError('有効なデータがありません'); return; }
+                        if (!window.confirm(`${grants.length}名に付与します。\n${grants.map(g => `${users.find(u=>u.id===g.userId)?.name}: +${g.pts}pt`).join('\n')}`)) return;
+                        grantBatch(grants, 'CSV一括付与');
+                        refreshData();
+                        alert(`✅ ${grants.length}名に付与しました`);
+                      } catch {
+                        setBatchCsvError('CSVの読み込みに失敗しました');
+                      }
+                    };
+                    reader.readAsText(file, 'UTF-8');
+                    e.target.value = '';
+                  }}/>
+                </label>
+              </div>
             </div>
           </Card>
 

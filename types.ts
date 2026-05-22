@@ -103,6 +103,8 @@ export interface User {
 
   currentStreak: number;
   maxStreak: number;
+  /** ★ 連続出席ストリーク（活動日ベース） */
+  attendanceStreak: number;
   upsetWins: number;      // 格上撃破（レート差+100以上）の累計
   lossStreak: number;     // 現在の連敗数（comeback 判定用）
   wins: number;
@@ -191,6 +193,12 @@ export interface SystemSettings {
   } | null;
   /** ★ 指導対局PIN（全指導者共通・初期値 "000000"） */
   instructorPin?: string;
+  /** ★ クラブ活動日カレンダー（1人でも出席した日付の配列 YYYY-MM-DD） */
+  activityDates?: string[];
+  /** ★ 合宿表彰用スナップショット */
+  campBaselineRate?:   Record<string, number>;
+  campBaselinePoints?: Record<string, number>;
+  campBaselineLabel?:  string | null;
 }
 
 export interface ActivityLog {

@@ -53,7 +53,7 @@ const DEFAULT_SETTINGS: SystemSettings = {
 };
 
 // 初期レートは0（負けで減る仕様のため）
-const INITIAL_RATE = 0;
+const INITIAL_RATE = 500;
 
 const DEFAULT_UNLOCKED_ICONS = [
   'DEFAULT_INITIAL', 'DEFAULT_SMILE', 'DEFAULT_CAT', 'DEFAULT_DOG',
@@ -1202,6 +1202,7 @@ const _mergeUser = (local: User, cloud: User): User => {
     rateHistory:    cloudIsNewer ? (cloud.rateHistory ?? local.rateHistory) : local.rateHistory,
     currentStreak:  cloudIsNewer ? (cloud.currentStreak ?? local.currentStreak) : local.currentStreak,
     lossStreak:     cloudIsNewer ? (cloud.lossStreak ?? local.lossStreak) : local.lossStreak,
+    attendanceStreak: cloudIsNewer ? (cloud.attendanceStreak ?? local.attendanceStreak ?? 0) : (local.attendanceStreak ?? 0),
 
     // 出席: 最新日付を採用
     lastAttendance: _laterDate(local.lastAttendance, cloud.lastAttendance),
@@ -1556,6 +1557,7 @@ const normalizeUser = (user: any): User => ({
   maxStreak:      user.maxStreak      ?? 0,
   upsetWins:      user.upsetWins      ?? 0,
   lossStreak:     user.lossStreak     ?? 0,
+  attendanceStreak: user.attendanceStreak ?? 0,
   activityDays:   user.activityDays   ?? 0,
   totalPoints:    user.totalPoints    ?? 0,
   monthlyPoints:  user.monthlyPoints  ?? 0,
@@ -1796,12 +1798,43 @@ export const recordAttendance = (userId: string): AttendanceResult => {
   // ★ Undo snapshot
   pushUndoSnapshot('ATTENDANCE', `出席: ${user.name}`);
 
-  const pts = 5;
-  user.lastAttendance   = new Date().toISOString();
-  user.totalPoints      += pts;
-  user.monthlyPoints    += pts;
-  user.pointsAttendance  = (user.pointsAttendance || 0) + pts;
-  user.activityDays     += 1;
+  // ★ 活動日カレンダーを更新（1人でも出席した日をクラブ活動日として記録）
+  const settings = getSettings();
+  const activityDates: string[] = settings.activityDates ?? [];
+  const isNewActivityDay = !activityDates.includes(today);
+  if (isNewActivityDay) {
+    const updated = [...activityDates, today].sort();
+    saveSettings({ ...settings, activityDates: updated });
+  }
+
+  // ★ 連続出席ストリーク計算（活動日ベース）
+  // 「前回の活動日に出席していたか」で連続を判定
+  const allActivityDates: string[] = (getSettings().activityDates ?? []).sort();
+  const prevActivityDay = (() => {
+    const idx = allActivityDates.indexOf(today);
+    return idx > 0 ? allActivityDates[idx - 1] : null;
+  })();
+  const prevAttended = prevActivityDay
+    ? (user.lastAttendance ? getLocalDateString(user.lastAttendance) === prevActivityDay : false)
+    : false;
+  const currentStreak = (user.attendanceStreak ?? 0);
+  const newAttendanceStreak = prevAttended ? currentStreak + 1 : 1;
+
+  // ★ 基本出席ポイント: 10pt
+  const basePts = 10;
+  // ★ 連続ボーナス: 3連続+5, 5連続+10, 10連続+20
+  const streakBonus =
+    newAttendanceStreak >= 10 ? 20 :
+    newAttendanceStreak >= 5  ? 10 :
+    newAttendanceStreak >= 3  ? 5  : 0;
+  const pts = basePts + streakBonus;
+
+  user.lastAttendance     = new Date().toISOString();
+  user.totalPoints       += pts;
+  user.monthlyPoints     += pts;
+  user.pointsAttendance   = (user.pointsAttendance || 0) + pts;
+  user.activityDays      += 1;
+  user.attendanceStreak   = newAttendanceStreak;
   // 紅白戦中は出席ポイントをイベントポイントに加算しない（チームスコアは対局ポイントのみ）
   if (isEventActive() && getSettings().eventType !== EventType.FACTION_WAR) {
     user.eventPoints = (user.eventPoints || 0) + pts;
@@ -1813,11 +1846,12 @@ export const recordAttendance = (userId: string): AttendanceResult => {
   // pushUserCounters（transaction加算）は呼ばない。
   // saveUsers → pushUsers がフルオブジェクト上書きで同期するので十分。
 
+  const streakMsg = streakBonus > 0 ? ` 🔥${newAttendanceStreak}連続出席ボーナス +${streakBonus}pt` : '';
   appendLogs([{
     id: randomId(), userId,
     type: ActivityType.ATTENDANCE,
     points: pts,
-    description: '出席',
+    description: streakBonus > 0 ? `出席（連続${newAttendanceStreak}日ボーナス）` : '出席',
     date: new Date().toISOString(),
   }]);
 
@@ -1881,7 +1915,7 @@ export const recordAttendance = (userId: string): AttendanceResult => {
   }
   saveMissionProgressAll(allProgress);
 
-  return { success: true, newAchievements: res.newAchievements, newIcons: res.newIcons, message: `出席を記録しました！ (+${pts} pt)` };
+  return { success: true, newAchievements: res.newAchievements, newIcons: res.newIcons, message: `出席を記録しました！ (+${pts} pt)${streakMsg}` };
 };
 
 // ============================================================
@@ -1899,15 +1933,20 @@ const eloExpected = (rA: number, rB: number): number =>
  * 引き分け → 両者微増（±0〜+3程度）
  * レートは0未満にはならない
  */
-const eloChange = (myRate: number, oppRate: number, score: number): number => {
-  const K_WIN  = 40;  // 勝ち: 上昇を大きく
-  const K_LOSE = 24;  // 負け: 下落を小さく
-  const K = score === 1 ? K_WIN : score === 0 ? K_LOSE : 32;
+const eloChange = (myRate: number, oppRate: number, score: number, winStreak = 0): number => {
+  // ★ K係数を引き上げ（初期レートが上がった分、変動も大きく）
+  const K_WIN  = 56;  // 勝ち（旧40→56）
+  const K_LOSE = 32;  // 負け（旧24→32）
+  const K = score === 1 ? K_WIN : score === 0 ? K_LOSE : 44;
   const expected = eloExpected(myRate, oppRate);
   const raw = Math.round(K * (score - expected));
-  if (score === 1)   return Math.max(1,  raw);   // 勝ち: 最低+1
-  if (score === 0)   return Math.min(-1, raw);   // 負け: 最大-1（負の数）
-  return Math.max(0, raw);                       // 引き分け: 0以上
+  // ★ 連勝ボーナス: 3連勝+5, 5連勝+10, 7連勝+15
+  const streakBonus = score === 1
+    ? winStreak >= 7 ? 15 : winStreak >= 5 ? 10 : winStreak >= 3 ? 5 : 0
+    : 0;
+  if (score === 1)   return Math.max(1,  raw) + streakBonus;
+  if (score === 0)   return Math.min(-1, raw);
+  return Math.max(0, raw);
 };
 
 /** Spam check: >3 matches in last 30 minutes → 0.5 penalty */
@@ -1956,8 +1995,8 @@ export const processMatch = (
   else if (result === 'PLAYER2_WIN') { p1Score = 0;   p2Score = 1; }
   else                               { p1Score = 0.5; p2Score = 0.5; }
 
-  const p1RateChange = eloChange(p1.rate, p2.rate, p1Score);
-  const p2RateChange = eloChange(p2.rate, p1.rate, p2Score);
+  const p1RateChange = eloChange(p1.rate, p2.rate, p1Score, p1.currentStreak || 0);
+  const p2RateChange = eloChange(p2.rate, p1.rate, p2Score, p2.currentStreak || 0);
 
   // ── Points ──────────────────────────────────────────────
   const calcPoints = (user: User, isWinner: boolean, isDraw: boolean): PointBreakdown => {
@@ -2214,6 +2253,40 @@ export const snapshotSeasonBaseline = (): void => {
     u.seasonStartPoints = u.totalPoints;
   });
   saveUsers(all);
+};
+
+// ============================================================
+// CAMP BASELINE SNAPSHOT（合宿表彰用・学期をまたいで保持）
+// ============================================================
+export const snapshotCampBaseline = (label: string): void => {
+  const all = getRawUsers();
+  const rateMap:   Record<string, number> = {};
+  const pointsMap: Record<string, number> = {};
+  all.forEach(u => {
+    rateMap[u.id]   = u.rate;
+    pointsMap[u.id] = u.totalPoints;
+  });
+  const s = getSettings();
+  saveSettings({
+    ...s,
+    campBaselineRate:   rateMap,
+    campBaselinePoints: pointsMap,
+    campBaselineLabel:  label,
+  });
+};
+
+export const getCampRankings = (): (ReturnType<typeof getUsers>[0] & {
+  campRateGrowth: number;
+  campPointsGrowth: number;
+})[] => {
+  const s    = getSettings();
+  const baseRate   = s.campBaselineRate   ?? {};
+  const basePts    = s.campBaselinePoints ?? {};
+  return getUsers().map(u => ({
+    ...u,
+    campRateGrowth:   u.rate        - (baseRate[u.id]  ?? u.rate),
+    campPointsGrowth: u.totalPoints - (basePts[u.id]   ?? u.totalPoints),
+  }));
 };
 
 // ============================================================
@@ -2504,7 +2577,36 @@ export const manualPointAdjustment = (uid: string, pts: number, reason: string):
 };
 
 /**
- * ランキング入賞ボーナスをログに記録（ポイント付与 + 変動履歴に残す）
+ * 複数部員への一括ポイント/レート付与
+ * grants: { userId, pts, rate? }[] — pts はポイント増分、rate はレート増分（省略可）
+ */
+export const grantBatch = (
+  grants: { userId: string; pts?: number; rate?: number }[],
+  reason: string,
+): void => {
+  if (grants.length === 0) return;
+  pushUndoSnapshot('POINT_ADJUST', `一括付与: ${grants.length}名 / ${reason}`);
+  const all = getRawUsers();
+  const now = new Date().toISOString();
+  const logs: ActivityLog[] = [];
+  grants.forEach(({ userId, pts = 0, rate = 0 }) => {
+    const u = all.find(x => x.id === userId);
+    if (!u) return;
+    if (pts !== 0) {
+      u.totalPoints   += pts;
+      u.pointsSpecial  = (u.pointsSpecial || 0) + pts;
+      u.monthlyPoints += pts;
+      checkAchievementsAndIcons(u);
+      logs.push({ id: randomId(), userId, type: ActivityType.BONUS, points: pts, description: reason || '一括付与', date: now });
+    }
+    if (rate !== 0) {
+      u.rate = Math.max(0, u.rate + rate);
+      u.rateHistory = [...(u.rateHistory || []), { date: now, rate: u.rate }];
+    }
+  });
+  saveUsers(all);
+  if (logs.length > 0) appendLogs(logs);
+};
  * 管理者が「四天王を更新」「月次リセット」を実行したタイミングで呼ぶ想定
  */
 export const recordRankingAward = (
@@ -2668,6 +2770,7 @@ const newUserBase = (name: string, reading?: string, isNewMember = false): User 
   maxStreak:        0,
   upsetWins:        0,
   lossStreak:       0,
+  attendanceStreak: 0,
   wins:             0,
   losses:           0,
   draws:            0,
@@ -3055,6 +3158,7 @@ export const deleteAttendanceLog = (logId: string): { success: boolean; message:
   if (!user) return { success: false, message: 'ユーザーが見つかりません' };
 
   const pts = log.points;
+  const deletedDay = getLocalDateString(log.date);
 
   // ポイントを巻き戻す
   user.totalPoints      = Math.max(0, (user.totalPoints || 0) - pts);
@@ -3062,7 +3166,7 @@ export const deleteAttendanceLog = (logId: string): { success: boolean; message:
   user.pointsAttendance = Math.max(0, (user.pointsAttendance || 0) - pts);
   user.activityDays     = Math.max(0, (user.activityDays || 0) - 1);
 
-  // イベントポイントも巻き戻す（イベント中に記録されたログか確認は省略し安全に減算）
+  // イベントポイントも巻き戻す
   if (user.eventPoints && user.eventPoints > 0) {
     user.eventPoints = Math.max(0, user.eventPoints - pts);
   }
@@ -3076,6 +3180,34 @@ export const deleteAttendanceLog = (logId: string): { success: boolean; message:
     .filter(l => l.userId === log.userId && l.type === 'ATTENDANCE')
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   user.lastAttendance = remainingAttendances[0]?.date ?? undefined;
+
+  // ★ attendanceStreak を残ったログから再計算
+  // 削除後の出席日セットを作り、末尾から連続している日数を数える
+  const allSettings = getSettings();
+  const actDates = (allSettings.activityDates ?? []).slice().sort();
+  const attendedDays = new Set(
+    remainingAttendances
+      .filter(l => l.userId === log.userId)
+      .map(l => getLocalDateString(l.date))
+  );
+  let streak = 0;
+  for (let i = actDates.length - 1; i >= 0; i--) {
+    if (attendedDays.has(actDates[i])) {
+      streak++;
+    } else {
+      break; // 直近の活動日を欠席した時点で連続終了
+    }
+  }
+  user.attendanceStreak = streak;
+
+  // ★ activityDates から削除：その日に他の誰も出席していなければ活動日から除去
+  const anyoneElseAttendedThatDay = newLogs.some(
+    l => l.type === 'ATTENDANCE' && getLocalDateString(l.date) === deletedDay
+  );
+  if (!anyoneElseAttendedThatDay) {
+    const updatedDates = actDates.filter(d => d !== deletedDay);
+    saveSettings({ ...allSettings, activityDates: updatedDates });
+  }
 
   saveUsers(all);
   return { success: true, message: `${user.name} の出席を削除しました` };

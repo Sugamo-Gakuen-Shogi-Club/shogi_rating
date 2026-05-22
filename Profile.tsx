@@ -78,32 +78,43 @@ const Avatar: React.FC<{ user: User; size?: 'md' | 'lg' }> = ({ user, size = 'md
 
 // ─── アクティビティ ヒートマップ ──────────────────────────────
 const ActivityHeatmap: React.FC<{ logs: ActivityLog[]; userId: string }> = ({ logs, userId }) => {
+  // クラブ活動日カレンダー（1人でも出席した日）
+  const activityDates = new Set(getSettings().activityDates ?? []);
+
+  // 直近90日のうちクラブ活動日のみ表示
   const days: string[] = [];
   for (let i = 89; i >= 0; i--) {
     const d = new Date(); d.setDate(d.getDate() - i);
-    days.push(d.toISOString().split('T')[0]);
+    const s = d.toISOString().split('T')[0];
+    if (activityDates.has(s)) days.push(s);
   }
-  const counts: Record<string, number> = {};
-  logs.forEach(l => {
-    if (l.userId !== userId) return;
-    const dt = l.date.split('T')[0];
-    counts[dt] = (counts[dt] || 0) + 1;
-  });
-  const color = (n: number) => {
-    if (!n) return 'bg-slate-800/50';
-    if (n >= 4) return 'bg-green-400';
-    if (n >= 2) return 'bg-green-600';
-    return 'bg-green-900';
+
+  // 自分の出席ログをセット化
+  const attendedDays = new Set(
+    logs
+      .filter(l => l.userId === userId && l.type === ActivityType.ATTENDANCE)
+      .map(l => l.date.split('T')[0])
+  );
+
+  const color = (date: string) => {
+    if (!activityDates.has(date)) return 'bg-slate-800/50';        // 非活動日（表示しない）
+    if (attendedDays.has(date))  return 'bg-green-400';            // 出席
+    return 'bg-slate-700/60';                                       // 欠席（活動日だが来なかった）
   };
+
   return (
     <div>
       <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1.5">
-        <Calendar size={11}/> 活動ヒートマップ（直近90日）
+        <Calendar size={11}/> 活動日ヒートマップ（直近90日・活動日のみ）
       </div>
       <div className="flex flex-wrap gap-1">
         {days.map(d => (
-          <div key={d} className={`w-3 h-3 rounded-sm ${color(counts[d])}`} title={`${d}: ${counts[d] || 0}件`}/>
+          <div key={d} className={`w-3 h-3 rounded-sm ${color(d)}`} title={`${d}: ${attendedDays.has(d) ? '出席' : '欠席'}`}/>
         ))}
+      </div>
+      <div className="flex items-center gap-3 mt-2 text-[9px] text-slate-600 font-bold">
+        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-green-400 inline-block"/>出席</span>
+        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-slate-700/60 inline-block"/>欠席</span>
       </div>
     </div>
   );
