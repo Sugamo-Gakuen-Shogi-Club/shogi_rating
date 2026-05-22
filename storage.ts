@@ -2607,6 +2607,9 @@ export const grantBatch = (
   saveUsers(all);
   if (logs.length > 0) appendLogs(logs);
 };
+
+/**
+ * ランキング入賞ボーナスをログに記録（ポイント付与 + 変動履歴に残す）
  * 管理者が「四天王を更新」「月次リセット」を実行したタイミングで呼ぶ想定
  */
 export const recordRankingAward = (
