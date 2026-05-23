@@ -3,7 +3,7 @@ import { getUsers, getMatches, ACHIEVEMENTS_DATA, getUserAvatarChar, SYSTEM_TITL
 import { Card } from './Card';
 import {
   TrendingUp, Award, Crown, Zap, Calendar, Star,
-  Swords, Target, Shield, Flame,
+  Swords, Target, Shield, Flame, X, Check,
 } from 'lucide-react';
 import { RankEntry, User } from './types';
 import { ShogiPiece } from './ShogiPiece';
@@ -315,6 +315,7 @@ const Rankings: React.FC = () => {
   const matches = getMatches();
   const [activeTab, setActiveTab] = useState<TabKey>('seasonGrowth');
   const [showTabSelector, setShowTabSelector] = useState(false);
+  const [showSortModal, setShowSortModal] = useState(true);
 
   // 最終活動日（出席が1件でも記録された日を活動日とみなす）
   const lastActivityDate = getSettings().lastActivityDate;
@@ -430,7 +431,78 @@ const Rankings: React.FC = () => {
 
   return (
     <div className="space-y-6 pb-20">
-      {/* ヘッダー */}
+
+      {/* ソート選択モーダル */}
+      {showSortModal && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => setShowSortModal(false)}>
+          <div className="bg-slate-900 border border-white/10 rounded-t-3xl sm:rounded-3xl w-full sm:max-w-sm p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <div className="text-xs font-black text-blue-400 uppercase tracking-widest mb-0.5">Season Rankings</div>
+                <h3 className="text-xl font-black text-white">ソート順を選択</h3>
+              </div>
+              <button onClick={() => setShowSortModal(false)} className="text-slate-500 hover:text-white p-2 transition-colors"><X size={20}/></button>
+            </div>
+            <div className="space-y-2">
+              {/* 今期成長 - 最大 */}
+              <button
+                onClick={() => { setActiveTab('seasonGrowth'); setShowSortModal(false); }}
+                className={`w-full flex items-center justify-between px-4 py-4 rounded-2xl font-black transition-all text-left ${activeTab === 'seasonGrowth' ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-xl shadow-blue-900/40' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">📈</span>
+                  <div>
+                    <div className="text-base">今期成長</div>
+                    <div className="text-[10px] font-bold text-slate-400 mt-0.5">レート上昇＋ポイント増加の合算</div>
+                  </div>
+                </div>
+                {activeTab === 'seasonGrowth' && <Check size={18} className="text-white shrink-0"/>}
+              </button>
+
+              {/* レート・ポイント - 大きめ */}
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { key: 'rate' as TabKey, icon: '⚡', label: 'レート', desc: '実力値' },
+                  { key: 'totalPoints' as TabKey, icon: '💎', label: '通算Pt', desc: '全期間累計' },
+                ].map(t => (
+                  <button key={t.key}
+                    onClick={() => { setActiveTab(t.key); setShowSortModal(false); }}
+                    className={`flex flex-col items-center gap-1 px-3 py-3.5 rounded-2xl font-black transition-all ${activeTab === t.key ? 'bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-xl' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+                  >
+                    <span className="text-xl">{t.icon}</span>
+                    <div className="text-sm">{t.label}</div>
+                    <div className="text-[9px] font-bold text-slate-400">{t.desc}</div>
+                    {activeTab === t.key && <Check size={14} className="text-white"/>}
+                  </button>
+                ))}
+              </div>
+
+              {/* その他 - 小 */}
+              <div className="grid grid-cols-3 gap-1.5">
+                {[
+                  { key: 'monthlyPoints' as TabKey, icon: '⭐', label: '今月Pt' },
+                  { key: 'weekWinRate' as TabKey, icon: '🎯', label: '今週勝率' },
+                  { key: 'upsetWins' as TabKey, icon: '💀', label: '格上撃破' },
+                  { key: 'activityDays' as TabKey, icon: '📅', label: '活動日数' },
+                  { key: 'seasonMatches' as TabKey, icon: '🏟️', label: '今期対局' },
+                  { key: 'maxStreak' as TabKey, icon: '🔥', label: '最大連勝' },
+                  { key: 'todayMatches' as TabKey, icon: '⚔️', label: '最終活動' },
+                  { key: 'draws' as TabKey, icon: '☯️', label: '引き分け' },
+                  { key: 'fourKings' as TabKey, icon: '👑', label: '四天王' },
+                ].map(t => (
+                  <button key={t.key}
+                    onClick={() => { setActiveTab(t.key); setShowSortModal(false); }}
+                    className={`flex flex-col items-center gap-0.5 px-2 py-2.5 rounded-xl font-black text-xs transition-all ${activeTab === t.key ? 'bg-blue-600 text-white shadow-lg' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}
+                  >
+                    <span>{t.icon}</span>
+                    <span>{t.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="flex flex-col sm:flex-row justify-between items-end gap-4">
         <div>
           <h2 className="text-3xl font-black text-white italic tracking-tighter uppercase flex items-center gap-3">
@@ -441,6 +513,12 @@ const Rankings: React.FC = () => {
             {TABS.find(t => t.key === activeTab)?.label}で並び替え中
           </p>
         </div>
+        <button
+          onClick={() => setShowSortModal(true)}
+          className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 border border-white/10 text-slate-300 px-4 py-2 rounded-xl text-xs font-black transition-all shrink-0"
+        >
+          <TrendingUp size={14} className="text-blue-400"/> ソートを変更
+        </button>
       </div>
 
       {/* タブスクロール */}
@@ -469,20 +547,52 @@ const Rankings: React.FC = () => {
 
       {/* 今期成長ヒーローカード（seasonGrowthタブ選択時に大きく表示） */}
       {activeTab === 'seasonGrowth' && (() => {
-        const top = sortedUsers[0];
-        if (!top) return null;
-        const rateGrowth = Math.round(top.rate - top.seasonStartRate);
-        const ptsGrowth  = top.totalPoints - top.seasonStartPoints;
-        const score      = getScore(top, 'seasonGrowth');
+        const top3 = sortedUsers.slice(0, 3);
+        if (top3.length === 0) return null;
+        const [gold, silver, bronze] = top3;
+        const podiumOrder = top3.length >= 2
+          ? [silver, gold, bronze].filter(Boolean)
+          : [gold];
+        const podiumConfig = [
+          { user: silver, rank: 2, height: 'h-16', label: '2nd', color: 'text-slate-300', bg: 'from-slate-600/40 to-slate-700/30', border: 'border-slate-500/40', scoreSize: 'text-2xl', nameSize: 'text-sm', scoreColor: 'text-slate-200' },
+          { user: gold,   rank: 1, height: 'h-24', label: '1st', color: 'text-yellow-300', bg: 'from-yellow-600/30 to-amber-700/20', border: 'border-yellow-500/50', scoreSize: 'text-3xl', nameSize: 'text-base', scoreColor: 'text-yellow-300' },
+          { user: bronze, rank: 3, height: 'h-12', label: '3rd', color: 'text-amber-600', bg: 'from-amber-800/30 to-orange-900/20', border: 'border-amber-700/40', scoreSize: 'text-xl', nameSize: 'text-xs', scoreColor: 'text-amber-500' },
+        ].filter(p => p.user);
+
         return (
-          <div className="rounded-[2rem] bg-gradient-to-br from-blue-900/60 via-indigo-900/50 to-slate-900/60 border border-blue-500/30 p-6 flex flex-col items-center gap-2 shadow-2xl">
-            <div className="text-[10px] font-black text-blue-400 uppercase tracking-widest">👑 今期トップ</div>
-            <div className="text-4xl font-black text-white mt-1">{top.name}</div>
-            <div className="text-6xl font-black font-mono text-yellow-300 mt-2">{score >= 0 ? `+${score}` : score}</div>
-            <div className="flex gap-6 mt-2 text-sm font-bold text-slate-400">
-              <span>Rate {rateGrowth >= 0 ? '+' : ''}{rateGrowth}</span>
-              <span>Pt×½ {ptsGrowth >= 0 ? '+' : ''}{Math.round(ptsGrowth * 0.5)}</span>
+          <div className="rounded-[2rem] bg-gradient-to-br from-blue-950/80 via-indigo-950/60 to-slate-900/80 border border-blue-500/20 p-5 shadow-2xl">
+            <div className="text-[10px] font-black text-blue-400 uppercase tracking-widest text-center mb-4">📈 今期成長ランキング</div>
+            {/* 表彰台 */}
+            <div className="flex items-end justify-center gap-2 mb-4">
+              {podiumConfig.map(({ user: u, rank, height, label, color, bg, border, scoreSize, nameSize, scoreColor }) => {
+                const score = getScore(u!, 'seasonGrowth');
+                const rateG = Math.round(u!.rate - u!.seasonStartRate);
+                const ptsG  = u!.totalPoints - u!.seasonStartPoints;
+                return (
+                  <div key={u!.id} className="flex flex-col items-center gap-1" style={{ flex: rank === 1 ? '1.2' : '1' }}>
+                    {/* アバター */}
+                    <div className={`w-10 h-10 rounded-full ${u!.avatarColor} flex items-center justify-center text-white font-black text-base font-serif-jp shadow-lg ${rank === 1 ? 'ring-2 ring-yellow-400/60 w-14 h-14 text-xl' : ''}`}>
+                      {u!.name.charAt(0)}
+                    </div>
+                    {/* 名前 */}
+                    <div className={`font-black text-center truncate max-w-[80px] ${nameSize} ${color}`}>{u!.name}</div>
+                    {/* スコア */}
+                    <div className={`font-black font-mono ${scoreSize} ${scoreColor}`}>{score >= 0 ? `+${score}` : score}</div>
+                    <div className="text-[9px] text-slate-500 font-bold">Rate{rateG >= 0 ? '+' : ''}{rateG}</div>
+                    {/* 台座 */}
+                    <div className={`w-full ${height} rounded-t-xl bg-gradient-to-b ${bg} border border-b-0 ${border} flex items-center justify-center mt-1`}>
+                      <span className={`text-xs font-black ${color}`}>{label}</span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
+            {/* 4位以下サマリー */}
+            {sortedUsers.length > 3 && (
+              <div className="text-center text-[10px] text-slate-600 font-bold">
+                以下 {sortedUsers.length - 3}名はランキングテーブルで確認
+              </div>
+            )}
           </div>
         );
       })()}

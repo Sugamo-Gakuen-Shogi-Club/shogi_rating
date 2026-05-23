@@ -2258,6 +2258,68 @@ export const snapshotSeasonBaseline = (): void => {
 // ============================================================
 // CAMP BASELINE SNAPSHOT（合宿表彰用・学期をまたいで保持）
 // ============================================================
+// ─── 合宿表彰スロット定義 ────────────────────────────────────
+export const CAMP_SLOT_DEFS: { id: string; label: string; emoji: string; desc: string }[] = [
+  { id: 'S1_FIRST',  label: '1学期前半', emoji: '🌸', desc: '1学期の前半を基準とした成長' },
+  { id: 'S1_SECOND', label: '1学期後半', emoji: '🌿', desc: '1学期の後半を基準とした成長' },
+  { id: 'SUMMER',    label: '夏合宿',    emoji: '🏕️', desc: '夏合宿での総合成長表彰' },
+  { id: 'S2_FIRST',  label: '2学期前半', emoji: '🍂', desc: '2学期の前半を基準とした成長' },
+  { id: 'S2_SECOND', label: '2学期後半', emoji: '❄️', desc: '2学期の後半を基準とした成長' },
+  { id: 'WINTER',    label: '冬合宿',    emoji: '⛄', desc: '冬合宿での総合成長表彰' },
+  { id: 'S3',        label: '3学期',     emoji: '🌱', desc: '3学期を基準とした成長' },
+  { id: 'SPRING',    label: '春合宿',    emoji: '🌺', desc: '春合宿での総合成長表彰' },
+];
+
+/** 指定スロットに現在の全部員レート・ポイントをスナップショット */
+export const snapshotCampSlot = (slotId: string): void => {
+  const all = getRawUsers();
+  const rateMap:   Record<string, number> = {};
+  const pointsMap: Record<string, number> = {};
+  all.forEach(u => {
+    rateMap[u.id]   = u.rate;
+    pointsMap[u.id] = u.totalPoints;
+  });
+  const s = getSettings();
+  const existing = s.campSlots ?? {};
+  saveSettings({
+    ...s,
+    campSlots: {
+      ...existing,
+      [slotId]: {
+        snapshotAt: new Date().toISOString(),
+        rate:       rateMap,
+        points:     pointsMap,
+      },
+    },
+  });
+};
+
+/** 指定スロットのスナップショットを削除 */
+export const clearCampSlot = (slotId: string): void => {
+  const s = getSettings();
+  const slots = { ...(s.campSlots ?? {}) };
+  delete slots[slotId];
+  saveSettings({ ...s, campSlots: slots });
+};
+
+/** 指定スロットを起点とした成長ランキングを取得 */
+export const getCampRankingsBySlot = (slotId: string): (ReturnType<typeof getUsers>[0] & {
+  campRateGrowth: number;
+  campPointsGrowth: number;
+  campTotalGrowth: number;
+})[] => {
+  const s    = getSettings();
+  const snap = (s.campSlots ?? {})[slotId];
+  const baseRate = snap?.rate   ?? {};
+  const basePts  = snap?.points ?? {};
+  return getUsers().map(u => {
+    const rg = u.rate        - (baseRate[u.id] ?? u.rate);
+    const pg = u.totalPoints - (basePts[u.id]  ?? u.totalPoints);
+    return { ...u, campRateGrowth: rg, campPointsGrowth: pg, campTotalGrowth: rg + pg };
+  }).sort((a, b) => b.campTotalGrowth - a.campTotalGrowth);
+};
+
+/** 後方互換：旧 snapshotCampBaseline */
 export const snapshotCampBaseline = (label: string): void => {
   const all = getRawUsers();
   const rateMap:   Record<string, number> = {};
@@ -2275,6 +2337,7 @@ export const snapshotCampBaseline = (label: string): void => {
   });
 };
 
+/** 後方互換：旧 getCampRankings */
 export const getCampRankings = (): (ReturnType<typeof getUsers>[0] & {
   campRateGrowth: number;
   campPointsGrowth: number;
@@ -2725,6 +2788,18 @@ export const updateUserReading = (id: string, reading: string): void => {
   const all = getRawUsers();
   const u = all.find(x => x.id === id);
   if (u) { u.reading = reading; saveUsers(all); }
+};
+
+export const updateUserName = (id: string, name: string): void => {
+  const all = getRawUsers();
+  const u = all.find(x => x.id === id);
+  if (u) { u.name = name; saveUsers(all); }
+};
+
+export const deleteUserPermanently = (id: string): void => {
+  const all = getRawUsers();
+  const filtered = all.filter(x => x.id !== id);
+  saveUsers(filtered);
 };
 
 export const updateUserTitle = (id: string, t: string | null): void => {

@@ -4,8 +4,9 @@ import {
   Star, Award, Crown, Swords, Medal, Shield, TrendingUp,
   Lock, Key, ChevronDown, ChevronRight, Info, Zap,
   AlertTriangle, CheckCircle, ArrowRight, Users, RotateCcw,
-  Eye, FileText,
-  Layers, Minus, Plus, Target,
+  Eye, FileText, Layers, Minus, Plus, Target,
+  GraduationCap, Monitor, Undo2, Map, Pencil, Trash2,
+  Calendar, Cloud, Database, RefreshCw,
 } from 'lucide-react';
 import { Tutorial, markTutorialDone } from './Tutorial';
 
@@ -111,18 +112,18 @@ const TabIntro = () => (
       <div className="relative">
         <div className="text-[11px] font-black uppercase tracking-widest text-blue-400 mb-2">Club Rivals</div>
         <h2 className="text-2xl font-black text-white mb-2 leading-tight">巣鴨学園将棋班の活動を<br />記録・可視化・盛り上げる</h2>
-        <p className="text-slate-400 text-sm font-medium">対局記録・レーティング・称号・ランキング・ミッションをひとつで管理する将棋班専用ツール。</p>
+        <p className="text-slate-400 text-sm font-medium">対局記録・レーティング・称号・ランキング・ミッション・指導対局をひとつで管理する将棋班専用ツール。</p>
       </div>
     </div>
 
     <div className="grid grid-cols-2 gap-3">
       {[
-        { icon: <PlusCircle size={18}/>, label: '対局記録',   desc: 'Eloレートを自動計算',       color: 'text-red-400',    bg: 'bg-red-900/20 border-red-700/20' },
-        { icon: <Trophy size={18}/>,     label: 'ランキング', desc: '12軸＋四天王で多角比較',    color: 'text-amber-400',  bg: 'bg-amber-900/20 border-amber-700/20' },
-        { icon: <Star size={18}/>,       label: '称号・実績', desc: '活動で自動解放',             color: 'text-yellow-400', bg: 'bg-yellow-900/20 border-yellow-700/20' },
-        { icon: <Target size={18}/>,     label: 'ミッション', desc: 'デイリー/ウィークリーでPt',  color: 'text-indigo-400', bg: 'bg-indigo-900/20 border-indigo-700/20' },
-        { icon: <Swords size={18}/>,     label: 'イベント',   desc: '紅白戦・ポイントマッチ',     color: 'text-rose-400',   bg: 'bg-rose-900/20 border-rose-700/20' },
-        { icon: <Home size={18}/>,       label: '出席管理',   desc: '部活参加でポイント獲得',     color: 'text-green-400',  bg: 'bg-green-900/20 border-green-700/20' },
+        { icon: <PlusCircle size={18}/>, label: '対局記録',   desc: 'Eloレートを自動計算',        color: 'text-red-400',    bg: 'bg-red-900/20 border-red-700/20' },
+        { icon: <Trophy size={18}/>,     label: 'ランキング', desc: '12軸＋四天王で多角比較',     color: 'text-amber-400',  bg: 'bg-amber-900/20 border-amber-700/20' },
+        { icon: <Star size={18}/>,       label: '称号・実績', desc: '活動で自動解放',              color: 'text-yellow-400', bg: 'bg-yellow-900/20 border-yellow-700/20' },
+        { icon: <Target size={18}/>,     label: 'ミッション', desc: 'デイリー/ウィークリーでPt',   color: 'text-indigo-400', bg: 'bg-indigo-900/20 border-indigo-700/20' },
+        { icon: <Swords size={18}/>,     label: 'イベント',   desc: '紅白戦・ポイントマッチ',      color: 'text-rose-400',   bg: 'bg-rose-900/20 border-rose-700/20' },
+        { icon: <GraduationCap size={18}/>, label: '指導対局', desc: '指導者と生徒でポイント記録', color: 'text-yellow-400', bg: 'bg-yellow-900/20 border-yellow-700/20' },
       ].map(item => (
         <div key={item.label} className={`${item.bg} border rounded-2xl p-4`}>
           <span className={item.color}>{item.icon}</span>
@@ -135,22 +136,26 @@ const TabIntro = () => (
     <div className="space-y-3">
       <H icon={<Layers size={16}/>}>画面一覧</H>
       <Table rows={[
-        ['🏠 ホーム',     '出席記録・イベント状況・四天王'],
-        ['⊕ 対局記録',   '結果入力（本人PINで確認）'],
-        ['🏆 ランキング', '全班員の順位・まとめ・四天王'],
-        ['👤 個人データ', 'レート推移・ミッション・因縁ボード（PIN必要）'],
-        ['📖 ガイド',     'このページ'],
-        ['⚙️ 管理画面',  '班員管理・各種設定（承認済みデバイスのみ）'],
+        ['🏠 ホーム',       '出席記録・イベント状況・四天王・スコア速報'],
+        ['⊕ 対局記録',     '結果入力（本人PINで確認）'],
+        ['🏆 ランキング',   '全班員の12軸順位・今期成長表彰台'],
+        ['👑 四天王',       '歴代四天王の記録一覧'],
+        ['🎓 指導対局',     '指導者と生徒のセッション記録'],
+        ['👤 個人データ',   'レート推移・ミッション・因縁ボード（PIN必要）'],
+        ['📖 ガイド',       'このページ'],
+        ['⚙️ 管理画面',    '班員管理・各種設定（承認済みデバイスのみ）'],
       ]} />
     </div>
 
     <div className="space-y-3">
       <H icon={<Key size={16}/>}>PINコード</H>
       <Table rows={[
-        ['管理者PIN（6桁）', '管理画面の操作に必要'],
-        ['個人PIN（6桁）',   '対局時の本人確認・個人ページ閲覧に必要。初期値 000000'],
+        ['管理者PIN（6桁）',  '管理画面の操作に必要'],
+        ['個人PIN（6桁）',    '対局時の本人確認・個人ページ閲覧に必要。初期値 000000'],
+        ['指導者PIN（6桁）',  '指導対局ページで使用。指導者共通'],
+        ['変更パスワード',    'デバイス承認時に入力する合言葉（管理者が設定）'],
       ]} />
-      <Tip type="warn">初期PIN（000000）のままでは対局に参加できません。管理者に変更してもらいましょう。</Tip>
+      <Tip type="warn">個人PIN（000000）のままでは対局に参加できない。管理者に変更してもらおう。</Tip>
     </div>
 
     <div className="space-y-3">
@@ -161,6 +166,31 @@ const TabIntro = () => (
         <Step n={3} title="結果を確認する">ランキングや個人ページでレートとポイントの変動を確認</Step>
         <Step n={4} title="称号・ミッションを集める">対局・出席を重ねると称号やミッションボーナスが解放される</Step>
       </div>
+    </div>
+
+    <div className="space-y-3">
+      <H icon={<Monitor size={16}/>}>スクリーンセーバー</H>
+      <p className="text-sm text-slate-400 font-medium">45秒間操作がないと自動でスクリーンセーバーが起動する。ランキング上位者を複数のスライドで表示。タップ・クリックで解除。</p>
+      <DetailOnly>
+        <Table rows={[
+          ['起動条件',   '45秒間の無操作'],
+          ['表示内容',   'レート・今期成長・今月Pt・活動日数・連勝・格上撃破・勝利数・通算Pt・四天王・紅白戦スコア'],
+          ['解除',       '画面のどこかをタップ・クリック'],
+        ]} />
+        <Tip type="info">部室の大型モニターに映しておくと盛り上がる。</Tip>
+      </DetailOnly>
+    </div>
+
+    <div className="space-y-3">
+      <H icon={<Undo2 size={16}/>}>操作取り消し（アンドゥ）</H>
+      <p className="text-sm text-slate-400 font-medium">対局・出席・ポイント調整などの操作は後から取り消せる。画面右下のアンドゥボタンから履歴を確認して巻き戻す。</p>
+      <DetailOnly>
+        <Table rows={[
+          ['対象操作',   '対局記録・出席記録・ポイント調整・レート調整・部員追加・休眠・再入班'],
+          ['認証',       '取り消しにはPIN認証が必要（誤操作防止）'],
+          ['制限',       '直近の操作のみ取り消し可能。古い操作は管理画面から手動対応'],
+        ]} />
+      </DetailOnly>
     </div>
 
     <DetailOnly>
@@ -299,6 +329,8 @@ const TabRate = () => (
         ['対局（負け）',      '5pt（基本）'],
         ['連勝ボーナス',      '連勝中は1連勝ごとに+2pt（最大+6pt）'],
         ['新入班員ボーナス',  '新入班員フラグON時は+3pt'],
+        ['指導対局（指導者）','通常対局勝利相当のポイント獲得'],
+        ['指導対局（生徒）',  '通常対局負け相当のポイント獲得'],
         ['イベント倍率',      'イベント期間中は全ポイントに倍率がかかる'],
       ]} />
       <Tip type="info">スパム防止：24時間以内に同じ相手と3局以上対局するとポイントが減衰する。レート変動は通常通り。</Tip>
@@ -307,20 +339,20 @@ const TabRate = () => (
     <div className="space-y-3">
       <H icon={<Trophy size={16}/>}>ランキング12軸</H>
       <Table rows={[
-        ['今期成長',   'シーズン開始時からのレート＋ポイント増加の合計'],
+        ['今期成長',   'シーズン開始時からのレート＋ポイント増加の合計（上位3名を表彰台表示）'],
         ['レート',     '現在のEloレート。純粋な実力値'],
-        ['最終活動日', '直近に活動した日付（出席または対局）'],
-        ['今週の勝率', '今週（月〜日）の対局勝率'],
+        ['通算Pt',     '全期間の累計ポイント'],
         ['今月のPt',   '今月獲得したポイント累計'],
+        ['今週の勝率', '今週（月〜日）の対局勝率（3局以上で集計）'],
         ['格上撃破',   'レート差+100以上の相手に勝った回数'],
         ['今期対局数', '今シーズンの総対局数'],
         ['最大連勝',   '過去最高の連勝記録'],
         ['活動日数',   '今シーズンに部活に来た日数'],
-        ['通算Pt',     '全期間の累計ポイント'],
+        ['最終活動日', '直近に活動した日付（出席または対局）'],
         ['引き分け',   '引き分け対局の総数'],
         ['四天王基準', '四天王選出に使われる各指標値'],
       ]} />
-      <Tip type="info">「今期成長」は実力の強さだけでなく、頑張りも評価される指標。レートが低くても大きく伸びれば上位に入れる。</Tip>
+      <Tip type="info">ランキングタブを開くと自動でソート選択モーダルが表示される。「ソートを変更」ボタンからいつでも切り替え可能。</Tip>
     </div>
 
     <DetailOnly>
@@ -329,6 +361,10 @@ const TabRate = () => (
         <Step n={2} title="シーズン基準値をスナップショット">現在のレート・ポイントを「今期の基準」として記録</Step>
         <Step n={3} title="月次リセットを実行">今月の活動日数・イベントポイントをリセット</Step>
         <Tip type="ok">総ポイントとレートはリセットされない。活動日数などの今月分のみリセット対象。</Tip>
+      </Acc>
+      <Acc title="合宿ベースラインとは">
+        <p>学期開始時などに「合宿ベースライン」を記録しておくと、そこからの成長度を表彰に使える。管理画面 → シーズン・称号 → 合宿ベースラインに起点を入力して「起点を記録」ボタンを押す。</p>
+        <Tip type="info">「○○ 夏季合宿」のようなラベルで複数記録できる。</Tip>
       </Acc>
     </DetailOnly>
   </div>
@@ -351,7 +387,7 @@ const TabAchievements = () => (
             { cat: '格上撃破',    items: ['番狂わせ（1回）','ジャイアントキリング（10回）','下剋上（20回）','巨人の天敵（30回）','不可能を可能に（50回）'] },
             { cat: '連勝記録',    items: ['スプリンター（5連勝）','記録破り（10連勝）','伝説の連勝（15連勝）','神話（20連勝）'] },
             { cat: 'カムバック',  items: ['不屈（3連敗後に勝利）','逆境の勇者（5連敗後）','復活劇（10連敗後）'] },
-            { cat: 'イベント',    items: ['大将軍（紅白戦で大将に任命）','一騎討ち（大将同士の対決を制す）'] },
+            { cat: 'イベント',    items: ['大将軍（紅白戦で大将に任命）','一騎討ち（大将同士の対決を制す）','紅白戦 第1功（+30pt）','紅白戦 第2功（+20pt）','紅白戦 第3功（+10pt）'] },
             { cat: 'その他',      items: ['初黒星','めげない心（30敗）','七転八起（100敗）','公式認定（段位承認）','コレクター（称号5個）〜究極の収集家（50個）'] },
           ].map(group => (
             <div key={group.cat} className="bg-slate-800/40 border border-white/5 rounded-xl p-3">
@@ -369,7 +405,7 @@ const TabAchievements = () => (
 
     <div className="space-y-3">
       <H icon={<Crown size={16}/>}>システム称号（四天王）</H>
-      <p className="text-sm text-slate-400 font-medium">各部門でシーズン1位の班員に自動付与される特別称号。毎月の更新時に再計算される。</p>
+      <p className="text-sm text-slate-400 font-medium">各部門でシーズン1位の班員に自動付与される特別称号。更新時に再計算される。「四天王」ページで歴代記録が確認できる。</p>
       <div className="grid grid-cols-2 gap-3">
         {[
           { id: 'MASTER',       desc: '今期レート上昇1位' },
@@ -383,7 +419,7 @@ const TabAchievements = () => (
           </div>
         ))}
       </div>
-      <Tip type="info">四天王称号は兼任可能（複数の班員が同時に保持できる）。履歴も管理画面で確認できる。</Tip>
+      <Tip type="info">四天王称号は兼任可能（複数の班員が同時に保持できる）。歴代記録はナビの「四天王」ページで確認できる。</Tip>
     </div>
 
     <div className="space-y-3">
@@ -391,8 +427,8 @@ const TabAchievements = () => (
       <p className="text-sm text-slate-400 font-medium">プロフィールに表示する将棋駒アイコンとフレームを選択できる。条件を満たすと新しいものが解放される。</p>
       <DetailOnly>
         <Table rows={[
-          ['アイコン変更', '個人ページ → 「アイコンを変更」ボタン'],
-          ['フレーム変更', '個人ページ → 「フレームを変更」ボタン'],
+          ['アイコン変更', '個人ページ → 「アイコン」ボタン'],
+          ['フレーム変更', '個人ページ → 「フレーム」ボタン'],
           ['解放条件',     '対局数・レート・活動日数・称号数などで解放'],
           ['四天王限定',   '四天王保持中のみ使えるフレームがある'],
         ]} />
@@ -440,8 +476,9 @@ const TabEvents = () => (
         ['一騎討ち',     '大将同士の対局は自動で一騎討ち判定。勝者に「一騎討ち」称号'],
         ['チームスコア', 'イベント期間中の各班員のイベントポイント合計がチームスコアになる'],
         ['同士討ち',     '同じチーム同士の対局は勝敗数・イベントポイントにカウントされない'],
+        ['終了後',       '勝利チームが確定。上位者に殊勲表彰（第1功+30pt・第2功+20pt・第3功+10pt）'],
       ]} />
-      <Tip type="info">ホーム画面のゲージでリアルタイムにチームスコアが確認できる。</Tip>
+      <Tip type="info">ホーム画面のゲージでリアルタイムにチームスコアが確認できる。個人ページに結果モーダルが表示される。</Tip>
     </div>
 
     <DetailOnly>
@@ -449,10 +486,11 @@ const TabEvents = () => (
         <Step n={1} title="管理画面 → 「イベント管理」を開く" />
         <Step n={2} title="イベント種類・名前・終了日を設定する">終了日を過ぎると自動でイベント終了</Step>
         <Step n={3} title="紅白戦の場合はチームを編成する">「チームをシャッフル」または手動で振り分け</Step>
-        <Step n={4} title="大将を任命する（任意）">大将選択ドロップダウンから選ぶ</Step>
+        <Step n={4} title="大将を任命する（任意）">大将選択から各チームの大将を選ぶ</Step>
       </Acc>
-      <Acc title="イベント終了後の処理">
-        <p>管理者が「イベントポイントをリセット」を押すと全員のイベントポイントが0に戻る。総ポイント・レートはリセットされない。</p>
+      <Acc title="紅白戦終了後の処理">
+        <p>イベント終了時に自動で集計・殊勲表彰が処理される。各班員の個人ページを開いた際に結果モーダルが表示される（1回のみ）。</p>
+        <p className="mt-2">管理者が「イベントポイントをリセット」を押すと全員のイベントポイントが0に戻る。総ポイント・レートはリセットされない。</p>
       </Acc>
     </DetailOnly>
   </div>
@@ -466,16 +504,31 @@ const TabProfile = () => (
       <H icon={<UserIcon size={16}/>}>個人ページでできること</H>
       <Table rows={[
         ['プロフィール確認',  'レート・ポイント・勝敗・活動日数'],
-        ['ランキング順位',    '12軸すべての現在順位を一覧確認'],
+        ['シーズンステータス','12軸の現在順位一覧・シーズン残り日数バー'],
         ['レート推移グラフ',  '対局のたびに記録される折れ線グラフ'],
+        ['活動ヒートマップ',  '直近90日の活動状況をカレンダー形式で表示'],
         ['ミッション確認',    'デイリー/ウィークリーの達成状況・報酬Pt'],
         ['因縁ボード',        'ライバル・お得意様・天敵を煽り文付きで表示'],
         ['称号変更',          '解放済み称号から表示するものを選ぶ'],
+        ['称号一覧',          '解放済み・未解放すべての称号を確認'],
         ['アイコン変更',      '解放済み将棋駒アイコンを選ぶ'],
         ['フレーム変更',      '解放済みフレームを選ぶ'],
         ['段位・級位',        '承認済みランクの確認と新規申請'],
         ['対局履歴',          '直近の対局結果とレート変動'],
       ]} />
+      <Tip type="info">ランキングの名前をタップするとPINなしで他のプレイヤーのプロフィールを閲覧できる（編集不可）。</Tip>
+    </div>
+
+    <div className="space-y-3">
+      <H icon={<Map size={16}/>}>シーズンステータスカード</H>
+      <p className="text-sm text-slate-400 font-medium">個人ページ内に表示される。12軸全ランキングの現在順位と、シーズン残り日数を一画面で確認できる。</p>
+      <DetailOnly>
+        <Table rows={[
+          ['残り日数バー',   'シーズン進行率をプログレスバーで表示。残り7日でラストスパート警告'],
+          ['12軸順位グリッド','1〜3位はゴールドハイライト。各軸の自分のスコアと1つ上の順位者名も表示'],
+          ['浮上メッセージ', 'レート・今期成長で「あと○○で○○位浮上」を自動計算して表示'],
+        ]} />
+      </DetailOnly>
     </div>
 
     <div className="space-y-3">
@@ -523,9 +576,50 @@ const TabProfile = () => (
         <p><strong className="text-white">お得意様</strong>：対局した相手のうち、勝率が最も高い相手</p>
         <p><strong className="text-white">天敵</strong>：対局した相手のうち、勝率が最も低い相手</p>
         <p><strong className="text-white">全因縁履歴</strong>：2局以上対戦した相手を勝率バー付きで一覧表示</p>
+        <Tip type="info">因縁ボードは本人のみ表示。他のユーザーからは閲覧できない。</Tip>
       </Acc>
-      <Acc title="ランキング順位の見方">
-        <p>個人ページの「現在の各ランキング順位」セクションに12軸すべての現在順位が表示される。1〜3位はゴールドハイライト。</p>
+      <Acc title="プロフィール閲覧ビュー（PIN不要）">
+        <p>ランキング画面で名前をタップすると、誰でも閲覧できるプロフィールページが開く。PIN不要で以下が見られる。</p>
+        <Table rows={[
+          ['表示内容', 'レート・勝敗・段位・四天王称号・取得実績・対局履歴・レート推移グラフ'],
+          ['非表示',   '因縁ボード・ミッション・PIN関連操作'],
+        ]} />
+      </Acc>
+    </DetailOnly>
+  </div>
+);
+
+// ━━━ タブ: 指導対局 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+const TabCoaching = () => (
+  <div className="space-y-6">
+    <div className="space-y-3">
+      <H icon={<GraduationCap size={16}/>}>指導対局とは</H>
+      <p className="text-sm text-slate-400 font-medium">指導者（上位者）が班員に将棋を教える「指導対局」を記録する専用ページ。通常の対局と分けて管理される。</p>
+      <Table rows={[
+        ['指導者',     '管理者が isInstructor フラグをONにした部員のみ選択可'],
+        ['ポイント',   '指導者：通常勝利相当 / 生徒：通常負け相当のポイントをそれぞれ獲得'],
+        ['レート',     '変動なし（指導対局はレーティングに影響しない）'],
+        ['重複防止',   '同日・同指導者での登録は1回まで'],
+        ['認証',       '指導者共通PINを入力して記録（個人PINとは別）'],
+      ]} />
+    </div>
+
+    <div className="space-y-3">
+      <H icon={<ArrowRight size={16}/>}>記録手順</H>
+      <div className="space-y-3">
+        <Step n={1} title="「指導対局」ページを開く">ナビの 🎓 アイコンから</Step>
+        <Step n={2} title="指導者を選ぶ">指導者フラグが付いている班員が一覧に表示される</Step>
+        <Step n={3} title="指導者PINを入力">指導者共通PIN（6桁）を入力して認証</Step>
+        <Step n={4} title="生徒を選んで記録">対局する生徒を選択して「記録する」を押す</Step>
+      </div>
+      <Tip type="warn">承認済みデバイスからのみ記録できる。</Tip>
+    </div>
+
+    <DetailOnly>
+      <Acc title="指導者の設定（管理者）">
+        <p>管理画面 → 「在籍部員」で部員カードを開き、「指導者」トグルボタンをONにする。</p>
+        <p className="mt-2">指導者PINの変更は管理画面 → 「PIN管理」→「指導者PIN変更」から行う。</p>
       </Acc>
     </DetailOnly>
   </div>
@@ -538,14 +632,14 @@ const TabAdmin = () => (
     <div className="space-y-3">
       <H icon={<Settings size={16}/>}>管理画面でできること</H>
       <Table rows={[
-        ['部員管理',           '追加・退班・再入班（データは保持）・CSVで一括追加'],
+        ['部員管理',           '追加・名前編集・学籍番号管理・新入班員フラグ・休眠・再入班・完全削除・CSV一括追加'],
         ['部員表示順',         'ドラッグ&ドロップで表示順をカスタマイズ'],
-        ['出席・ポイント調整', '手動でポイントを加減算'],
-        ['シーズン管理',       '基準値のスナップショット・月次リセット'],
+        ['ポイント/レート調整','個別手動調整・複数部員への一括付与'],
+        ['シーズン管理',       '基準値スナップショット・合宿ベースライン・月次リセット・終了日設定'],
         ['四天王の更新',       'システム称号を現在の成績で再計算'],
-        ['イベント管理',       '作成・チーム編成・大将任命'],
+        ['イベント管理',       '作成・チーム編成・大将任命・強制終了'],
         ['段位申請の承認',     '班員からの申請を承認・却下'],
-        ['PIN管理',            '個人ページPINの変更（6桁）'],
+        ['PIN管理',            '個人ページPIN・指導者PINの変更'],
         ['デバイス管理',       '対局・出席操作を許可するデバイスの承認・取り消し'],
         ['クラウド同期',       '手動でFirebaseと同期'],
         ['バックアップ管理',   '自動バックアップの確認・手動復元'],
@@ -555,9 +649,33 @@ const TabAdmin = () => (
     </div>
 
     <div className="space-y-3">
+      <H icon={<Users size={16}/>}>部員の管理</H>
+      <Table rows={[
+        ['名前編集',       '在籍部員の名前横の ✏ ボタンから編集。Enterで確定、Escでキャンセル'],
+        ['学籍番号',       '各部員カードの入力欄から設定・変更可能'],
+        ['新入班員フラグ', '「新入」「一般」ボタンで切り替え。ONの間は対局・出席でボーナス+3pt'],
+        ['指導者フラグ',   '指導対局ページで指導者として選択されるには管理者がONにする必要がある'],
+        ['休眠（退班）',   '部員リスト右の 👤✕ ボタンで休眠状態に。データはすべて保持される'],
+        ['再入班',         '休眠中の部員パネルから「再入班」ボタン。過去の実績が引き継がれる'],
+        ['完全削除',       '休眠中の部員パネルから「完全削除」ボタン。データが完全に消去される（取り消し不可）'],
+      ]} />
+      <Tip type="warn">完全削除は取り消しできない。誤操作防止のため確認ダイアログが2回表示される。</Tip>
+    </div>
+
+    <div className="space-y-3">
+      <H icon={<Database size={16}/>}>ポイント・レートの調整</H>
+      <Table rows={[
+        ['個別調整',   '管理画面 → 「出席・ポイント調整」で部員を選択してポイントまたはレートを加減算'],
+        ['一括付与',   '管理画面 → 「一括付与」で複数部員を選択して同一値を一度に付与'],
+        ['理由の記録', '調整理由をテキストで入力して記録できる'],
+      ]} />
+    </div>
+
+    <div className="space-y-3">
       <H icon={<Lock size={16}/>}>アクセス制限</H>
       <Table rows={[
         ['管理者PIN（6桁）', '管理画面ログインに必要'],
+        ['変更パスワード',   'デバイス承認時に入力する合言葉（管理者が任意で設定）'],
         ['承認済みデバイス', '対局記録・出席記録はこのデバイスからのみ操作可能'],
         ['デバイス承認手順', '変更パスワード入力 → 管理者PIN入力 → デバイス名登録'],
       ]} />
@@ -568,13 +686,28 @@ const TabAdmin = () => (
       <Acc title="班員をCSVで一括追加">
         <p className="text-xs text-slate-400">以下の形式のCSVを用意してください：</p>
         <div className="bg-slate-800 rounded-xl p-3 font-mono text-xs text-slate-300 leading-relaxed">
-          名前,読み<br/>
-          山田太郎,やまだたろう<br/>
-          鈴木一郎,すずきいちろう
+          名前,読み,学籍番号<br/>
+          山田太郎,やまだたろう,125001<br/>
+          鈴木一郎,すずきいちろう,125002
         </div>
         <Step n={1} title="管理画面 → 「在籍部員」→「CSVで一括追加」を開く" />
         <Step n={2} title="CSVファイルを選択 → 「追加する」を押す" />
         <Step n={3} title="確認モーダルで内容を確認して「追加を実行」" />
+        <Tip type="warn">学籍番号未入力の行があるとエラーが表示される。</Tip>
+      </Acc>
+
+      <Acc title="シーズン更新の推奨手順">
+        <Step n={1} title="四天王を更新する">現在の成績で称号を確定</Step>
+        <Step n={2} title="シーズン基準値をスナップショット">レート・ポイントを今期の基準として記録</Step>
+        <Step n={3} title="月次リセットを実行">活動日数・イベントポイントをリセット</Step>
+        <Tip type="ok">総ポイントとレートはリセットされない。</Tip>
+      </Acc>
+
+      <Acc title="合宿ベースラインの設定">
+        <p>学期開始時などに現在のレート・ポイントを「起点」として記録する機能。合宿などで「学期中の成長度」を表彰するために使う。</p>
+        <Step n={1} title="管理画面 → 「シーズン・称号」を開く" />
+        <Step n={2} title="合宿ベースランのラベルを入力">例：「2025 夏季合宿」</Step>
+        <Step n={3} title="「起点を記録」ボタンを押す">全部員の現在レート・ポイントが起点として保存される</Step>
       </Acc>
 
       <Acc title="メンテナンスモードとは">
@@ -586,29 +719,23 @@ const TabAdmin = () => (
         ]} />
         <Tip type="warn">メンテナンス中は全端末にオレンジのバナーが表示される。対局記録は終了後に行うこと。</Tip>
       </Acc>
-
-      <Acc title="シーズン更新の推奨手順">
-        <Step n={1} title="四天王を更新する">現在の成績で称号を確定</Step>
-        <Step n={2} title="シーズン基準値をスナップショット">レート・ポイントを今期の基準として記録</Step>
-        <Step n={3} title="月次リセットを実行">活動日数・イベントポイントをリセット</Step>
-        <Tip type="ok">総ポイントとレートはリセットされない。</Tip>
-      </Acc>
     </DetailOnly>
   </div>
 );
 
 // ━━━ タブ定義 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-type TabKey = 'intro' | 'match' | 'rate' | 'achievements' | 'events' | 'profile' | 'admin';
+type TabKey = 'intro' | 'match' | 'rate' | 'achievements' | 'events' | 'coaching' | 'profile' | 'admin';
 
 const TABS: { key: TabKey; label: string; icon: React.ReactNode; color: string }[] = [
-  { key: 'intro',        label: 'はじめに', icon: <BookOpen size={14}/>,   color: 'text-blue-400' },
-  { key: 'match',        label: '対局',     icon: <PlusCircle size={14}/>, color: 'text-red-400' },
-  { key: 'rate',         label: 'レート',   icon: <TrendingUp size={14}/>, color: 'text-green-400' },
-  { key: 'achievements', label: '称号',     icon: <Star size={14}/>,       color: 'text-yellow-400' },
-  { key: 'events',       label: 'イベント', icon: <Swords size={14}/>,     color: 'text-rose-400' },
-  { key: 'profile',      label: '個人',     icon: <UserIcon size={14}/>,   color: 'text-purple-400' },
-  { key: 'admin',        label: '管理者',   icon: <Settings size={14}/>,   color: 'text-slate-400' },
+  { key: 'intro',        label: 'はじめに', icon: <BookOpen size={14}/>,      color: 'text-blue-400' },
+  { key: 'match',        label: '対局',     icon: <PlusCircle size={14}/>,    color: 'text-red-400' },
+  { key: 'rate',         label: 'レート',   icon: <TrendingUp size={14}/>,    color: 'text-green-400' },
+  { key: 'achievements', label: '称号',     icon: <Star size={14}/>,          color: 'text-yellow-400' },
+  { key: 'events',       label: 'イベント', icon: <Swords size={14}/>,        color: 'text-rose-400' },
+  { key: 'coaching',     label: '指導対局', icon: <GraduationCap size={14}/>, color: 'text-amber-400' },
+  { key: 'profile',      label: '個人',     icon: <UserIcon size={14}/>,      color: 'text-purple-400' },
+  { key: 'admin',        label: '管理者',   icon: <Settings size={14}/>,      color: 'text-slate-400' },
 ];
 
 const CONTENT: Record<TabKey, React.ReactNode> = {
@@ -617,6 +744,7 @@ const CONTENT: Record<TabKey, React.ReactNode> = {
   rate:         <TabRate />,
   achievements: <TabAchievements />,
   events:       <TabEvents />,
+  coaching:     <TabCoaching />,
   profile:      <TabProfile />,
   admin:        <TabAdmin />,
 };

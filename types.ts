@@ -199,6 +199,7 @@ export interface SystemSettings {
   campBaselineRate?:   Record<string, number>;
   campBaselinePoints?: Record<string, number>;
   campBaselineLabel?:  string | null;
+  campSlots?: Partial<Record<string, CampSlotSnapshot>>;
 }
 
 export interface ActivityLog {
@@ -379,4 +380,21 @@ export interface InstructorSession {
   content: string;         // 指導内容（簡潔に）
   instructorPointsEarned: number;
   studentPointsEarned: number;  // 3倍
+}
+
+// ─── 合宿表彰スロット ────────────────────────────────────────
+export type CampSlotId =
+  | 'S1_FIRST'   // 1学期前半
+  | 'S1_SECOND'  // 1学期後半
+  | 'SUMMER'     // 夏合宿
+  | 'S2_FIRST'   // 2学期前半
+  | 'S2_SECOND'  // 2学期後半
+  | 'WINTER'     // 冬合宿
+  | 'S3'         // 3学期
+  | 'SPRING';    // 春合宿
+
+export interface CampSlotSnapshot {
+  snapshotAt: string;
+  rate:   Record<string, number>;
+  points: Record<string, number>;
 }

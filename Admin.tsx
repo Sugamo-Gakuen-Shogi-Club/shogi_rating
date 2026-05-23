@@ -4,9 +4,12 @@ import {
   manualPointAdjustment, manualRateAdjustment, resetMonthly, grantBatch,
   isEventActive, exportData, importData, getMatches, deleteMatch,
   assignGenerals, resetEventPoints, getFactionBalanceSimulation,
-  awardSystemTitles, snapshotSeasonBaseline, snapshotCampBaseline, updateUserReading,
+  awardSystemTitles, snapshotSeasonBaseline, snapshotCampBaseline,
+  snapshotCampSlot, clearCampSlot, getCampRankingsBySlot, CAMP_SLOT_DEFS,
+  updateUserReading,
   parseUserCSV, bulkAddUsers,
   deactivateUser, reactivateUser, getInactiveUsers,
+  updateUserName, deleteUserPermanently,
   manualSync, getSyncStatus, getAutoBackups, restoreFromAutoBackup,
   getMaintenanceState,
   getPendingRankApplications, approveRankApplication, rejectRankApplication, removeRank,
@@ -24,7 +27,8 @@ import {
   CheckCircle, Shuffle, Users, Crown, ChevronRight, X,
   RefreshCw, Languages, FileUp, Upload, Swords, Cloud,
   CloudOff, AlertCircle, Loader, UserCheck, UserX, RotateCcw,
-  Wrench, Medal, Check, KeyRound, Star, Lock, LogOut, GraduationCap as GraduationCapIcon
+  Wrench, Medal, Check, KeyRound, Star, Lock, LogOut, GraduationCap as GraduationCapIcon,
+  Pencil,
 } from 'lucide-react';
 import { UserSelector } from './UserSelector';
 import MaintenancePanel from './MaintenancePanel';
@@ -59,6 +63,7 @@ const Admin: React.FC = () => {
   const [approveAdminErr, setApproveAdminErr] = useState(false);
   const [approveLabel, setApproveLabel] = useState('部室iPad');
   const [campLabel, setCampLabel] = useState('');
+  const [campAwardSlot, setCampAwardSlot] = useState<string | null>(null); // 表彰モーダル表示中のスロット
 
   // 一括付与
   const [batchMode, setBatchMode]       = useState<'POINT' | 'RATE'>('POINT');
@@ -115,6 +120,10 @@ const Admin: React.FC = () => {
   const [newName, setNewName] = useState('');
   const [newReading, setNewReading] = useState('');
   const [newStudentId, setNewStudentId] = useState('');
+
+  // Name editing
+  const [editingNameId, setEditingNameId] = useState<string | null>(null);
+  const [editingNameValue, setEditingNameValue] = useState('');
 
   // Four Kings confirmation modal
   const [kingsConfirm, setKingsConfirm] = useState<{
@@ -267,10 +276,29 @@ const Admin: React.FC = () => {
 
   // ★ Reactivate
   const handleReactivateUser = (id: string, name: string) => {
-    if (window.confirm(`「${name}」を再入班させますか？\n過去のレート・実績が引き継がれます。`)) {
+    if (window.confirm(`「${name}」を再入班させますか？\\n過去のレート・実績が引き継がれます。`)) {
       reactivateUser(id);
       refreshData();
       alert(`${name} を再入班させました。`);
+    }
+  };
+
+  const handleSaveName = (id: string) => {
+    const trimmed = editingNameValue.trim();
+    if (!trimmed) return;
+    updateUserName(id, trimmed);
+    setEditingNameId(null);
+    setEditingNameValue('');
+    refreshData();
+  };
+
+  const handleDeleteUserPermanently = (id: string, name: string) => {
+    if (window.confirm(`「${name}」を完全に削除しますか？\nこの操作は取り消せません。すべてのデータが失われます。`)) {
+      if (window.confirm(`本当に「${name}」を削除しますか？`)) {
+        deleteUserPermanently(id);
+        refreshData();
+        alert(`${name} を完全削除しました。`);
+      }
     }
   };
 
@@ -943,7 +971,27 @@ const Admin: React.FC = () => {
                       <div className="flex items-center gap-3">
                         <div className={`w-10 h-10 rounded-full ${u.avatarColor} flex items-center justify-center text-white font-black text-lg font-serif-jp shadow-inner`}>{u.name.charAt(0)}</div>
                         <div>
-                          <div className="font-bold text-slate-100">{u.name}</div>
+                          {editingNameId === u.id ? (
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="text"
+                                value={editingNameValue}
+                                onChange={e => setEditingNameValue(e.target.value)}
+                                onKeyDown={e => { if (e.key === 'Enter') handleSaveName(u.id); if (e.key === 'Escape') { setEditingNameId(null); setEditingNameValue(''); } }}
+                                className="bg-slate-700 border border-blue-500 rounded-lg px-2 py-1 text-sm text-white font-bold focus:outline-none w-32"
+                                autoFocus
+                              />
+                              <button onClick={() => handleSaveName(u.id)} className="text-green-400 hover:text-green-300 p-1"><Check size={14}/></button>
+                              <button onClick={() => { setEditingNameId(null); setEditingNameValue(''); }} className="text-slate-500 hover:text-slate-300 p-1"><X size={14}/></button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1.5">
+                              <div className="font-bold text-slate-100">{u.name}</div>
+                              <button onClick={() => { setEditingNameId(u.id); setEditingNameValue(u.name); }} className="text-slate-600 hover:text-blue-400 p-0.5 transition-colors" title="名前を編集">
+                                <Pencil size={12}/>
+                              </button>
+                            </div>
+                          )}
                           <div className="text-[10px] text-slate-500 font-mono">Rate: {Math.round(u.rate)} / {u.wins}勝{u.losses}敗</div>
                         </div>
                       </div>
@@ -1037,6 +1085,13 @@ const Admin: React.FC = () => {
                       className="flex items-center gap-1 bg-green-900/30 hover:bg-green-700/40 text-green-400 border border-green-700/40 px-3 py-1.5 rounded-lg text-xs font-black transition-all active:scale-95"
                     >
                       <UserCheck size={14} /> 再入班
+                    </button>
+                    <button
+                      onClick={() => handleDeleteUserPermanently(u.id, u.name)}
+                      className="flex items-center gap-1 bg-red-900/20 hover:bg-red-700/30 text-red-400 border border-red-700/40 px-3 py-1.5 rounded-lg text-xs font-black transition-all active:scale-95"
+                      title="完全削除（取り消し不可）"
+                    >
+                      <Trash2 size={14} /> 完全削除
                     </button>
                   </div>
                 ))}
@@ -1225,39 +1280,118 @@ const Admin: React.FC = () => {
                   {Object.values(Season).map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
-              {/* 合宿ベースライン */}
+              {/* 合宿表彰ベースライン（スロット式） */}
               <div className="border-t border-white/5 pt-4 space-y-3">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block">合宿表彰ベースライン</label>
-                {settings.campBaselineLabel && (
-                  <p className="text-[11px] text-indigo-400 font-bold">
-                    📌 現在の起点: {settings.campBaselineLabel}
-                  </p>
-                )}
-                <p className="text-[10px] text-slate-600">学期開始時に記録。合宿で「学期またぎの成長度」を表彰するための基準点です。</p>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    placeholder="例: 2025 夏季合宿"
-                    value={campLabel}
-                    onChange={e => setCampLabel(e.target.value)}
-                    className="flex-1 p-3 border border-slate-700 rounded-xl font-bold bg-slate-900 text-white focus:border-indigo-500 outline-none text-sm"
-                  />
-                  <button
-                    onClick={() => {
-                      const label = campLabel.trim() || `${settings.currentSeason} 起点`;
-                      if (window.confirm(`合宿ベースラインを「${label}」として記録しますか？\n全部員の現在のレート・ポイントが起点として保存されます。`)) {
-                        snapshotCampBaseline(label);
-                        setSettings(getSettings());
-                        setCampLabel('');
-                        alert('合宿ベースラインを記録しました。');
-                      }
-                    }}
-                    className="px-4 py-2 bg-indigo-700 hover:bg-indigo-600 text-white rounded-xl font-black text-sm transition-all whitespace-nowrap"
-                  >
-                    起点を記録
-                  </button>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block">
+                  🏕️ 合宿表彰ベースライン
+                </label>
+                <p className="text-[10px] text-slate-600 leading-relaxed">
+                  各区間の開始時に「起点を記録」してください。合宿前に「表彰」を押すと成長ランキングが表示されます。
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  {CAMP_SLOT_DEFS.map((slot) => {
+                    const snap = (settings.campSlots ?? {})[slot.id];
+                    const hasSnap = !!snap;
+                    const snapDate = hasSnap ? new Date(snap.snapshotAt).toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : null;
+                    return (
+                      <div key={slot.id} className={`rounded-xl border p-3 space-y-2 transition-all ${hasSnap ? 'bg-indigo-900/15 border-indigo-700/40' : 'bg-slate-800/40 border-slate-700/30'}`}>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <span className="text-sm font-black text-white">{slot.emoji} {slot.label}</span>
+                            {hasSnap
+                              ? <div className="text-[9px] text-indigo-400 font-bold mt-0.5">📌 {snapDate}</div>
+                              : <div className="text-[9px] text-slate-600 font-bold mt-0.5">未記録</div>
+                            }
+                          </div>
+                          {hasSnap && (
+                            <button
+                              onClick={() => { if (window.confirm(`「${slot.label}」の起点を削除しますか？`)) { clearCampSlot(slot.id); setSettings(getSettings()); } }}
+                              className="text-slate-600 hover:text-red-400 p-1 transition-colors"
+                              title="起点を削除"
+                            >
+                              <Trash2 size={11}/>
+                            </button>
+                          )}
+                        </div>
+                        <div className="flex gap-1.5">
+                          <button
+                            onClick={() => {
+                              if (window.confirm(`「${slot.label}」の起点を${hasSnap ? '上書き' : '記録'}しますか？\n全部員の現在のレート・ポイントが保存されます。`)) {
+                                snapshotCampSlot(slot.id);
+                                setSettings(getSettings());
+                              }
+                            }}
+                            className={`flex-1 py-1.5 rounded-lg text-[10px] font-black transition-all ${hasSnap ? 'bg-slate-700 hover:bg-slate-600 text-slate-300' : 'bg-indigo-700 hover:bg-indigo-600 text-white'}`}
+                          >
+                            {hasSnap ? '📷 上書き' : '📷 起点を記録'}
+                          </button>
+                          {hasSnap && (
+                            <button
+                              onClick={() => setCampAwardSlot(slot.id)}
+                              className="flex-1 py-1.5 rounded-lg text-[10px] font-black bg-yellow-700 hover:bg-yellow-600 text-white transition-all"
+                            >
+                              🏆 表彰
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
+
+              {/* 合宿表彰モーダル */}
+              {campAwardSlot && (() => {
+                const slotDef = CAMP_SLOT_DEFS.find(s => s.id === campAwardSlot)!;
+                const ranking = getCampRankingsBySlot(campAwardSlot);
+                const snap = (settings.campSlots ?? {})[campAwardSlot]!;
+                const snapDate = new Date(snap.snapshotAt).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' });
+                return (
+                  <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm p-0 sm:p-4" onClick={() => setCampAwardSlot(null)}>
+                    <div className="bg-slate-900 border border-white/10 rounded-t-3xl sm:rounded-3xl w-full sm:max-w-md max-h-[85vh] flex flex-col shadow-2xl" onClick={e => e.stopPropagation()}>
+                      <div className="p-5 border-b border-white/5 flex items-center justify-between shrink-0">
+                        <div>
+                          <div className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-0.5">CAMP AWARD</div>
+                          <h3 className="text-lg font-black text-white">{slotDef.emoji} {slotDef.label} 表彰</h3>
+                          <p className="text-[10px] text-slate-500 font-bold mt-0.5">起点: {snapDate}</p>
+                        </div>
+                        <button onClick={() => setCampAwardSlot(null)} className="text-slate-500 hover:text-white p-2 transition-colors"><X size={20}/></button>
+                      </div>
+                      <div className="overflow-y-auto flex-1 p-4 space-y-2">
+                        {ranking.length === 0 ? (
+                          <p className="text-slate-500 text-sm text-center py-8">部員データがありません</p>
+                        ) : ranking.map((u, idx) => {
+                          const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : null;
+                          const isTop = idx < 3;
+                          return (
+                            <div key={u.id} className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border ${isTop ? 'bg-yellow-900/15 border-yellow-700/30' : 'bg-slate-800/40 border-white/5'}`}>
+                              <div className="w-8 text-center shrink-0">
+                                {medal ? <span className="text-xl">{medal}</span> : <span className="text-sm font-black text-slate-500">#{idx + 1}</span>}
+                              </div>
+                              <div className={`w-8 h-8 rounded-full ${u.avatarColor} flex items-center justify-center text-white font-black text-sm shrink-0`}>{u.name.charAt(0)}</div>
+                              <div className="flex-1 min-w-0">
+                                <div className={`font-black text-sm truncate ${isTop ? 'text-yellow-100' : 'text-slate-200'}`}>{u.name}</div>
+                                <div className="text-[10px] text-slate-500 font-bold">
+                                  Rate{u.campRateGrowth >= 0 ? '+' : ''}{Math.round(u.campRateGrowth)}
+                                  <span className="mx-1">·</span>
+                                  Pt{u.campPointsGrowth >= 0 ? '+' : ''}{Math.round(u.campPointsGrowth)}
+                                </div>
+                              </div>
+                              <div className={`text-right font-black font-mono shrink-0 ${isTop ? 'text-yellow-300' : u.campTotalGrowth > 0 ? 'text-blue-300' : 'text-slate-500'}`}>
+                                <div className="text-base">{u.campTotalGrowth >= 0 ? '+' : ''}{Math.round(u.campTotalGrowth)}</div>
+                                <div className="text-[9px] font-bold text-slate-600">総合</div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div className="p-4 border-t border-white/5 shrink-0">
+                        <p className="text-[10px] text-slate-600 text-center">総合 = レート上昇 ＋ ポイント増加</p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
               {/* シーズン終了日 */}
               <div className="border-t border-white/5 pt-4">
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block mb-2">
