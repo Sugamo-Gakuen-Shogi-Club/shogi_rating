@@ -323,8 +323,6 @@ const Rankings: React.FC = () => {
   // 最終活動日（出席が1件でも記録された日を活動日とみなす）
   const lastActivityDate = getSettings().lastActivityDate;
   const activityDateStr = lastActivityDate ?? new Date().toISOString().split('T')[0];
-  // 7日前
-  const weekAgo  = new Date(Date.now() - 7 * 86400000).toISOString();
 
   // 最終活動日の対局数マップ
   const todayMatchCount = useMemo(() => {
@@ -340,12 +338,15 @@ const Rankings: React.FC = () => {
     return m;
   }, [users, matches, activityDateStr]);
 
-  // 今週の勝率マップ
+  // 今週の勝率マップ（過去7日間・日付文字列ベースで比較）
   const weekStats = useMemo(() => {
     const m: Record<string, { wins: number; total: number }> = {};
     users.forEach(u => { m[u.id] = { wins: 0, total: 0 }; });
+    // 7日前の日付文字列（YYYY-MM-DD）を基準にする（UTC/JSTずれ回避）
+    const weekAgoDate = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0];
     matches.forEach(match => {
-      if (match.date < weekAgo) return;
+      const matchDate = match.date.split('T')[0];
+      if (matchDate < weekAgoDate) return;
       const p1win = match.result === 'PLAYER1_WIN';
       const p2win = match.result === 'PLAYER2_WIN';
       if (!m[match.player1Id]) m[match.player1Id] = { wins: 0, total: 0 };
@@ -359,7 +360,7 @@ const Rankings: React.FC = () => {
       }
     });
     return m;
-  }, [users, matches, weekAgo]);
+  }, [users, matches]);
 
   // 今期の対局数マップ（全マッチから計算）
   const seasonMatchCount = useMemo(() => {
@@ -460,16 +461,16 @@ const Rankings: React.FC = () => {
               {/* 今期成長 - 特大・最優先 */}
               <button
                 onClick={() => { setActiveTab('seasonGrowth'); setShowSortModal(false); }}
-                className={`w-full flex items-center justify-between px-5 py-5 rounded-2xl font-black transition-all text-left ${activeTab === 'seasonGrowth' ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-2xl shadow-blue-900/50 ring-2 ring-blue-400/40' : 'bg-gradient-to-r from-slate-800 to-slate-700 text-white hover:from-slate-700 hover:to-slate-600 border border-white/10'}`}
+                className={`w-full flex items-center justify-between px-6 py-8 rounded-2xl font-black transition-all text-left ${activeTab === 'seasonGrowth' ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-2xl shadow-blue-900/50 ring-2 ring-blue-400/40' : 'bg-gradient-to-r from-slate-800 to-slate-700 text-white hover:from-slate-700 hover:to-slate-600 border border-white/10'}`}
               >
-                <div className="flex items-center gap-4">
-                  <span className="text-4xl">📈</span>
+                <div className="flex items-center gap-5">
+                  <span className="text-5xl">📈</span>
                   <div>
-                    <div className="text-xl">今期成長</div>
-                    <div className="text-xs font-bold text-slate-300 mt-0.5">レート上昇＋ポイント増加の合算</div>
+                    <div className="text-2xl">今期成長</div>
+                    <div className="text-sm font-bold text-slate-300 mt-1">レート上昇＋ポイント増加の合算</div>
                   </div>
                 </div>
-                {activeTab === 'seasonGrowth' && <Check size={22} className="text-white shrink-0"/>}
+                {activeTab === 'seasonGrowth' && <Check size={26} className="text-white shrink-0"/>}
               </button>
 
               {/* 学期まとめ - 合宿シーズン時のみ表示 */}

@@ -122,6 +122,10 @@ export interface User {
   profilePin: string;
   /** ★ 部員登録時に設定した初期PIN（任意）。未設定なら "000000" */
   initialPin?: string;
+  /** ★ 卒業フラグ（年度またぎで卒業扱いにした部員） */
+  isGraduated?: boolean;
+  /** ★ 卒業年度（例: 2026） */
+  graduatedYear?: number;
   // ★ 学籍番号（Googleログイン連携用）
   studentId?: string;
   // ★ アイコンフレーム

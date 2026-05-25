@@ -9,6 +9,7 @@ import {
   snapshotSeasonBaselineWithSlot, processFiscalYearRollover,
   getTermRankings, TERM_SUMMARY_MAP,
   SEASON_ORDER, getNextSeason,
+  forceSetS1FirstBaseline, getGraduatedUsers,
   updateUserReading,
   parseUserCSV, bulkAddUsers,
   deactivateUser, reactivateUser, getInactiveUsers,
@@ -1405,13 +1406,32 @@ const Admin: React.FC = () => {
                   )}
                 </div>
               </div>
+              {/* 【一回限り】S1_FIRST 強制埋め込み */}
+              <div className="border-t border-white/5 pt-4 space-y-2">
+                <label className="text-xs font-bold text-red-500 uppercase tracking-widest block">⚠️ 初期化（一回限り・後で削除）</label>
+                <p className="text-[10px] text-slate-600 leading-relaxed">
+                  年度途中から導入した場合のみ使用。S1_FIRSTをrate=500/pt=0で全員に強制記録します。
+                </p>
+                <button
+                  onClick={() => {
+                    if (!window.confirm('全員のS1_FIRSTをrate=500, points=0で強制記録します。\n既に記録がある場合は上書きされます。よろしいですか？')) return;
+                    forceSetS1FirstBaseline(500);
+                    setSettings(getSettings());
+                    alert('S1_FIRSTを記録しました。このボタンはコードから削除してください。');
+                  }}
+                  className="w-full py-2.5 rounded-xl bg-red-900/30 hover:bg-red-800/40 text-red-300 text-sm font-black border border-red-800/40 transition-all"
+                >
+                  🔧 S1_FIRST を rate=500/pt=0 で全員記録
+                </button>
+              </div>
+
               {/* 合宿表彰ベースライン（スロット式） */}
               <div className="border-t border-white/5 pt-4 space-y-3">
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block">
-                  🏕️ 合宿表彰ベースライン
+                  🏕️ 表彰スロット
                 </label>
                 <p className="text-[10px] text-slate-600 leading-relaxed">
-                  各区間の開始時に「起点を記録」してください。合宿前に「表彰」を押すと成長ランキングが表示されます。
+                  シーズン切り替え時に自動記録されます。「表彰」でランキングを確認できます。
                 </p>
                 <div className="grid grid-cols-2 gap-2">
                   {CAMP_SLOT_DEFS.map((slot) => {
@@ -1430,35 +1450,22 @@ const Admin: React.FC = () => {
                           </div>
                           {hasSnap && (
                             <button
-                              onClick={() => { if (window.confirm(`「${slot.label}」の起点を削除しますか？`)) { clearCampSlot(slot.id); setSettings(getSettings()); } }}
+                              onClick={() => { if (window.confirm(`「${slot.label}」の記録を削除しますか？`)) { clearCampSlot(slot.id); setSettings(getSettings()); } }}
                               className="text-slate-600 hover:text-red-400 p-1 transition-colors"
-                              title="起点を削除"
+                              title="記録を削除"
                             >
                               <Trash2 size={11}/>
                             </button>
                           )}
                         </div>
-                        <div className="flex gap-1.5">
+                        {hasSnap && (
                           <button
-                            onClick={() => {
-                              if (window.confirm(`「${slot.label}」の起点を${hasSnap ? '上書き' : '記録'}しますか？\n全部員の現在のレート・ポイントが保存されます。`)) {
-                                snapshotCampSlot(slot.id);
-                                setSettings(getSettings());
-                              }
-                            }}
-                            className={`flex-1 py-1.5 rounded-lg text-[10px] font-black transition-all ${hasSnap ? 'bg-slate-700 hover:bg-slate-600 text-slate-300' : 'bg-indigo-700 hover:bg-indigo-600 text-white'}`}
+                            onClick={() => setCampAwardSlot(slot.id)}
+                            className="w-full py-1.5 rounded-lg text-[10px] font-black bg-yellow-700 hover:bg-yellow-600 text-white transition-all"
                           >
-                            {hasSnap ? '📷 上書き' : '📷 起点を記録'}
+                            🏆 表彰
                           </button>
-                          {hasSnap && (
-                            <button
-                              onClick={() => setCampAwardSlot(slot.id)}
-                              className="flex-1 py-1.5 rounded-lg text-[10px] font-black bg-yellow-700 hover:bg-yellow-600 text-white transition-all"
-                            >
-                              🏆 表彰
-                            </button>
-                          )}
-                        </div>
+                        )}
                       </div>
                     );
                   })}
