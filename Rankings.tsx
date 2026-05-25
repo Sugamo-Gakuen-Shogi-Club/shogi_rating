@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { getUsers, getMatches, ACHIEVEMENTS_DATA, getUserAvatarChar, SYSTEM_TITLES, ICONS_DATA, getUserFrameDef, getSettings } from './storage';
+import { getUsers, getMatches, ACHIEVEMENTS_DATA, getUserAvatarChar, SYSTEM_TITLES, ICONS_DATA, getUserFrameDef, getSettings, getCampRankingsBySlot, getTermRankings, TERM_SUMMARY_MAP, CAMP_SLOT_DEFS } from './storage';
 import { Card } from './Card';
 import {
   TrendingUp, Award, Crown, Zap, Calendar, Star,
@@ -22,7 +22,8 @@ type TabKey =
   | 'monthlyPoints'
   | 'draws'
   | 'fourKings'
-  | 'summary';
+  | 'summary'
+  | 'termSummary'; // 学期まとめ表彰（合宿シーズン切り替え時に解放）
 
 // ─── タブ定義 ─────────────────────────────────────────────────
 const TABS: { key: TabKey; label: string; icon: React.ReactNode; badge?: string }[] = [
@@ -39,6 +40,7 @@ const TABS: { key: TabKey; label: string; icon: React.ReactNode; badge?: string 
   { key: 'draws',         label: '引き分け',      icon: <Shield size={12}/> },
   { key: 'fourKings',     label: '四天王基準',    icon: <Crown size={12} className="text-yellow-400"/> },
   { key: 'summary',       label: '📊 まとめ',     icon: null },
+  { key: 'termSummary',   label: '🏆 学期まとめ', icon: null },
 ];
 
 // 軸ごとの1位バッジラベル
@@ -56,6 +58,7 @@ const FIRST_BADGES: Record<TabKey, string> = {
   draws:         '☯️ 均衡の達人',
   fourKings:     '',
   summary:       '',
+  termSummary:   '🏆 学期トップ',
 };
 
 // ─── 四天王バッジ ─────────────────────────────────────────────
@@ -419,7 +422,17 @@ const Rankings: React.FC = () => {
     const diff = getScore(b, activeTab) - getScore(a, activeTab);
     return diff !== 0 ? diff : tiebreak(a, b);
   });
-  const isTable = activeTab !== 'fourKings' && activeTab !== 'summary';
+
+  // 学期まとめ表彰データ
+  const settings = getSettings();
+  const currentSeason = settings.currentSeason;
+  const termSummaryDef = TERM_SUMMARY_MAP[currentSeason as keyof typeof TERM_SUMMARY_MAP];
+  const termSummaryUsers = useMemo(() => {
+    if (!termSummaryDef) return [];
+    return getTermRankings(termSummaryDef.from, termSummaryDef.to);
+  }, [termSummaryDef?.from, termSummaryDef?.to, currentSeason]);
+
+  const isTable = activeTab !== 'fourKings' && activeTab !== 'summary' && activeTab !== 'termSummary';
 
   // タブのスコア色
   const scoreColor = (key: TabKey, rank: number): string => {
@@ -444,20 +457,37 @@ const Rankings: React.FC = () => {
               <button onClick={() => setShowSortModal(false)} className="text-slate-500 hover:text-white p-2 transition-colors"><X size={20}/></button>
             </div>
             <div className="space-y-2">
-              {/* 今期成長 - 最大 */}
+              {/* 今期成長 - 特大・最優先 */}
               <button
                 onClick={() => { setActiveTab('seasonGrowth'); setShowSortModal(false); }}
-                className={`w-full flex items-center justify-between px-4 py-4 rounded-2xl font-black transition-all text-left ${activeTab === 'seasonGrowth' ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-xl shadow-blue-900/40' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+                className={`w-full flex items-center justify-between px-5 py-5 rounded-2xl font-black transition-all text-left ${activeTab === 'seasonGrowth' ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-2xl shadow-blue-900/50 ring-2 ring-blue-400/40' : 'bg-gradient-to-r from-slate-800 to-slate-700 text-white hover:from-slate-700 hover:to-slate-600 border border-white/10'}`}
               >
-                <div className="flex items-center gap-3">
-                  <span className="text-2xl">📈</span>
+                <div className="flex items-center gap-4">
+                  <span className="text-4xl">📈</span>
                   <div>
-                    <div className="text-base">今期成長</div>
-                    <div className="text-[10px] font-bold text-slate-400 mt-0.5">レート上昇＋ポイント増加の合算</div>
+                    <div className="text-xl">今期成長</div>
+                    <div className="text-xs font-bold text-slate-300 mt-0.5">レート上昇＋ポイント増加の合算</div>
                   </div>
                 </div>
-                {activeTab === 'seasonGrowth' && <Check size={18} className="text-white shrink-0"/>}
+                {activeTab === 'seasonGrowth' && <Check size={22} className="text-white shrink-0"/>}
               </button>
+
+              {/* 学期まとめ - 合宿シーズン時のみ表示 */}
+              {termSummaryDef && (
+                <button
+                  onClick={() => { setActiveTab('termSummary'); setShowSortModal(false); }}
+                  className={`w-full flex items-center justify-between px-5 py-4 rounded-2xl font-black transition-all text-left ${activeTab === 'termSummary' ? 'bg-gradient-to-r from-amber-600 to-orange-600 text-white shadow-2xl shadow-amber-900/50 ring-2 ring-amber-400/40' : 'bg-gradient-to-r from-amber-950/60 to-orange-950/60 text-amber-200 hover:from-amber-900/60 hover:to-orange-900/60 border border-amber-700/40'}`}
+                >
+                  <div className="flex items-center gap-4">
+                    <span className="text-3xl">🏆</span>
+                    <div>
+                      <div className="text-lg">{termSummaryDef.label}表彰</div>
+                      <div className="text-xs font-bold text-amber-300/80 mt-0.5">{termSummaryDef.from} → {termSummaryDef.to} の成長</div>
+                    </div>
+                  </div>
+                  {activeTab === 'termSummary' && <Check size={20} className="text-white shrink-0"/>}
+                </button>
+              )}
 
               {/* レート・ポイント - 大きめ */}
               <div className="grid grid-cols-2 gap-2">
@@ -618,6 +648,50 @@ const Rankings: React.FC = () => {
               getScoreLabel={getScoreLabel}
               tiebreak={tiebreak}
             />
+          </div>
+        </Card>
+      )}
+
+      {/* 学期まとめ表彰タブ */}
+      {activeTab === 'termSummary' && (
+        <Card className="border border-amber-500/20 rounded-[2rem] bg-slate-900/50 backdrop-blur-xl overflow-hidden">
+          <div className="p-6 space-y-4">
+            <h3 className="text-lg font-black text-amber-300 flex items-center gap-2">
+              🏆 {termSummaryDef ? termSummaryDef.label : '学期まとめ'}表彰
+            </h3>
+            {!termSummaryDef ? (
+              <p className="text-slate-500 text-sm">合宿シーズンに切り替えると表示されます。</p>
+            ) : termSummaryUsers.length === 0 ? (
+              <p className="text-slate-500 text-sm">スロット「{termSummaryDef.from}」のデータがありません。</p>
+            ) : (
+              <>
+                <p className="text-[10px] text-slate-500 font-bold">
+                  {termSummaryDef.from} 起点 → {termSummaryDef.to} 終点のレート＋ポイント成長
+                </p>
+                <div className="space-y-2">
+                  {termSummaryUsers.map((u, idx) => {
+                    const rank = idx + 1;
+                    const growth = u.campTotalGrowth;
+                    return (
+                      <div key={u.id} className={`flex items-center gap-3 p-3 rounded-xl transition-all ${rowBg(rank)}`}>
+                        <div className="w-8 shrink-0 flex justify-center">{rankIcon(rank)}</div>
+                        <UserAvatar user={u}/>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-black text-white truncate">{u.name}</div>
+                          <div className="text-[10px] text-slate-500 font-bold flex gap-2">
+                            <span>Rate {u.campRateGrowth >= 0 ? '+' : ''}{Math.round(u.campRateGrowth)}</span>
+                            <span>Pt {u.campPointsGrowth >= 0 ? '+' : ''}{u.campPointsGrowth}</span>
+                          </div>
+                        </div>
+                        <div className={`font-black font-mono text-xl shrink-0 ${growth > 0 ? 'text-emerald-400' : growth < 0 ? 'text-red-400' : 'text-slate-500'}`}>
+                          {growth >= 0 ? `+${growth}` : growth}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
           </div>
         </Card>
       )}

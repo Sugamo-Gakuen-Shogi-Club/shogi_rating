@@ -9,6 +9,7 @@ import {
   SystemTitleHistoryEntry, SystemTitleSnapshot,
   MissionDef, MissionProgress, MissionAchieved,
   InstructorSession,
+  FiscalYearCategory,
 } from './types';
 import { getAppCheckToken } from './appCheck';
 
@@ -50,6 +51,7 @@ const DEFAULT_SETTINGS: SystemSettings = {
   lastMonthlyReset: new Date().toISOString(),
   lastTitleUpdate: null,
   instructorPin: '000000',
+  fiscalYear: 2026,
 };
 
 // 初期レートは0（負けで減る仕様のため）
@@ -2255,19 +2257,20 @@ export const snapshotSeasonBaseline = (): void => {
   saveUsers(all);
 };
 
+
 // ============================================================
 // CAMP BASELINE SNAPSHOT（合宿表彰用・学期をまたいで保持）
 // ============================================================
 // ─── 合宿表彰スロット定義 ────────────────────────────────────
-export const CAMP_SLOT_DEFS: { id: string; label: string; emoji: string; desc: string }[] = [
-  { id: 'S1_FIRST',  label: '1学期前半', emoji: '🌸', desc: '1学期の前半を基準とした成長' },
-  { id: 'S1_SECOND', label: '1学期後半', emoji: '🌿', desc: '1学期の後半を基準とした成長' },
-  { id: 'SUMMER',    label: '夏合宿',    emoji: '🏕️', desc: '夏合宿での総合成長表彰' },
-  { id: 'S2_FIRST',  label: '2学期前半', emoji: '🍂', desc: '2学期の前半を基準とした成長' },
-  { id: 'S2_SECOND', label: '2学期後半', emoji: '❄️', desc: '2学期の後半を基準とした成長' },
-  { id: 'WINTER',    label: '冬合宿',    emoji: '⛄', desc: '冬合宿での総合成長表彰' },
-  { id: 'S3',        label: '3学期',     emoji: '🌱', desc: '3学期を基準とした成長' },
-  { id: 'SPRING',    label: '春合宿',    emoji: '🌺', desc: '春合宿での総合成長表彰' },
+export const CAMP_SLOT_DEFS: { id: string; label: string; emoji: string; desc: string; isCamp?: boolean; isAuto?: boolean }[] = [
+  { id: 'S1_FIRST',  label: '1学期前半', emoji: '🌸', desc: '1学期前半の起点（シーズン変更時に自動記録）',    isAuto: true },
+  { id: 'S1_SECOND', label: '1学期後半', emoji: '🌿', desc: '1学期後半の起点（シーズン変更時に自動記録）',    isAuto: true },
+  { id: 'SUMMER',    label: '夏合宿',    emoji: '🏕️', desc: '夏合宿での表彰専用（独立集計）',               isCamp: true, isAuto: true },
+  { id: 'S2_FIRST',  label: '2学期前半', emoji: '🍂', desc: '2学期前半の起点（シーズン変更時に自動記録）',    isAuto: true },
+  { id: 'S2_SECOND', label: '2学期後半', emoji: '❄️', desc: '2学期後半の起点（シーズン変更時に自動記録）',    isAuto: true },
+  { id: 'WINTER',    label: '冬合宿',    emoji: '⛄', desc: '冬合宿での表彰専用（独立集計）',               isCamp: true, isAuto: true },
+  { id: 'S3',        label: '3学期',     emoji: '🌱', desc: '3学期の起点（シーズン変更時に自動記録）',        isAuto: true },
+  { id: 'SPRING',    label: '春合宿',    emoji: '🌺', desc: '春合宿での表彰専用（独立集計）',               isCamp: true, isAuto: true },
 ];
 
 /** 指定スロットに現在の全部員レート・ポイントをスナップショット */
@@ -2302,6 +2305,34 @@ export const clearCampSlot = (slotId: string): void => {
   saveSettings({ ...s, campSlots: slots });
 };
 
+/**
+ * シーズン変更時に対応スロットへ自動スナップショットを記録する。
+ * snapshotCampSlot の後に置くこと（前方参照エラー回避）。
+ *
+ * 自動記録ルール:
+ *   TERM_1_EARLY → S1_FIRST  / TERM_1_LATE → S1_SECOND
+ *   SUMMER_CAMP  → SUMMER    / TERM_2_EARLY → S2_FIRST
+ *   TERM_2_LATE  → S2_SECOND / WINTER_CAMP  → WINTER
+ *   TERM_3       → S3        / SPRING_CAMP  → SPRING
+ */
+const SEASON_TO_SLOT: Partial<Record<Season, string>> = {
+  [Season.TERM_1_EARLY]: 'S1_FIRST',
+  [Season.TERM_1_LATE]:  'S1_SECOND',
+  [Season.SUMMER_CAMP]:  'SUMMER',
+  [Season.TERM_2_EARLY]: 'S2_FIRST',
+  [Season.TERM_2_LATE]:  'S2_SECOND',
+  [Season.WINTER_CAMP]:  'WINTER',
+  [Season.TERM_3]:       'S3',
+  [Season.SPRING_CAMP]:  'SPRING',
+};
+
+/** シーズン変更と同時に seasonStartRate/Points を更新し、対応スロットを自動スナップショット */
+export const snapshotSeasonBaselineWithSlot = (newSeason: Season): void => {
+  snapshotSeasonBaseline();
+  const slotId = SEASON_TO_SLOT[newSeason];
+  if (slotId) snapshotCampSlot(slotId);
+};
+
 /** 指定スロットを起点とした成長ランキングを取得 */
 export const getCampRankingsBySlot = (slotId: string): (ReturnType<typeof getUsers>[0] & {
   campRateGrowth: number;
@@ -2319,7 +2350,64 @@ export const getCampRankingsBySlot = (slotId: string): (ReturnType<typeof getUse
   }).sort((a, b) => b.campTotalGrowth - a.campTotalGrowth);
 };
 
-/** 後方互換：旧 snapshotCampBaseline */
+/**
+ * 2つのスロット間の成長ランキングを返す。
+ * fromSlot起点 → toSlot終了時点の差分を計算する。
+ * toSlotが未記録の場合は現在値を使う。
+ */
+export const getTermRankings = (fromSlotId: string, toSlotId?: string): (ReturnType<typeof getUsers>[0] & {
+  campRateGrowth: number;
+  campPointsGrowth: number;
+  campTotalGrowth: number;
+})[] => {
+  const s = getSettings();
+  const slots = s.campSlots ?? {};
+  const fromSnap = slots[fromSlotId];
+  const toSnap   = toSlotId ? slots[toSlotId] : undefined;
+
+  const baseRate   = fromSnap?.rate   ?? {};
+  const basePoints = fromSnap?.points ?? {};
+  const toRate     = toSnap?.rate;
+  const toPoints   = toSnap?.points;
+
+  return getUsers().map(u => {
+    const endRate   = toRate   ? (toRate[u.id]   ?? u.rate)        : u.rate;
+    const endPoints = toPoints ? (toPoints[u.id] ?? u.totalPoints) : u.totalPoints;
+    const rg = endRate   - (baseRate[u.id]   ?? endRate);
+    const pg = endPoints - (basePoints[u.id] ?? endPoints);
+    return { ...u, campRateGrowth: rg, campPointsGrowth: pg, campTotalGrowth: rg + pg };
+  }).sort((a, b) => b.campTotalGrowth - a.campTotalGrowth);
+};
+
+/**
+ * 学期まとめ表彰の定義。
+ * キー = まとめ表彰がトリガーされるシーズン。
+ * from = 起点スロット、to = 終点スロット（そのシーズンのスロット記録直前の値）
+ */
+export const TERM_SUMMARY_MAP: Partial<Record<Season, { from: string; to: string; label: string }>> = {
+  [Season.SUMMER_CAMP]: { from: 'S1_FIRST', to: 'SUMMER', label: '1学期まとめ' },
+  [Season.WINTER_CAMP]: { from: 'S2_FIRST', to: 'WINTER', label: '2学期まとめ' },
+  [Season.SPRING_CAMP]: { from: 'S3',       to: 'SPRING', label: '3学期まとめ' },
+};
+
+/** シーズンの固定順序 */
+export const SEASON_ORDER: Season[] = [
+  Season.TERM_1_EARLY,
+  Season.TERM_1_LATE,
+  Season.SUMMER_CAMP,
+  Season.TERM_2_EARLY,
+  Season.TERM_2_LATE,
+  Season.WINTER_CAMP,
+  Season.TERM_3,
+  Season.SPRING_CAMP,
+];
+
+/** 次のシーズンを返す。最終シーズン（SPRING_CAMP）の次はnull */
+export const getNextSeason = (current: Season): Season | null => {
+  const idx = SEASON_ORDER.indexOf(current);
+  if (idx === -1 || idx === SEASON_ORDER.length - 1) return null;
+  return SEASON_ORDER[idx + 1];
+};
 export const snapshotCampBaseline = (label: string): void => {
   const all = getRawUsers();
   const rateMap:   Record<string, number> = {};
@@ -2826,7 +2914,7 @@ export const parseUserCSV = (csv: string): { data: Partial<User>[]; errors: stri
   return { data, errors };
 };
 
-const newUserBase = (name: string, reading?: string, isNewMember = false): User => ({
+const newUserBase = (name: string, reading?: string, isNewMember = false, pin?: string): User => ({
   id:               randomId(),
   name,
   reading,
@@ -2861,7 +2949,8 @@ const newUserBase = (name: string, reading?: string, isNewMember = false): User 
   activeIconId:     'DEFAULT_INITIAL',
   unlockedIcons:    [...DEFAULT_UNLOCKED_ICONS],
   ranks:            [],
-  profilePin:       '000000',
+  profilePin:       (pin && /^\d{6}$/.test(pin)) ? pin : '000000',
+  initialPin:       (pin && /^\d{6}$/.test(pin)) ? pin : undefined,
   studentId:        undefined,
   activeFrameId:    'FRAME_NONE',
   unlockedFrames:   ['FRAME_NONE', 'FRAME_DEFAULT'],
@@ -2870,8 +2959,79 @@ const newUserBase = (name: string, reading?: string, isNewMember = false): User 
 
 export const bulkAddUsers = (stubs: Partial<User>[]): void => {
   const all = getRawUsers();
-  const added = stubs.map(s => ({ ...newUserBase(s.name || '名称未設定', s.reading, !!s.isNewMember), ...(s.studentId ? { studentId: s.studentId } : {}) }));
+  const added = stubs.map(s => ({
+    ...newUserBase(s.name || '名称未設定', s.reading, !!s.isNewMember, s.initialPin),
+    ...(s.studentId ? { studentId: s.studentId } : {}),
+  }));
   saveUsers([...all, ...added]);
+};
+
+// ============================================================
+// 年度またぎ処理
+// ============================================================
+
+/**
+ * 年度またぎ処理を実行する。
+ *
+ * @param categories  userId → カテゴリ のマップ（管理者が手動で分類）
+ *   - graduate: 卒業 → レート・ポイントを保持したままアーカイブ（isActive=false, isGraduated=true）
+ *   - withdraw:  退班 → 休眠（isActive=false）
+ *   - continue:  残留 → ポイントリセット、レートを半減
+ * @param nextFiscalYear  次の年度（例: 2027）
+ *
+ * 処理は全スロットのクリアも行い、次年度の1学期前半（TERM_1_EARLY / S1_FIRST）を起点とする。
+ */
+export const processFiscalYearRollover = (
+  categories: Record<string, FiscalYearCategory>,
+  nextFiscalYear: number,
+): void => {
+  const all = getRawUsers();
+
+  all.forEach(u => {
+    const cat = categories[u.id];
+    if (!cat) return; // 未分類はスキップ
+
+    if (cat === 'graduate') {
+      // 卒業：アーカイブ（休眠）、データ保持
+      u.isActive = false;
+      (u as any).isGraduated = true;
+      u.isGeneral = false;
+    } else if (cat === 'withdraw') {
+      // 退班：休眠
+      u.isActive = false;
+      u.isGeneral = false;
+    } else {
+      // 残留：ポイントリセット・レート半減
+      const newRate = Math.round(u.rate / 2);
+      u.rate             = newRate;
+      u.seasonStartRate  = newRate;
+      u.totalPoints      = 0;
+      u.pointsMatch      = 0;
+      u.pointsAttendance = 0;
+      u.pointsSpecial    = 0;
+      u.monthlyPoints    = 0;
+      u.eventPoints      = 0;
+      u.seasonStartPoints = 0;
+      u.currentStreak    = 0;
+      u.lossStreak       = 0;
+      u.rateHistory      = [{ date: new Date().toISOString(), rate: newRate }];
+    }
+  });
+
+  saveUsers(all);
+
+  // 全スロットをクリア
+  const s = getSettings();
+  saveSettings({
+    ...s,
+    campSlots: {},
+    currentSeason: Season.TERM_1_EARLY,
+    fiscalYear: nextFiscalYear,
+  });
+
+  // 新年度1学期前半のスロットを記録
+  snapshotCampSlot('S1_FIRST');
+  snapshotSeasonBaseline();
 };
 
 // ============================================================

@@ -120,6 +120,8 @@ export interface User {
   ranks: RankEntry[];
   // ★ 個人ページPIN（初期値 "0000"）
   profilePin: string;
+  /** ★ 部員登録時に設定した初期PIN（任意）。未設定なら "000000" */
+  initialPin?: string;
   // ★ 学籍番号（Googleログイン連携用）
   studentId?: string;
   // ★ アイコンフレーム
@@ -200,6 +202,14 @@ export interface SystemSettings {
   campBaselinePoints?: Record<string, number>;
   campBaselineLabel?:  string | null;
   campSlots?: Partial<Record<string, CampSlotSnapshot>>;
+  /** ★ 年度（例: 2026）。年度またぎ処理の基準 */
+  fiscalYear?: number;
+  /** ★ seasonEndsAt（残り日数表示用） */
+  seasonEndsAt?: string | null;
+  /** ★ 最終活動日（Rankings用） */
+  lastActivityDate?: string;
+  /** ★ 部員表示順 */
+  memberOrder?: string[];
 }
 
 export interface ActivityLog {
@@ -398,3 +408,6 @@ export interface CampSlotSnapshot {
   rate:   Record<string, number>;
   points: Record<string, number>;
 }
+
+/** ★ 年度またぎ処理の部員カテゴリ */
+export type FiscalYearCategory = 'graduate' | 'withdraw' | 'continue';

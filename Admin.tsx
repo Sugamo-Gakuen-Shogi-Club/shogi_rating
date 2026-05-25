@@ -6,6 +6,9 @@ import {
   assignGenerals, resetEventPoints, getFactionBalanceSimulation,
   awardSystemTitles, snapshotSeasonBaseline, snapshotCampBaseline,
   snapshotCampSlot, clearCampSlot, getCampRankingsBySlot, CAMP_SLOT_DEFS,
+  snapshotSeasonBaselineWithSlot, processFiscalYearRollover,
+  getTermRankings, TERM_SUMMARY_MAP,
+  SEASON_ORDER, getNextSeason,
   updateUserReading,
   parseUserCSV, bulkAddUsers,
   deactivateUser, reactivateUser, getInactiveUsers,
@@ -19,7 +22,7 @@ import {
   finalizeFactionWar,
   toggleInstructor, changeInstructorPin,
 } from './storage';
-import { User, SystemSettings, Season, EventType, SyncMeta, AutoBackupEntry, MaintenanceState, RankApplication, ActivityLog, ActivityType } from './types';
+import { User, SystemSettings, Season, EventType, SyncMeta, AutoBackupEntry, MaintenanceState, RankApplication, ActivityLog, ActivityType, FiscalYearCategory } from './types';
 import { Card } from './Card';
 import { NumPad } from './NumPad';
 import {
@@ -120,8 +123,12 @@ const Admin: React.FC = () => {
   const [newName, setNewName] = useState('');
   const [newReading, setNewReading] = useState('');
   const [newStudentId, setNewStudentId] = useState('');
+  const [newUserPin, setNewUserPin] = useState('');
 
-  // Name editing
+  // 年度またぎ
+  const [showFiscalModal, setShowFiscalModal] = useState(false);
+  const [fiscalCategories, setFiscalCategories] = useState<Record<string, FiscalYearCategory>>({});
+  const [nextFiscalYear, setNextFiscalYear] = useState<number>((getSettings().fiscalYear ?? 2026) + 1);
   const [editingNameId, setEditingNameId] = useState<string | null>(null);
   const [editingNameValue, setEditingNameValue] = useState('');
 
@@ -175,15 +182,24 @@ const Admin: React.FC = () => {
   // ──────────────────────────────────────────────────────────
   // SEASON / TITLES
   // ──────────────────────────────────────────────────────────
-  const handleSeasonChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const newSeason = e.target.value as Season;
-    if (window.confirm(`シーズンを「${newSeason}」に変更し、成長度のスナップショットを取りますか？`)) {
-      snapshotSeasonBaseline(); // ★ Fix: was no-op
-      const s = { ...settings, currentSeason: newSeason };
+  const handleSeasonAdvance = () => {
+    const nextSeason = getNextSeason(settings.currentSeason as Season);
+    if (!nextSeason) {
+      alert('現在のシーズンは最終シーズン（春季合宿）です。\n年度またぎ処理を行ってください。');
+      return;
+    }
+    const summary = TERM_SUMMARY_MAP[nextSeason as Season];
+    const summaryNote = summary ? `\n\n📊「${summary.label}」ランキングが確定します。` : '';
+    if (window.confirm(`シーズンを「${nextSeason}」に進めますか？${summaryNote}`)) {
+      snapshotSeasonBaselineWithSlot(nextSeason);
+      const s = { ...settings, currentSeason: nextSeason };
       saveSettings(s);
       setSettings(s);
       refreshData();
-      alert('シーズンを変更しました。成長度の基準がリセットされました。');
+      const msg = summary
+        ? `シーズンを「${nextSeason}」に変更しました。\n「${summary.label}」ランキングが確定しました。`
+        : `シーズンを「${nextSeason}」に変更しました。`;
+      alert(msg);
     }
   };
 
@@ -234,10 +250,17 @@ const Admin: React.FC = () => {
   // ──────────────────────────────────────────────────────────
   const handleAddUser = () => {
     if (!newName.trim() || !newStudentId.trim()) return;
-    bulkAddUsers([{ name: newName.trim(), reading: newReading.trim(), isNewMember: true, studentId: newStudentId.trim() }]);
+    bulkAddUsers([{
+      name: newName.trim(),
+      reading: newReading.trim(),
+      isNewMember: true,
+      studentId: newStudentId.trim(),
+      initialPin: newUserPin.length === 6 ? newUserPin : undefined,
+    }]);
     setNewName('');
     setNewReading('');
     setNewStudentId('');
+    setNewUserPin('');
     refreshData();
   };
 
@@ -918,6 +941,81 @@ const Admin: React.FC = () => {
         />
       )}
 
+      {/* ── 年度またぎモーダル ── */}
+      {showFiscalModal && (
+        <div className="fixed inset-0 z-[700] flex items-center justify-center bg-slate-950/95 backdrop-blur-md p-4">
+          <div className="bg-slate-900 w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] border border-white/10">
+            <div className="bg-slate-800 text-white p-6 flex justify-between items-center border-b border-white/10">
+              <h3 className="text-xl font-black flex items-center gap-2">🗓️ 年度またぎ処理
+                <span className="text-sm font-bold text-slate-400">({settings.fiscalYear ?? 2026}年度 → {nextFiscalYear}年度)</span>
+              </h3>
+              <button onClick={() => setShowFiscalModal(false)} className="bg-white/10 p-2 rounded-full hover:bg-white/20"><X /></button>
+            </div>
+            <div className="p-6 overflow-y-auto flex-1 space-y-4">
+              <div className="bg-amber-900/20 border border-amber-700/40 rounded-xl p-3 text-xs text-amber-300 font-bold leading-relaxed">
+                ⚠ この操作は取り消せません。実行前に必ずバックアップを取ってください。<br/>
+                残留者: ポイントリセット・レート半減 / 退班者: 休眠 / 卒業者: アーカイブ
+              </div>
+              <div className="flex items-center gap-3 mb-2">
+                <label className="text-xs font-bold text-slate-400">次の年度:</label>
+                <input
+                  type="number"
+                  value={nextFiscalYear}
+                  onChange={e => setNextFiscalYear(Number(e.target.value))}
+                  className="w-24 p-2 bg-slate-800 border border-slate-600 rounded-lg text-white font-bold text-center text-sm focus:border-purple-500 outline-none"
+                />
+              </div>
+              <div className="space-y-2">
+                {getUsers().map(u => {
+                  const cat = fiscalCategories[u.id] ?? 'continue';
+                  return (
+                    <div key={u.id} className="flex items-center gap-3 p-3 bg-slate-800/60 border border-slate-700 rounded-xl">
+                      <div className={`w-8 h-8 rounded-full ${u.avatarColor} flex items-center justify-center text-white font-black text-sm shrink-0`}>{u.name.charAt(0)}</div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-black text-white text-sm truncate">{u.name}</div>
+                        <div className="text-[10px] text-slate-500">Rate {Math.round(u.rate)}</div>
+                      </div>
+                      <div className="flex gap-1 shrink-0">
+                        {(['continue', 'withdraw', 'graduate'] as FiscalYearCategory[]).map(c => (
+                          <button
+                            key={c}
+                            onClick={() => setFiscalCategories(prev => ({ ...prev, [u.id]: c }))}
+                            className={`px-2.5 py-1.5 rounded-lg text-[10px] font-black border transition-all ${
+                              cat === c
+                                ? c === 'continue'  ? 'bg-blue-700 border-blue-500 text-white'
+                                : c === 'withdraw'  ? 'bg-yellow-700 border-yellow-500 text-white'
+                                : 'bg-red-800 border-red-600 text-white'
+                                : 'bg-slate-900 border-slate-700 text-slate-500 hover:border-slate-500'
+                            }`}
+                          >
+                            {c === 'continue' ? '残留' : c === 'withdraw' ? '退班' : '卒業'}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="p-6 border-t border-white/5 bg-slate-950 flex justify-end gap-3">
+              <button onClick={() => setShowFiscalModal(false)} className="px-6 py-3 rounded-xl font-bold text-slate-400 hover:text-white">キャンセル</button>
+              <button
+                onClick={() => {
+                  if (!window.confirm(`${nextFiscalYear}年度への切り替えを実行します。\n残留者のポイントリセット・レート半減を含む重大な変更です。\n本当によろしいですか？`)) return;
+                  processFiscalYearRollover(fiscalCategories, nextFiscalYear);
+                  setShowFiscalModal(false);
+                  refreshData();
+                  alert(`✅ ${nextFiscalYear}年度へ切り替えました。`);
+                }}
+                className="px-8 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black shadow-lg transition-all"
+              >
+                🗓️ 年度またぎを実行
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-end gap-4">
         <div>
@@ -948,8 +1046,9 @@ const Admin: React.FC = () => {
               <div className="space-y-3 p-4 bg-slate-900/50 rounded-2xl border border-white/5">
                 <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-3">
                   <input type="text" value={newName} onChange={e => setNewName(e.target.value)} placeholder="名前（例：秀村 紘嗣）" className="w-full p-3 border border-slate-700 rounded-xl bg-slate-800 text-white font-bold focus:ring-2 focus:ring-blue-500 outline-none" />
-                  <input type="text" value={newReading} onChange={e => setNewReading(e.target.value)} placeholder="読み（例：ひでむら ひろし）" className="w-full p-3 border border-slate-700 rounded-xl bg-slate-800 text-white font-bold focus:ring-2 focus:ring-blue-500 outline-none" />
+                  <input type="text" value={newReading} onChange={e => setNewReading(e.target.value)} placeholder="読み（例：ひでむら こうじ）" className="w-full p-3 border border-slate-700 rounded-xl bg-slate-800 text-white font-bold focus:ring-2 focus:ring-blue-500 outline-none" />
                   <input type="text" value={newStudentId} onChange={e => setNewStudentId(e.target.value.replace(/\D/g,''))} placeholder="学籍番号（例：125010）" className={`w-full p-3 border rounded-xl bg-slate-800 text-white font-bold focus:ring-2 outline-none ${newStudentId ? 'border-slate-700 focus:ring-indigo-500' : 'border-yellow-500/60 focus:ring-yellow-500'}`} />
+                  <input type="text" value={newUserPin} onChange={e => setNewUserPin(e.target.value.replace(/\D/g,'').slice(0,6))} placeholder="初期PIN（任意・6桁）" maxLength={6} className={`w-full p-3 border rounded-xl bg-slate-800 text-white font-mono font-bold focus:ring-2 outline-none tracking-widest ${newUserPin && newUserPin.length === 6 ? 'border-amber-500/70 focus:ring-amber-500' : 'border-slate-700 focus:ring-slate-500'}`} />
                   <button onClick={handleAddUser} disabled={!newName.trim() || !newStudentId.trim()} className="bg-blue-600 disabled:bg-slate-700 disabled:text-slate-500 text-white px-6 py-3 rounded-xl font-bold shadow-lg hover:bg-blue-500 flex items-center justify-center gap-2 md:col-span-1 transition-all">
                     <Plus size={20} /> 追加
                   </button>
@@ -1275,10 +1374,36 @@ const Admin: React.FC = () => {
             <div className="space-y-6">
               <div className="border-b border-white/5 pb-4">
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block mb-2">現在のシーズン</label>
-                <select className="w-full p-4 border border-slate-600 rounded-xl font-bold bg-slate-900 text-white appearance-none cursor-pointer"
-                  value={settings.currentSeason} onChange={handleSeasonChange}>
-                  {Object.values(Season).map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
+                {/* 進捗バー */}
+                <div className="flex gap-0.5 mb-3">
+                  {SEASON_ORDER.map((s, i) => {
+                    const idx = SEASON_ORDER.indexOf(settings.currentSeason as Season);
+                    const isCurrent = s === settings.currentSeason;
+                    const isPast    = i < idx;
+                    return (
+                      <div key={s} title={s} className={`flex-1 h-1.5 rounded-full transition-all ${isCurrent ? 'bg-blue-400' : isPast ? 'bg-slate-600' : 'bg-slate-800'}`}/>
+                    );
+                  })}
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-lg font-black text-white">{settings.currentSeason}</div>
+                    <div className="text-[10px] text-slate-500 font-bold mt-0.5">
+                      {SEASON_ORDER.indexOf(settings.currentSeason as Season) + 1} / {SEASON_ORDER.length} シーズン目
+                    </div>
+                  </div>
+                  {getNextSeason(settings.currentSeason as Season) ? (
+                    <button
+                      onClick={handleSeasonAdvance}
+                      className="flex items-center gap-2 bg-blue-700 hover:bg-blue-600 text-white px-4 py-2.5 rounded-xl text-sm font-black transition-all shadow-lg shrink-0"
+                    >
+                      次へ →<br/>
+                      <span className="text-[10px] font-bold opacity-80">{getNextSeason(settings.currentSeason as Season)}</span>
+                    </button>
+                  ) : (
+                    <span className="text-[10px] text-amber-400 font-black">最終シーズン<br/>年度またぎへ</span>
+                  )}
+                </div>
               </div>
               {/* 合宿表彰ベースライン（スロット式） */}
               <div className="border-t border-white/5 pt-4 space-y-3">
@@ -1392,6 +1517,30 @@ const Admin: React.FC = () => {
                   </div>
                 );
               })()}
+              {/* 年度またぎ */}
+              <div className="border-t border-white/5 pt-4 space-y-3">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block">
+                  🗓️ 年度またぎ処理
+                </label>
+                <p className="text-[10px] text-slate-600 leading-relaxed">
+                  現在の年度: <span className="text-white font-black">{settings.fiscalYear ?? 2026}年度</span>
+                  <br/>卒業・退班・残留を手動で分類してから実行してください。
+                </p>
+                <button
+                  onClick={() => {
+                    const allActive = getUsers();
+                    const init: Record<string, FiscalYearCategory> = {};
+                    allActive.forEach(u => { init[u.id] = 'continue'; });
+                    setFiscalCategories(init);
+                    setNextFiscalYear((settings.fiscalYear ?? 2026) + 1);
+                    setShowFiscalModal(true);
+                  }}
+                  className="w-full py-2.5 rounded-xl bg-purple-900/30 hover:bg-purple-800/40 text-purple-300 text-sm font-black border border-purple-800/40 transition-all"
+                >
+                  📋 年度またぎ設定を開く
+                </button>
+              </div>
+
               {/* シーズン終了日 */}
               <div className="border-t border-white/5 pt-4">
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block mb-2">
