@@ -9,7 +9,7 @@ import {
   snapshotSeasonBaselineWithSlot, processFiscalYearRollover,
   getTermRankings, TERM_SUMMARY_MAP,
   SEASON_ORDER, getNextSeason,
-  forceSetS1FirstBaseline, getGraduatedUsers,
+  getGraduatedUsers,
   updateUserReading,
   parseUserCSV, bulkAddUsers,
   deactivateUser, reactivateUser, getInactiveUsers,
@@ -1405,25 +1405,6 @@ const Admin: React.FC = () => {
                   )}
                 </div>
               </div>
-              {/* 【一回限り】S1_FIRST 強制埋め込み */}
-              <div className="border-t border-white/5 pt-4 space-y-2">
-                <label className="text-xs font-bold text-red-500 uppercase tracking-widest block">⚠️ 初期化（一回限り・後で削除）</label>
-                <p className="text-[10px] text-slate-600 leading-relaxed">
-                  年度途中から導入した場合のみ使用。S1_FIRSTをrate=500/pt=0で全員に強制記録します。
-                </p>
-                <button
-                  onClick={() => {
-                    if (!window.confirm('全員のS1_FIRSTをrate=500, points=0で強制記録します。\n既に記録がある場合は上書きされます。よろしいですか？')) return;
-                    forceSetS1FirstBaseline(500);
-                    setSettings(getSettings());
-                    alert('S1_FIRSTを記録しました。このボタンはコードから削除してください。');
-                  }}
-                  className="w-full py-2.5 rounded-xl bg-red-900/30 hover:bg-red-800/40 text-red-300 text-sm font-black border border-red-800/40 transition-all"
-                >
-                  🔧 S1_FIRST を rate=500/pt=0 で全員記録
-                </button>
-              </div>
-
               {/* 合宿表彰ベースライン（スロット式） */}
               <div className="border-t border-white/5 pt-4 space-y-3">
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block">
