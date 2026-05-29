@@ -5,7 +5,7 @@ import {
   isEventActive, exportData, importData, getMatches, deleteMatch,
   assignGenerals, resetEventPoints, getFactionBalanceSimulation,
   awardSystemTitles, snapshotSeasonBaseline, snapshotCampBaseline,
-  snapshotCampSlot, clearCampSlot, getCampRankingsBySlot, CAMP_SLOT_DEFS,
+  snapshotCampSlot, clearCampSlot, CAMP_SLOT_DEFS,
   snapshotSeasonBaselineWithSlot, processFiscalYearRollover,
   getTermRankings, TERM_SUMMARY_MAP,
   SEASON_ORDER, getNextSeason,
@@ -67,7 +67,6 @@ const Admin: React.FC = () => {
   const [approveAdminErr, setApproveAdminErr] = useState(false);
   const [approveLabel, setApproveLabel] = useState('部室iPad');
   const [campLabel, setCampLabel] = useState('');
-  const [campAwardSlot, setCampAwardSlot] = useState<string | null>(null); // 表彰モーダル表示中のスロット
 
   // 一括付与
   const [batchMode, setBatchMode]       = useState<'POINT' | 'RATE'>('POINT');
@@ -1459,12 +1458,9 @@ const Admin: React.FC = () => {
                           )}
                         </div>
                         {hasSnap && (
-                          <button
-                            onClick={() => setCampAwardSlot(slot.id)}
-                            className="w-full py-1.5 rounded-lg text-[10px] font-black bg-yellow-700 hover:bg-yellow-600 text-white transition-all"
-                          >
-                            🏆 表彰
-                          </button>
+                          <div className="text-[9px] text-indigo-300 font-bold">
+                            ✅ 記録済み · ランキングタブで確認
+                          </div>
                         )}
                       </div>
                     );
@@ -1473,57 +1469,6 @@ const Admin: React.FC = () => {
               </div>
 
               {/* 合宿表彰モーダル */}
-              {campAwardSlot && (() => {
-                const slotDef = CAMP_SLOT_DEFS.find(s => s.id === campAwardSlot)!;
-                const ranking = getCampRankingsBySlot(campAwardSlot);
-                const snap = (settings.campSlots ?? {})[campAwardSlot]!;
-                const snapDate = new Date(snap.snapshotAt).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' });
-                return (
-                  <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm p-0 sm:p-4" onClick={() => setCampAwardSlot(null)}>
-                    <div className="bg-slate-900 border border-white/10 rounded-t-3xl sm:rounded-3xl w-full sm:max-w-md max-h-[85vh] flex flex-col shadow-2xl" onClick={e => e.stopPropagation()}>
-                      <div className="p-5 border-b border-white/5 flex items-center justify-between shrink-0">
-                        <div>
-                          <div className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-0.5">CAMP AWARD</div>
-                          <h3 className="text-lg font-black text-white">{slotDef.emoji} {slotDef.label} 表彰</h3>
-                          <p className="text-[10px] text-slate-500 font-bold mt-0.5">起点: {snapDate}</p>
-                        </div>
-                        <button onClick={() => setCampAwardSlot(null)} className="text-slate-500 hover:text-white p-2 transition-colors"><X size={20}/></button>
-                      </div>
-                      <div className="overflow-y-auto flex-1 p-4 space-y-2">
-                        {ranking.length === 0 ? (
-                          <p className="text-slate-500 text-sm text-center py-8">部員データがありません</p>
-                        ) : ranking.map((u, idx) => {
-                          const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : null;
-                          const isTop = idx < 3;
-                          return (
-                            <div key={u.id} className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border ${isTop ? 'bg-yellow-900/15 border-yellow-700/30' : 'bg-slate-800/40 border-white/5'}`}>
-                              <div className="w-8 text-center shrink-0">
-                                {medal ? <span className="text-xl">{medal}</span> : <span className="text-sm font-black text-slate-500">#{idx + 1}</span>}
-                              </div>
-                              <div className={`w-8 h-8 rounded-full ${u.avatarColor} flex items-center justify-center text-white font-black text-sm shrink-0`}>{u.name.charAt(0)}</div>
-                              <div className="flex-1 min-w-0">
-                                <div className={`font-black text-sm truncate ${isTop ? 'text-yellow-100' : 'text-slate-200'}`}>{u.name}</div>
-                                <div className="text-[10px] text-slate-500 font-bold">
-                                  Rate{u.campRateGrowth >= 0 ? '+' : ''}{Math.round(u.campRateGrowth)}
-                                  <span className="mx-1">·</span>
-                                  Pt{u.campPointsGrowth >= 0 ? '+' : ''}{Math.round(u.campPointsGrowth)}
-                                </div>
-                              </div>
-                              <div className={`text-right font-black font-mono shrink-0 ${isTop ? 'text-yellow-300' : u.campTotalGrowth > 0 ? 'text-blue-300' : 'text-slate-500'}`}>
-                                <div className="text-base">{u.campTotalGrowth >= 0 ? '+' : ''}{Math.round(u.campTotalGrowth)}</div>
-                                <div className="text-[9px] font-bold text-slate-600">総合</div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                      <div className="p-4 border-t border-white/5 shrink-0">
-                        <p className="text-[10px] text-slate-600 text-center">総合 = レート上昇 ＋ ポイント増加</p>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })()}
               {/* 年度またぎ */}
               <div className="border-t border-white/5 pt-4 space-y-3">
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block">

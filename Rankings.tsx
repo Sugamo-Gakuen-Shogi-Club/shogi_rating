@@ -433,6 +433,16 @@ const Rankings: React.FC = () => {
     return getTermRankings(termSummaryDef.from, termSummaryDef.to);
   }, [termSummaryDef?.from, termSummaryDef?.to, currentSeason]);
 
+  // 合宿スロット単独表彰モーダル
+  const [awardSlot, setAwardSlot] = useState<string | null>(null);
+  const awardSlotDef = CAMP_SLOT_DEFS.find(s => s.id === awardSlot);
+  const awardSlotRanking = useMemo(() =>
+    awardSlot ? getCampRankingsBySlot(awardSlot) : [],
+  [awardSlot]);
+  const campSlots = settings.campSlots ?? {};
+  // 記録済みスロット一覧（現在のシーズンに対応するもの＋合宿スロット）
+  const recordedSlots = CAMP_SLOT_DEFS.filter(s => !!campSlots[s.id]);
+
   const isTable = activeTab !== 'fourKings' && activeTab !== 'summary' && activeTab !== 'termSummary';
 
   // タブのスコア色
@@ -444,6 +454,7 @@ const Rankings: React.FC = () => {
   };
 
   return (
+    <>
     <div className="space-y-6 pb-20">
 
       {/* ソート選択モーダル */}
@@ -530,6 +541,30 @@ const Rankings: React.FC = () => {
                   </button>
                 ))}
               </div>
+
+              {/* スロット表彰（記録済みのものをボタン表示） */}
+              {recordedSlots.length > 0 && (
+                <div className="space-y-2">
+                  <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest">🏕️ スロット表彰</div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {recordedSlots.map(slot => (
+                      <button
+                        key={slot.id}
+                        onClick={() => { setAwardSlot(slot.id); setShowSortModal(false); }}
+                        className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-white/10 text-left transition-all"
+                      >
+                        <span className="text-lg shrink-0">{slot.emoji}</span>
+                        <div className="min-w-0">
+                          <div className="text-xs font-black text-white truncate">{slot.label}</div>
+                          <div className="text-[9px] text-slate-500 font-bold">
+                            {slot.isCamp ? '合宿単独' : '学期スロット'}
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -813,6 +848,68 @@ const Rankings: React.FC = () => {
         </Card>
       )}
     </div>
+
+    {/* 合宿スロット単独表彰モーダル */}
+    {awardSlot && awardSlotDef && (
+      <div
+        className="fixed inset-0 z-[300] flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm p-0 sm:p-4"
+        onClick={() => setAwardSlot(null)}
+      >
+        <div
+          className="bg-slate-900 border border-white/10 rounded-t-3xl sm:rounded-3xl w-full sm:max-w-md max-h-[85vh] flex flex-col shadow-2xl"
+          onClick={e => e.stopPropagation()}
+        >
+          <div className="p-5 border-b border-white/5 flex items-center justify-between shrink-0">
+            <div>
+              <div className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-0.5">SLOT AWARD</div>
+              <h3 className="text-lg font-black text-white">{awardSlotDef.emoji} {awardSlotDef.label} 表彰</h3>
+              {campSlots[awardSlot] && (
+                <p className="text-[10px] text-slate-500 font-bold mt-0.5">
+                  起点: {new Date(campSlots[awardSlot]!.snapshotAt).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })}
+                </p>
+              )}
+            </div>
+            <button onClick={() => setAwardSlot(null)} className="text-slate-500 hover:text-white p-2 transition-colors">
+              <X size={20}/>
+            </button>
+          </div>
+          <div className="overflow-y-auto flex-1 p-4 space-y-2">
+            {awardSlotRanking.length === 0 ? (
+              <p className="text-slate-500 text-sm text-center py-8">部員データがありません</p>
+            ) : awardSlotRanking.map((u, idx) => {
+              const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : null;
+              const isTop = idx < 3;
+              return (
+                <div key={u.id} className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border ${isTop ? 'bg-yellow-900/15 border-yellow-700/30' : 'bg-slate-800/40 border-white/5'}`}>
+                  <div className="w-8 text-center shrink-0">
+                    {medal ? <span className="text-xl">{medal}</span> : <span className="text-sm font-black text-slate-500">#{idx + 1}</span>}
+                  </div>
+                  <div className={`w-8 h-8 rounded-full ${u.avatarColor} flex items-center justify-center text-white font-black text-sm shrink-0`}>
+                    {u.name.charAt(0)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className={`font-black text-sm truncate ${isTop ? 'text-yellow-100' : 'text-slate-200'}`}>{u.name}</div>
+                    <div className="text-[10px] text-slate-500 font-bold">
+                      Rate{u.campRateGrowth >= 0 ? '+' : ''}{Math.round(u.campRateGrowth)}
+                      <span className="mx-1">·</span>
+                      Pt{u.campPointsGrowth >= 0 ? '+' : ''}{Math.round(u.campPointsGrowth)}
+                    </div>
+                  </div>
+                  <div className={`text-right font-black font-mono shrink-0 ${isTop ? 'text-yellow-300' : u.campTotalGrowth > 0 ? 'text-blue-300' : 'text-slate-500'}`}>
+                    <div className="text-base">{u.campTotalGrowth >= 0 ? '+' : ''}{Math.round(u.campTotalGrowth)}</div>
+                    <div className="text-[9px] font-bold text-slate-600">総合</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div className="p-4 border-t border-white/5 shrink-0">
+            <p className="text-[10px] text-slate-600 text-center">総合 = レート上昇 ＋ ポイント増加</p>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 };
 

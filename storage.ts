@@ -738,7 +738,7 @@ export const verifyMaintenanceBackup = async (): Promise<{
 // ============================================================
 
 import {
-  getDatabase, ref, onValue, set, update, get,
+  getDatabase, ref, onValue, set, update, get, remove,
   runTransaction, serverTimestamp, type DatabaseReference, type Unsubscribe,
 } from 'firebase/database';
 import { app } from './firebase';
@@ -2912,9 +2912,17 @@ export const updateUserName = (id: string, name: string): void => {
 };
 
 export const deleteUserPermanently = (id: string): void => {
+  // ローカルから削除
   const all = getRawUsers();
   const filtered = all.filter(x => x.id !== id);
-  saveUsers(filtered);
+  localStorage.setItem(USERS_KEY, JSON.stringify(filtered));
+  window.dispatchEvent(new CustomEvent('rivals-users-changed'));
+
+  // Firebaseからも削除（再読み込みで復活しないよう）
+  if (getMaintenanceState().active) return;
+  remove(_r(`users/${id}`)).catch(e =>
+    console.warn('[deleteUserPermanently] Firebase remove failed:', e)
+  );
 };
 
 export const updateUserTitle = (id: string, t: string | null): void => {
