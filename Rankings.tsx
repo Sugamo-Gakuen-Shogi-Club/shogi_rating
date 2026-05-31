@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { getUsers, getMatches, ACHIEVEMENTS_DATA, getUserAvatarChar, SYSTEM_TITLES, ICONS_DATA, getUserFrameDef, getSettings, getCampRankingsBySlot, getTermRankings, TERM_SUMMARY_MAP, CAMP_SLOT_DEFS } from './storage';
 import { Card } from './Card';
 import {
@@ -117,10 +117,10 @@ const FourKingsCriteriaPanel: React.FC = () => {
   const users = getUsers();
   if (!users.length) return <p className="text-slate-500 text-sm py-4">部員がいません。</p>;
   const criteria = [
-    { id:'MASTER',       label:'覇者',       sub:'今期レート上昇',   val:(u:User)=>`+${Math.round(u.rate-u.seasonStartRate)}`,               sorted:[...users].sort((a,b)=>(b.rate-b.seasonStartRate)-(a.rate-a.seasonStartRate)) },
-    { id:'RISING_STAR',  label:'新星',       sub:'今期ポイント上昇', val:(u:User)=>`+${u.totalPoints-u.seasonStartPoints}pt`,                  sorted:[...users].sort((a,b)=>(b.totalPoints-b.seasonStartPoints)-(a.totalPoints-a.seasonStartPoints)) },
-    { id:'GRINDER',      label:'鉄人',       sub:'活動日数',         val:(u:User)=>`${u.activityDays}日`,                                      sorted:[...users].sort((a,b)=>b.activityDays-a.activityDays) },
-    { id:'GIANT_KILLER', label:'巨人キラー', sub:'格上撃破数',       val:(u:User)=>`${u.upsetWins||0}回`,                                      sorted:[...users].sort((a,b)=>(b.upsetWins||0)-(a.upsetWins||0)) },
+    { id:'MASTER',       label:'覇者',       sub:'今期レート上昇',   val:(u:User)=>`+${Math.round(u.rate-u.seasonStartRate)}`,                                                   sorted:[...users].sort((a,b)=>(b.rate-b.seasonStartRate)-(a.rate-a.seasonStartRate)) },
+    { id:'RISING_STAR',  label:'新星',       sub:'今期ポイント上昇', val:(u:User)=>`+${u.totalPoints-u.seasonStartPoints}pt`,                                                      sorted:[...users].sort((a,b)=>(b.totalPoints-b.seasonStartPoints)-(a.totalPoints-a.seasonStartPoints)) },
+    { id:'GRINDER',      label:'鉄人',       sub:'活動日数',         val:(u:User)=>`${u.activityDays}日`,                                                                          sorted:[...users].sort((a,b)=>b.activityDays-a.activityDays) },
+    { id:'GIANT_KILLER', label:'巨人キラー', sub:'今期格上撃破数',   val:(u:User)=>`${(u.upsetWins||0)-(u.seasonStartUpsetWins||0)}回`,  sorted:[...users].sort((a,b)=>((b.upsetWins||0)-(b.seasonStartUpsetWins||0))-((a.upsetWins||0)-(a.seasonStartUpsetWins||0))) },
   ];
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -314,11 +314,23 @@ const rankIcon = (r: number) => {
 
 // ─── メイン ───────────────────────────────────────────────────
 const Rankings: React.FC = () => {
-  const users   = getUsers();
-  const matches = getMatches();
+  const [users,   setUsers]   = useState<User[]>(() => getUsers());
+  const [matches, setMatches] = useState(() => getMatches());
   const [activeTab, setActiveTab] = useState<TabKey>('seasonGrowth');
   const [showTabSelector, setShowTabSelector] = useState(false);
   const [showSortModal, setShowSortModal] = useState(true);
+
+  const refreshData = useCallback(() => {
+    setUsers(getUsers());
+    setMatches(getMatches());
+  }, []);
+
+  useEffect(() => {
+    window.addEventListener('rivals-users-changed', refreshData);
+    return () => {
+      window.removeEventListener('rivals-users-changed', refreshData);
+    };
+  }, [refreshData]);
 
   // 最終活動日（出席が1件でも記録された日を活動日とみなす）
   const lastActivityDate = getSettings().lastActivityDate;

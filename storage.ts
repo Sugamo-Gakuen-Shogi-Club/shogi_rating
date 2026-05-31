@@ -1218,8 +1218,9 @@ const _mergeUser = (local: User, cloud: User): User => {
     activeTitle:   cloud.activeTitle   ?? local.activeTitle,
     profilePin:    cloud.profilePin    ?? local.profilePin,
     ranks:         cloud.ranks         ?? local.ranks,
-    seasonStartRate:   cloud.seasonStartRate   ?? local.seasonStartRate,
-    seasonStartPoints: cloud.seasonStartPoints ?? local.seasonStartPoints,
+    seasonStartRate:      cloud.seasonStartRate      ?? local.seasonStartRate,
+    seasonStartPoints:    cloud.seasonStartPoints    ?? local.seasonStartPoints,
+    seasonStartUpsetWins: cloud.seasonStartUpsetWins ?? local.seasonStartUpsetWins,
   });
 };
 
@@ -1567,8 +1568,9 @@ const normalizeUser = (user: any): User => ({
   pointsAttendance: user.pointsAttendance ?? 0,
   pointsSpecial:  user.pointsSpecial  ?? 0,
   eventPoints:    user.eventPoints    ?? 0,
-  seasonStartRate:   user.seasonStartRate   ?? user.rate ?? INITIAL_RATE,
-  seasonStartPoints: user.seasonStartPoints ?? user.totalPoints ?? 0,
+  seasonStartRate:      user.seasonStartRate      ?? user.rate ?? INITIAL_RATE,
+  seasonStartPoints:    user.seasonStartPoints    ?? user.totalPoints ?? 0,
+  seasonStartUpsetWins: user.seasonStartUpsetWins ?? user.upsetWins ?? 0,
   systemTitle:    Array.isArray(user.systemTitle) ? user.systemTitle : (user.systemTitle ? [user.systemTitle] : []),
   faction:        user.faction        ?? 'WHITE',
   isGeneral:      user.isGeneral      ?? false,
@@ -2251,8 +2253,9 @@ export const getRivalryStats = (userId: string): { bestCustomer: RivalData | nul
 export const snapshotSeasonBaseline = (): void => {
   const all = getRawUsers();
   all.forEach(u => {
-    u.seasonStartRate   = u.rate;
-    u.seasonStartPoints = u.totalPoints;
+    u.seasonStartRate      = u.rate;
+    u.seasonStartPoints    = u.totalPoints;
+    u.seasonStartUpsetWins = u.upsetWins ?? 0;
   });
   saveUsers(all);
 };
@@ -2478,33 +2481,26 @@ export const awardSystemTitles = (): void => {
   const byActivity = [...active].sort((a, b) => b.activityDays - a.activityDays);
   const grinder = byActivity[0] ?? null;
 
-  // ★ GIANT_KILLER: マッチレコードから格上撃破数を再計算（Admin確認画面と完全一致）
-  // user.upsetWins は対局時点レートで加算されるが Admin 確認画面と乖離するケースがあるため統一
-  const rateMap = Object.fromEntries(active.map(u => [u.id, u.rate]));
-  const upsetCountAward: Record<string, number> = {};
-  getMatches().forEach(m => {
-    const p1Rate = rateMap[m.player1Id] ?? 0;
-    const p2Rate = rateMap[m.player2Id] ?? 0;
-    if (m.result === 'PLAYER1_WIN' && p2Rate > p1Rate)
-      upsetCountAward[m.player1Id] = (upsetCountAward[m.player1Id] || 0) + 1;
-    else if (m.result === 'PLAYER2_WIN' && p1Rate > p2Rate)
-      upsetCountAward[m.player2Id] = (upsetCountAward[m.player2Id] || 0) + 1;
-  });
-  const byUpsets = [...active].sort((a, b) => (upsetCountAward[b.id] || 0) - (upsetCountAward[a.id] || 0));
+  // ★ GIANT_KILLER: 今期の格上撃破増分（upsetWins - seasonStartUpsetWins）で競う
+  // 他の称号と同様に「今シーズンの実績」で判定
+  const byUpsets = [...active].sort((a, b) =>
+    ((b.upsetWins || 0) - (b.seasonStartUpsetWins || 0)) -
+    ((a.upsetWins || 0) - (a.seasonStartUpsetWins || 0))
+  );
   const killer = byUpsets[0] ?? null;
 
   // 同率タイ検出（除外なし・全員対象）
-  const masterScore  = master  ? (master.rate - master.seasonStartRate)          : null;
-  const risingScore  = rising  ? (rising.totalPoints - rising.seasonStartPoints) : null;
-  const grinderScore = grinder ? grinder.activityDays                            : null;
-  const killerScore  = killer  ? (upsetCountAward[killer.id] || 0)               : null;
+  const masterScore  = master  ? (master.rate - master.seasonStartRate)                                    : null;
+  const risingScore  = rising  ? (rising.totalPoints - rising.seasonStartPoints)                           : null;
+  const grinderScore = grinder ? grinder.activityDays                                                      : null;
+  const killerScore  = killer  ? ((killer.upsetWins || 0) - (killer.seasonStartUpsetWins || 0))            : null;
 
-  const masterHolders  = masterScore  !== null ? active.filter(u => (u.rate - u.seasonStartRate) === masterScore)                   : [];
-  const risingHolders  = risingScore  !== null ? active.filter(u => (u.totalPoints - u.seasonStartPoints) === risingScore)          : [];
-  const grinderHolders = grinderScore !== null ? active.filter(u => u.activityDays === grinderScore)                                : [];
-  // ★ killerScore > 0 の条件で格上撃破0人全員選出バグを防ぐ
+  const masterHolders  = masterScore  !== null ? active.filter(u => (u.rate - u.seasonStartRate) === masterScore)                                            : [];
+  const risingHolders  = risingScore  !== null ? active.filter(u => (u.totalPoints - u.seasonStartPoints) === risingScore)                                   : [];
+  const grinderHolders = grinderScore !== null ? active.filter(u => u.activityDays === grinderScore)                                                         : [];
+  // ★ killerScore > 0 の条件で今期格上撃破0件全員選出バグを防ぐ
   const killerHolders  = killerScore !== null && killerScore > 0
-    ? active.filter(u => (upsetCountAward[u.id] || 0) === killerScore)
+    ? active.filter(u => ((u.upsetWins || 0) - (u.seasonStartUpsetWins || 0)) === killerScore)
     : [];
 
   // Assign（兼任可：配列にpush、重複なし）
@@ -2958,6 +2954,7 @@ const newUserBase = (name: string, reading?: string, isNewMember = false, pin?: 
   rate:             INITIAL_RATE,
   seasonStartRate:  INITIAL_RATE,
   seasonStartPoints: 0,
+  seasonStartUpsetWins: 0,
   faction:          'WHITE',
   isGeneral:        false,
   systemTitle:      [],
@@ -3047,7 +3044,9 @@ export const processFiscalYearRollover = (
       u.pointsSpecial    = 0;
       u.monthlyPoints    = 0;
       u.eventPoints      = 0;
-      u.seasonStartPoints = 0;
+      u.seasonStartPoints     = 0;
+      u.upsetWins             = 0;
+      u.seasonStartUpsetWins  = 0;
       u.currentStreak    = 0;
       u.lossStreak       = 0;
       u.rateHistory      = [{ date: new Date().toISOString(), rate: newRate }];

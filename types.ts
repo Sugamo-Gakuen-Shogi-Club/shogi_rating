@@ -84,6 +84,7 @@ export interface User {
   // Seasonal Snapshot
   seasonStartRate: number;
   seasonStartPoints: number;
+  seasonStartUpsetWins: number;
 
   // System Title (The Four Kings)
   systemTitle: SystemTitle[];  // 兼任可：複数保持可能
