@@ -3072,27 +3072,55 @@ export const processFiscalYearRollover = (
 // ============================================================
 // FACTION
 // ============================================================
-export const getFactionBalanceSimulation = (users: User[]) => {
-  const scored = users
-    .filter(u => u.isActive !== false)
+export const getFactionBalanceSimulation = (users: User[], seed?: number) => {
+  // シード付き疑似乱数（LCG: seed未指定時はDate.now()）
+  let rng = seed ?? Date.now();
+  const rand = () => { rng = (rng * 1664525 + 1013904223) & 0xffffffff; return (rng >>> 0) / 0xffffffff; };
+
+  const active = users.filter(u => u.isActive !== false);
+  const n = active.length;
+
+  // ランダム性: スコア順でソートしてから「蛇行ドラフト」方式で交互に割り振る
+  // 蛇行の起点（紅先 or 白先）をシードで決める
+  const scored = [...active]
     .map(u => ({ ...u, _score: u.rate * 0.3 + (u.activityDays || 0) * 300 }))
     .sort((a, b) => b._score - a._score);
 
-  const n = scored.length;
-  // 人数を均等に（奇数の場合は紅組が1人多い）
+  // 同スコア帯のブロック内をシャッフルして毎回違う結果に
+  let i = 0;
+  while (i < scored.length) {
+    let j = i;
+    while (j < scored.length && Math.abs(scored[j]._score - scored[i]._score) < 1) j++;
+    // [i, j) を Fisher-Yates shuffle
+    for (let k = j - 1; k > i; k--) {
+      const r = i + Math.floor(rand() * (k - i + 1));
+      [scored[k], scored[r]] = [scored[r], scored[k]];
+    }
+    i = j;
+  }
+
+  // 蛇行ドラフト（snake draft）: 1位→紅, 2位→白, 3位→白, 4位→紅, ...
+  // 奇数ラウンドの先攻をシードで決める
+  const redFirst = rand() > 0.5;
   const redTarget   = Math.ceil(n / 2);
   const whiteTarget = Math.floor(n / 2);
-
   const red: User[] = [], white: User[] = [];
-  let rScore = 0, wScore = 0;
-  scored.forEach(u => {
+
+  // 蛇行ドラフト: ラウンドごとに先攻を交互に入れ替え
+  scored.forEach((u, idx) => {
+    const round = Math.floor(idx / 2); // 0始まり
+    const posInRound = idx % 2;        // 0:先攻, 1:後攻
+    const redGoesFirst = redFirst ? (round % 2 === 0) : (round % 2 === 1);
+    const pickRed = posInRound === 0 ? redGoesFirst : !redGoesFirst;
+
     const redFull   = red.length   >= redTarget;
     const whiteFull = white.length >= whiteTarget;
-    if      (redFull)                          { white.push(u); wScore += u._score; }
-    else if (whiteFull)                        { red.push(u);   rScore += u._score; }
-    else if (rScore <= wScore)                 { red.push(u);   rScore += u._score; }
-    else                                       { white.push(u); wScore += u._score; }
+    if      (redFull)                { white.push(u); }
+    else if (whiteFull)              { red.push(u); }
+    else if (pickRed)                { red.push(u); }
+    else                             { white.push(u); }
   });
+
   const stats = (team: User[]) => ({
     count:      team.length,
     avgRate:    team.length ? Math.round(team.reduce((a, b) => a + b.rate, 0) / team.length) : 0,

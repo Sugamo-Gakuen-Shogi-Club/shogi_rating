@@ -407,7 +407,7 @@ const Admin: React.FC = () => {
     setIsEventWizardOpen(true);
   };
 
-  const handleTeamBalance = () => setWSimData(getFactionBalanceSimulation(users));
+  const handleTeamBalance = () => setWSimData(getFactionBalanceSimulation(users, Date.now()));
 
   const finishEventSetup = async () => {
     if (wType === EventType.FACTION_WAR) {
@@ -884,13 +884,27 @@ const Admin: React.FC = () => {
                       <div className="grid grid-cols-2 gap-4">
                         <div className="bg-red-900/20 border border-red-900/50 p-4 rounded-2xl">
                           <div className="text-red-500 font-black mb-2 flex items-center gap-2"><Users size={16}/> 紅組</div>
-                          <div className="text-xs text-slate-400">人数: {wSimData.redStats.count}人</div>
-                          <div className="text-xs text-slate-400">平均Rate: {wSimData.redStats.avgRate}</div>
+                          <div className="text-xs text-slate-400 mb-2">人数: {wSimData.redStats.count}人　平均Rate: {wSimData.redStats.avgRate}</div>
+                          <div className="space-y-1">
+                            {wSimData.redUsers.map(u => (
+                              <div key={u.id} className="text-xs text-red-200 bg-red-900/30 rounded-lg px-2 py-1 flex justify-between">
+                                <span className="font-bold">{u.name}</span>
+                                <span className="text-slate-400">{u.rate}</span>
+                              </div>
+                            ))}
+                          </div>
                         </div>
                         <div className="bg-blue-900/20 border border-blue-900/50 p-4 rounded-2xl">
                           <div className="text-blue-400 font-black mb-2 flex items-center gap-2"><Users size={16}/> 白組</div>
-                          <div className="text-xs text-slate-400">人数: {wSimData.whiteStats.count}人</div>
-                          <div className="text-xs text-slate-400">平均Rate: {wSimData.whiteStats.avgRate}</div>
+                          <div className="text-xs text-slate-400 mb-2">人数: {wSimData.whiteStats.count}人　平均Rate: {wSimData.whiteStats.avgRate}</div>
+                          <div className="space-y-1">
+                            {wSimData.whiteUsers.map(u => (
+                              <div key={u.id} className="text-xs text-blue-200 bg-blue-900/30 rounded-lg px-2 py-1 flex justify-between">
+                                <span className="font-bold">{u.name}</span>
+                                <span className="text-slate-400">{u.rate}</span>
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       </div>
                       <button onClick={handleTeamBalance} className="w-full py-3 rounded-xl font-bold text-slate-400 border border-slate-700 hover:bg-white/5 flex items-center justify-center gap-2">
