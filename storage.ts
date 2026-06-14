@@ -2704,28 +2704,6 @@ export const getInactiveUsers = (): User[] =>
 export const getGraduatedUsers = (): User[] =>
   getRawUsers().filter(u => u.isActive === false && u.isGraduated === true);
 
-/**
- * S1_FIRSTスロットを全員 rate=initialRate, points=0 で強制記録する。
- * 【一回限り使用・使用後コードごと削除すること】
- * 年度途中から運用を始めた場合の初期値埋め込み用。
- */
-export const forceSetS1FirstBaseline = (initialRate = 500): void => {
-  const all = getRawUsers();
-  const rateMap:   Record<string, number> = {};
-  const pointsMap: Record<string, number> = {};
-  all.forEach(u => {
-    rateMap[u.id]   = initialRate;
-    pointsMap[u.id] = 0;
-  });
-  const s = getSettings();
-  saveSettings({
-    ...s,
-    campSlots: {
-      ...(s.campSlots ?? {}),
-      S1_FIRST: { snapshotAt: new Date().toISOString(), rate: rateMap, points: pointsMap },
-    },
-  });
-};
 
 // ============================================================
 // MANUAL ADJUSTMENTS
